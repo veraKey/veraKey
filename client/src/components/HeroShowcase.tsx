@@ -1,12 +1,15 @@
-// Landing-page hero: one payment through the real /app flow, shown on a phone and in the dashboard
-// at the same time. The dashboard renders the app's own components; the phone shows the same flow as
-// it looks on iOS. It is an illustration: the numbers are measured, the transaction is not real.
+// Landing-page hero: one payment through the app, on a phone and in the dashboard at the same time.
+// Both screens render the app's own views (AppTop, AppNav, PayDesktop, PayMobile) with a scripted
+// payment, so the hero shows exactly what /app/pay shows. Only the iOS frame and the passkey sheet are
+// drawn here: on a real phone the system draws them. The numbers are measured; the payment is not real.
 import type { ProofState } from "@verakey/sdk/client";
 import { BatteryFull, Check, KeyRound, Lock, LockKeyhole, RotateCw, ScanFace, Signal, Wifi } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import type { TransactionReceipt } from "viem";
-import { ProofReceipt, ProofTimeline, useNow, type ReceiptData } from "@/pages/app/components";
-import { BrandMark } from "./BrandMark";
+import { shortHex } from "@/lib/format";
+import { AppNav, AppTop } from "@/pages/app/AppLayout";
+import type { ReceiptData } from "@/pages/app/components";
+import { PROOF_BYTES, PayDesktop, PayMobile, type PayViewProps } from "@/pages/app/PayView";
 
 type Phase = "idle" | "tap" | "sheet" | "faceid" | "proving" | "relaying" | "confirming" | "paid";
 
@@ -22,11 +25,17 @@ const SCRIPT: readonly (readonly [Phase, number])[] = [
   ["paid", 4200],
 ];
 const PROVING_MS = 2300;
-/** Layout sizes of the two screens before they are scaled into their frames. */
-const DESKTOP = { width: 1180, height: 760 };
-const PHONE = { width: 390, height: 844 };
+/** CSS widths the two screens are laid out at before they are scaled into their frames. */
+const DESKTOP_WIDTH = 1180;
+const PHONE_WIDTH = 390;
 
+const NETWORK = { chainId: 421614, chainName: "Arbitrum Sepolia" };
+const PROVER = { cls: "", text: "Prover ready · multi-thread" };
+const SESSION = { label: "iPhone passkey", credentialId: "a41f9c02" };
+/** The live relayer, which the app pays as its demo merchant. */
+const MERCHANT = "0x841CE1e27407EB9Bb6D14AC91374DAE60B41590A";
 // Illustrative values: the receipt shows the hash without an explorer link.
+const ACCOUNT = "0x7a3e5c1f9b2d4e6a8c0b1d3f5e7a9c2b4d6fc2b4";
 const TX_HASH = "0x5c0e9a2f41d7b3e8c6a90f12d4b7e35a8c1f6d09e2b47a3c5d8e1f60a9b2c7d4";
 const BLOCK = 311_900_418n;
 const RECEIPT: ReceiptData = {
@@ -35,11 +44,13 @@ const RECEIPT: ReceiptData = {
   gasUsed: 4_171_302n,
   provingMs: PROVING_MS,
   publicKeyOccurrences: 0,
-  proofBytes: 9152,
-  rows: [["To", "Demo merchant"], ["Relayer fee", "0.02 USDG"]],
+  proofBytes: PROOF_BYTES,
+  rows: [
+    ["From", <code key="f">Pay · {shortHex(ACCOUNT)}</code>],
+    ["To", <code key="t">{shortHex(MERCHANT)} · demo merchant</code>],
+    ["Relayer fee", <code key="fee">0.02 USDG, signed into the approval</code>],
+  ],
 };
-const NO_EXPLORER = { explorerUrl: null };
-const NAV = ["Accounts", "Pay", "Policy", "Recovery", "Developer docs"];
 
 function proofState(phase: Phase, startedAt: number): ProofState {
   switch (phase) {
@@ -59,6 +70,29 @@ function proofState(phase: Phase, startedAt: number): ProofState {
       // The timeline reads only the block number from the receipt.
       return { status: "verified", provingMs: PROVING_MS, hash: TX_HASH, receipt: { blockNumber: BLOCK } as TransactionReceipt, publicKeyOccurrences: 0 };
   }
+}
+
+/** The Pay view's props at `phase`: a funded account paying the demo merchant 2 USDG. */
+function demoView(phase: Phase, startedAt: number): PayViewProps {
+  const paid = phase === "paid";
+  return {
+    accountName: "Pay",
+    tone: "lime",
+    balance: paid ? 2_980_000n : 5_000_000n,
+    merchant: MERCHANT,
+    recipient: "",
+    amount: "2",
+    fee: 20_000n,
+    perTxCap: 10_000_000n,
+    remainingToday: paid ? 22_980_000n : 25_000_000n,
+    chainName: NETWORK.chainName,
+    state: proofState(phase, startedAt),
+    receipt: paid ? RECEIPT : null,
+    explorer: { explorerUrl: null },
+    problem: null,
+    overCap: false,
+    onDone: () => {}, // shows the paid screen's Done button, as in the app
+  };
 }
 
 /** Plays SCRIPT on a loop while `root` is on screen; holds the final frame when motion is reduced. */
@@ -104,8 +138,9 @@ function useFit(width: number) {
 export function HeroShowcase() {
   const root = useRef<HTMLDivElement>(null);
   const { phase, startedAt } = usePlayback(root);
-  const [viewport, viewportScale] = useFit(DESKTOP.width);
-  const [screen, screenScale] = useFit(PHONE.width);
+  const [viewport, viewportScale] = useFit(DESKTOP_WIDTH);
+  const [screen, screenScale] = useFit(PHONE_WIDTH);
+  const view = demoView(phase, startedAt);
 
   return (
     <div ref={root} className={`hero-visual hero-showcase is-${phase}`}>
@@ -116,7 +151,7 @@ export function HeroShowcase() {
       </p>
       <div className="showcase-glow" aria-hidden="true" />
 
-      <div className="showcase-browser" aria-hidden="true">
+      <div className="showcase-browser" aria-hidden="true" inert>
         <div className="browser-bar">
           <span className="browser-dots"><i /><i /><i /></span>
           <span className="browser-url"><Lock size={10} /> verakey.mdloglabs.org<span>/app/pay</span></span>
@@ -124,158 +159,52 @@ export function HeroShowcase() {
         </div>
         <div ref={viewport} className="browser-viewport">
           <div className="browser-canvas" style={viewportScale}>
-            <Dashboard phase={phase} startedAt={startedAt} />
+            <div className="vk-app showcase-app">
+              <AppTop network={NETWORK} prover={PROVER} session={SESSION} />
+              <div className="vk-layout showcase-page">
+                <AppNav location="/app/pay" />
+                <main className="vk-main"><PayDesktop {...view} /></main>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="showcase-phone" aria-hidden="true">
+      <div className="showcase-phone" aria-hidden="true" inert>
         <div ref={screen} className="phone-screen">
           <div className="phone-canvas" style={screenScale}>
-            <PhoneApp phase={phase} startedAt={startedAt} />
+            <div className="vk-app vk-compact phone-app">
+              <div className="ios-status">
+                <span className="ios-time">9:41</span>
+                <span className="ios-island" />
+                <span className="ios-icons"><Signal size={17} strokeWidth={2.6} /><Wifi size={17} strokeWidth={2.6} /><BatteryFull size={24} strokeWidth={1.8} /></span>
+              </div>
+              <div className="phone-scroll">
+                <AppTop network={NETWORK} prover={PROVER} session={SESSION} />
+                <div className="vk-layout">
+                  <AppNav location="/app/pay" />
+                  <main className="vk-main"><PayMobile {...view} /></main>
+                </div>
+              </div>
+              {(phase === "sheet" || phase === "faceid") && <PasskeySheet scanning={phase === "faceid"} />}
+              <div className="ios-safari">
+                <span className="ios-url"><span className="ios-aa">AA</span><span><Lock size={11} /> verakey.mdloglabs.org</span><RotateCw size={13} /></span>
+                <span className="ios-home" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {phase === "relaying" && (
-        <span className="showcase-packet" aria-hidden="true"><LockKeyhole size={11} /> proof · 9,152 B · no key</span>
+        <span className="showcase-packet" aria-hidden="true"><LockKeyhole size={11} /> proof · {PROOF_BYTES.toLocaleString("en-US")} B · no key</span>
       )}
-      <p className="showcase-caption" aria-hidden="true">Illustration of the /app flow · proof time measured in Chrome</p>
+      <p className="showcase-caption" aria-hidden="true">The app's own /app/pay views, playing one payment · proof time measured in Chrome</p>
     </div>
   );
 }
 
-/** The /app/pay page, built from the app's own classes and components. */
-function Dashboard({ phase, startedAt }: { phase: Phase; startedAt: number }) {
-  const state = proofState(phase, startedAt);
-  const paid = phase === "paid";
-  const busy = state.status !== "idle" && state.status !== "verified";
-
-  return (
-    <div className="vk-app showcase-app">
-      <header className="vk-top">
-        <div className="vk-top-inner">
-          <span className="brand-lockup"><BrandMark /><span className="brand-wordmark">Vera<span>Key</span></span></span>
-          <span className="vk-pill is-network"><i /> Arbitrum Sepolia</span>
-          <span className="vk-pill"><i /> Prover ready · multi-thread</span>
-          <span className="vk-top-spacer" />
-          <span className="vk-session">
-            <span><b>iPhone passkey</b> <small>a41f9c02</small></span>
-            <span className="vk-btn vk-btn-quiet"><Lock size={13} /> Lock</span>
-          </span>
-        </div>
-      </header>
-
-      <div className="vk-layout showcase-page">
-        <nav className="vk-nav">
-          {NAV.map((label, i) => (
-            <a key={label} className={label === "Pay" ? "is-active" : ""}><span>0{i + 1}</span>{label}</a>
-          ))}
-          <p className="vk-nav-foot">Proofs are generated in this browser. The relayer only ever receives a proof and public inputs.</p>
-        </nav>
-
-        <main className="vk-main">
-          <div className="vk-grid-2">
-            <section className="vk-stack">
-              <div>
-                <div className="vk-kicker">Pay with a passkey</div>
-                <h1 className="vk-title">Face ID in.<br /><em>A proof out.</em></h1>
-              </div>
-              <div className="vk-panel vk-tone-lime">
-                <div className="vk-panel-head"><span>Payment intent</span><span>USDG · Arbitrum Sepolia</span></div>
-                <div className="vk-panel-body vk-form">
-                  <div className="vk-field">
-                    <span>From account</span>
-                    <div className="vk-input is-mono showcase-field">Pay · <b className={paid ? "is-updated" : ""}>{paid ? "2.98" : "5.00"}</b> USDG</div>
-                  </div>
-                  <div className="vk-field">
-                    <span>Recipient</span>
-                    <div className="vk-input is-mono showcase-field">0x841C…590A · demo merchant</div>
-                  </div>
-                  <div className="vk-field">
-                    <span>Amount (USDG)</span>
-                    <div className="vk-input is-amount showcase-field">2.00</div>
-                  </div>
-                  <div className="vk-quote">
-                    <div><span>Relayer fee (paid in USDG, no ETH needed)</span><span className="vk-mono">0.02</span></div>
-                    <div><span>Per-payment cap</span><span className="vk-mono">10.00</span></div>
-                    <div><span>Left today</span><span className="vk-mono">{paid ? "22.98" : "25.00"}</span></div>
-                  </div>
-                  <span className="vk-btn vk-btn-primary vk-btn-lg">
-                    {busy ? <span className="vk-spinner" /> : <ScanFace size={17} />} Approve with passkey
-                  </span>
-                </div>
-              </div>
-            </section>
-
-            <section className="vk-stack">
-              <div className="vk-panel">
-                <div className="vk-panel-head"><span>Authorization</span><span>{state.status === "idle" ? "ready" : state.status}</span></div>
-                <div className="vk-panel-body"><ProofTimeline state={state} /></div>
-              </div>
-              {paid && <ProofReceipt receipt={RECEIPT} config={NO_EXPLORER} />}
-            </section>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
-}
-
-/** The same payment in mobile Safari on an iPhone, with the system passkey sheet. */
-function PhoneApp({ phase, startedAt }: { phase: Phase; startedAt: number }) {
-  const now = useNow(phase === "proving");
-  const provingMs = phase === "proving" ? Math.min(now - startedAt, PROVING_MS) : PROVING_MS;
-  const paid = phase === "paid";
-
-  return (
-    <div className="vk-app phone-app">
-      <div className="ios-status">
-        <span className="ios-time">9:41</span>
-        <span className="ios-island" />
-        <span className="ios-icons"><Signal size={17} strokeWidth={2.6} /><Wifi size={17} strokeWidth={2.6} /><BatteryFull size={24} strokeWidth={1.8} /></span>
-      </div>
-
-      <div className="phone-page">
-        <div className="phone-top">
-          <span className="brand-lockup"><BrandMark /><span className="brand-wordmark">Vera<span>Key</span></span></span>
-          <span className="vk-pill is-network"><i /> Arbitrum Sepolia</span>
-        </div>
-        <div className="vk-kicker">Pay with a passkey</div>
-        <h2 className="phone-title">Face ID in.<br /><em>A proof out.</em></h2>
-
-        <div className="phone-card vk-tone-lime">
-          <div className="phone-card-head"><span>Pay account</span><b className={paid ? "is-updated" : ""}>{paid ? "2.98" : "5.00"} USDG</b></div>
-          <div className="phone-amount"><strong>2.00</strong><span>USDG</span></div>
-          <div className="vk-quote">
-            <div><span>To</span><span>Demo merchant</span></div>
-            <div><span>Relayer fee</span><span className="vk-mono">0.02 USDG</span></div>
-            <div><span>Network</span><span>Arbitrum Sepolia</span></div>
-          </div>
-        </div>
-
-        <span className={`vk-btn vk-btn-primary vk-btn-lg phone-cta ${phase === "tap" ? "is-pressed" : ""}`}>
-          <ScanFace size={19} /> Approve with passkey
-          {phase === "tap" && <span className="phone-tap" />}
-        </span>
-        <div className="phone-privacy">
-          <div><span>Leaves this phone</span><b>a 9,152-byte proof</b></div>
-          <div><span>Stays on it</span><b><LockKeyhole size={12} /> key · signature · PRF secret</b></div>
-        </div>
-      </div>
-
-      {(phase === "sheet" || phase === "faceid") && <PasskeySheet scanning={phase === "faceid"} />}
-      {(phase === "proving" || phase === "relaying" || phase === "confirming") && <ProvingCard phase={phase} provingMs={provingMs} />}
-      {paid && <PaidScreen />}
-
-      <div className="ios-safari">
-        <span className="ios-url"><span className="ios-aa">AA</span><span><Lock size={11} /> verakey.mdloglabs.org</span><RotateCw size={13} /></span>
-        <span className="ios-home" />
-      </div>
-    </div>
-  );
-}
-
+/** The iOS passkey sheet, which the system shows over the page while the passkey signs. */
 function PasskeySheet({ scanning }: { scanning: boolean }) {
   return (
     <>
@@ -292,47 +221,5 @@ function PasskeySheet({ scanning }: { scanning: boolean }) {
         <span className="ios-sheet-button">{scanning ? "Face ID" : "Continue"}</span>
       </div>
     </>
-  );
-}
-
-function ProvingCard({ phase, provingMs }: { phase: Phase; provingMs: number }) {
-  const [title, detail] =
-    phase === "proving" ? ["Proving on this phone", "UltraHonk · in the browser"]
-      : phase === "relaying" ? ["Sending the proof", "Gasless · fee paid in USDG"]
-        : ["Confirming on Arbitrum", "The Stylus account verifies it"];
-  return (
-    <div className="phone-overlay">
-      <div className="phone-ring">
-        <svg viewBox="0 0 120 120">
-          <circle className="phone-ring-track" cx="60" cy="60" r="52" />
-          <circle className="phone-ring-fill" cx="60" cy="60" r="52" pathLength="100" style={{ strokeDashoffset: 100 - (100 * provingMs) / PROVING_MS }} />
-        </svg>
-        <strong>{(provingMs / 1000).toFixed(1)}<small>s</small></strong>
-      </div>
-      <b className="phone-overlay-title">{title} {phase !== "proving" && <span className="vk-spinner" />}</b>
-      <span className="phone-overlay-detail">{detail}</span>
-      <ul className="phone-secrets">
-        <li><LockKeyhole size={13} /> Public key</li>
-        <li><LockKeyhole size={13} /> Signature</li>
-        <li><LockKeyhole size={13} /> PRF secret</li>
-      </ul>
-      <span className="phone-overlay-detail">stay on this phone</span>
-    </div>
-  );
-}
-
-function PaidScreen() {
-  return (
-    <div className="phone-overlay is-paid">
-      <span className="phone-check"><Check size={46} strokeWidth={2.4} /></span>
-      <b className="phone-overlay-title">Paid</b>
-      <strong className="phone-paid-amount">2.00 USDG</strong>
-      <span className="phone-overlay-detail">to Demo merchant</span>
-      <div className="vk-quote phone-paid-quote">
-        <div><span>Proof on this phone</span><span className="vk-mono">2.3 s</span></div>
-        <div><span>Relayer fee</span><span className="vk-mono">0.02 USDG</span></div>
-        <div><span>Public key on-chain</span><span className="vk-mono phone-zero">0×</span></div>
-      </div>
-    </div>
   );
 }

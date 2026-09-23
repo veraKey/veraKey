@@ -59,10 +59,11 @@
 .vk-layout { position: relative; display: grid; grid-template-columns: 212px minmax(0, 1fr); gap: 36px; max-width: 1320px; margin: 0 auto; padding: 34px 28px 80px; }
 .vk-nav { position: sticky; top: 98px; align-self: start; display: flex; flex-direction: column; border-top: 1px solid var(--vk-line); }
 .vk-nav a { display: grid; grid-template-columns: 30px 1fr; align-items: center; min-height: 50px; border-bottom: 1px solid var(--vk-line); color: var(--vk-muted); font-size: 13px; text-decoration: none; transition: color 0.16s ease, padding 0.16s ease, background 0.16s ease; }
-.vk-nav a span { color: var(--vk-faint); font-size: 9px; letter-spacing: 0.1em; }
+.vk-nav-no { color: var(--vk-faint); font-size: 9px; letter-spacing: 0.1em; }
+.vk-nav-short { display: none; }
 .vk-nav a:hover { color: var(--vk-ink); padding-left: 6px; }
 .vk-nav a.is-active { color: var(--vk-ink); padding-left: 6px; background: linear-gradient(90deg, rgba(201, 255, 91, 0.08), transparent); }
-.vk-nav a.is-active span { color: var(--vk-lime); }
+.vk-nav a.is-active .vk-nav-no { color: var(--vk-lime); }
 .vk-nav-foot { margin-top: 22px; color: var(--vk-faint); font-size: 10px; line-height: 1.6; }
 .vk-main { min-width: 0; }
 .vk-stack { display: grid; gap: 18px; }
@@ -156,6 +157,8 @@
 .vk-input { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--vk-line-strong); background: rgba(8, 12, 16, 0.7); color: var(--vk-ink); font-size: 14px; outline: none; transition: border-color 0.16s ease, box-shadow 0.16s ease; }
 .vk-input:focus { border-color: var(--vk-lime); box-shadow: 0 0 0 3px rgba(201, 255, 91, 0.1); }
 .vk-input.is-mono { font-family: var(--vk-mono); font-size: 13px; }
+.vk-input.is-static { display: flex; align-items: center; }
+.vk-hint { margin: 0; color: var(--vk-faint); font-size: 12px; }
 .vk-input.is-amount { min-height: 64px; font-size: 32px; font-weight: 600; letter-spacing: -0.05em; }
 .vk-seg { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--vk-line-strong); }
 .vk-seg button { min-height: 42px; border-right: 1px solid var(--vk-line); background: transparent; color: var(--vk-muted); font-size: 12px; cursor: pointer; }
@@ -216,21 +219,75 @@
 .vk-doc code { font-family: var(--vk-mono); font-size: 12px; color: var(--vk-teal); }
 .vk-doc pre code { color: inherit; }
 
+/* Pay, phone layout (PayMobile in PayView.tsx). The payment itself takes over the screen. */
+.vk-mpay { display: grid; gap: 12px; }
+.vk-mpay-title { margin: 10px 0 0; font-size: 32px; font-weight: 600; line-height: 0.98; letter-spacing: -0.06em; }
+.vk-mpay-title em { color: #7ee0d1; font-family: "DM Serif Display", Georgia, serif; font-style: italic; font-weight: 400; letter-spacing: -0.04em; }
+.vk-mpay-card { position: relative; padding: 16px 16px 4px; border: 1px solid var(--vk-line-strong); background: var(--vk-panel); }
+.vk-mpay-card::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--tone); box-shadow: 0 0 18px var(--tone); }
+.vk-mpay-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; color: var(--vk-muted); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; }
+.vk-mpay-card-head b { color: var(--vk-ink); font-size: 14px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.vk-mpay-amount { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 8px; }
+.vk-mpay-amount-field { position: relative; display: inline-block; max-width: 100%; }
+.vk-mpay-amount-field::after { content: attr(data-value); display: inline-block; padding-right: 4px; visibility: hidden; white-space: pre; }
+.vk-mpay-amount-field::after, .vk-mpay-amount-field input { font: inherit; font-size: 54px; font-weight: 600; line-height: 1; letter-spacing: -0.07em; }
+.vk-mpay-amount-field input { position: absolute; inset: 0; width: 100%; padding: 0; border: 0; background: transparent; color: var(--vk-ink); outline: none; }
+.vk-mpay-amount-field input:focus { color: var(--vk-lime); }
+.vk-mpay-amount > span:last-child { color: var(--vk-muted); font-size: 16px; }
+.vk-mpay-card .vk-quote div { padding: 10px 0; font-size: 13px; }
+.vk-mpay-cta { width: 100%; min-height: 56px; font-size: 15px; }
+.vk-mpay-links { display: flex; justify-content: space-between; margin: -6px -8px -4px; }
+.vk-mpay-privacy { display: grid; border: 1px solid var(--vk-line); background: rgba(8, 12, 16, 0.55); }
+.vk-mpay-privacy div { display: grid; gap: 4px; padding: 9px 14px; }
+.vk-mpay-privacy div + div { border-top: 1px solid var(--vk-line); }
+.vk-mpay-privacy span { color: var(--vk-muted); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; }
+.vk-mpay-privacy b { display: inline-flex; align-items: center; gap: 6px; font-family: var(--vk-mono); font-size: 12px; font-weight: 500; }
+.vk-mpay-privacy div:first-child b { color: var(--vk-lime); }
+.vk-mpay-privacy div:last-child b { color: var(--vk-teal); }
+
+.vk-mpay-overlay { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px 26px; background: radial-gradient(circle at 50% 34%, rgba(201, 255, 91, 0.07), transparent 52%), var(--vk-bg); text-align: center; animation: vk-mpay-fade 0.3s ease both; }
+.vk-mpay-ring { position: relative; display: grid; place-items: center; width: 150px; height: 150px; margin-bottom: 8px; color: var(--vk-teal); }
+.vk-mpay-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.vk-mpay-ring circle { fill: none; stroke-width: 6; }
+.vk-mpay-ring-track { stroke: rgba(166, 224, 209, 0.14); }
+.vk-mpay-ring-fill { stroke: var(--vk-lime); stroke-linecap: round; stroke-dasharray: 100; filter: drop-shadow(0 0 8px rgba(201, 255, 91, 0.45)); transition: stroke-dashoffset 0.1s linear; }
+.vk-mpay-ring strong { color: var(--vk-ink); font-size: 44px; font-weight: 600; letter-spacing: -0.05em; font-variant-numeric: tabular-nums; }
+.vk-mpay-ring strong small { margin-left: 2px; color: var(--vk-muted); font-size: 18px; }
+.vk-mpay-overlay-title { display: inline-flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 600; letter-spacing: -0.03em; }
+.vk-mpay-overlay-detail { color: var(--vk-muted); font-size: 13px; }
+.vk-mpay-secrets { display: grid; gap: 8px; width: 100%; max-width: 340px; margin: 14px 0 0; padding: 14px 0 0; border-top: 1px solid var(--vk-line); list-style: none; }
+.vk-mpay-secrets li { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--vk-teal); font-size: 14px; }
+.vk-mpay-check { display: grid; place-items: center; width: 108px; height: 108px; margin-bottom: 6px; border-radius: 50%; background: var(--vk-lime); color: #0d1117; box-shadow: 0 0 0 14px rgba(201, 255, 91, 0.1), 0 0 60px rgba(201, 255, 91, 0.45); animation: vk-mpay-check 0.55s cubic-bezier(0.2, 1.4, 0.3, 1) both; }
+.vk-mpay-paid-amount { font-size: 46px; font-weight: 600; line-height: 1; letter-spacing: -0.06em; }
+.vk-mpay-paid-quote { width: 100%; max-width: 340px; margin-top: 14px; text-align: left; }
+.vk-mpay-paid-quote div { padding: 11px 0; font-size: 13px; }
+.vk-mpay-zero { color: var(--vk-lime); font-weight: 700; }
+.vk-mpay-actions { display: flex; gap: 10px; width: 100%; max-width: 340px; margin-top: 14px; }
+.vk-mpay-actions .vk-btn { flex: 1; min-height: 48px; text-decoration: none; }
+@keyframes vk-mpay-fade { from { opacity: 0; } }
+@keyframes vk-mpay-check { from { opacity: 0; transform: scale(0.4); } }
+
 @media (max-width: 1080px) {
   .vk-grid-3 { grid-template-columns: 1fr; }
   .vk-grid-2, .vk-ceremony { grid-template-columns: 1fr; }
 }
-@media (max-width: 820px) {
-  .vk-layout { grid-template-columns: 1fr; gap: 18px; padding: 18px 16px 70px; }
-  .vk-nav { position: static; flex-direction: row; overflow-x: auto; border-top: 0; border-bottom: 1px solid var(--vk-line); }
-  .vk-nav a { grid-template-columns: auto; min-height: 42px; padding: 0 14px; border-bottom: 0; white-space: nowrap; }
-  .vk-nav a span, .vk-nav-foot { display: none; }
-  .vk-nav a.is-active { padding-left: 14px; box-shadow: inset 0 -2px 0 var(--vk-lime); }
-  .vk-top-inner { padding: 0 16px; gap: 10px; }
-  .vk-top .vk-pill.is-network { display: none; }
-  .vk-matrix { font-size: 11px; }
-}
+/* Phone layout. AppLayout adds .vk-compact below 820px (COMPACT_QUERY); the landing-page hero's phone
+   always has it, so both render the same rules. */
+.vk-compact .vk-layout { grid-template-columns: 1fr; gap: 14px; padding: 14px 16px 70px; }
+.vk-compact .vk-nav { position: static; flex-direction: row; overflow-x: auto; border-top: 0; border-bottom: 1px solid var(--vk-line); scrollbar-width: none; }
+.vk-compact .vk-nav a { grid-template-columns: auto; min-height: 42px; padding: 0 14px; border-bottom: 0; white-space: nowrap; }
+.vk-compact .vk-nav-no, .vk-compact .vk-nav-foot, .vk-compact .vk-nav-label.has-short { display: none; }
+.vk-compact .vk-nav-short { display: inline; }
+.vk-compact .vk-nav a.is-active { padding-left: 14px; box-shadow: inset 0 -2px 0 var(--vk-lime); }
+.vk-compact .vk-top-inner { min-height: 58px; padding: 0 16px; gap: 10px; }
+.vk-compact .vk-top .vk-pill.is-network { display: none; }
+.vk-compact .vk-top .vk-pill.is-prover { gap: 0; padding: 8px; font-size: 0; }
+.vk-compact .vk-session { gap: 2px; padding-left: 10px; }
+.vk-compact .vk-session small { display: none; }
+.vk-compact .vk-session .vk-btn { gap: 0; padding: 0 8px; font-size: 0; }
+.vk-compact .vk-matrix { font-size: 11px; }
 @media (prefers-reduced-motion: reduce) {
   .vk-fanout-row, .vk-receipt, .vk-stamp { animation: none; opacity: 1; transform: none; }
   .vk-step.is-active .vk-step-icon, .vk-spinner { animation: none; }
+  .vk-mpay-overlay, .vk-mpay-check { animation: none; }
 }
