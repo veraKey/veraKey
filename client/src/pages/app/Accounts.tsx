@@ -101,12 +101,13 @@ export function Accounts() {
   return (
     <div className="vk-stack">
       <section>
-        <Kicker>Your accounts</Kicker>
-        <h1 className="vk-title">Three apps.<br /><em>No shared key on-chain.</em></h1>
+        <Kicker>Your account</Kicker>
+        <h1 className="vk-title">One passkey.<br /><em>No key on-chain.</em></h1>
         <p className="vk-lede">
-          <b>{session?.passkey.label}</b> controls each of these accounts. Each one has its own address and
-          its own owner ID (a nullifier derived from your passkey, its PRF secret and the app). Without
-          the PRF secret, which never leaves your authenticator, nothing on-chain connects them.
+          <b>{session?.passkey.label}</b> controls this account through zero-knowledge proofs. The chain
+          stores an owner ID (a nullifier derived from your passkey, its PRF secret and the app), never
+          your public key. Another app gets a different address and nullifier from the same passkey, and
+          without the PRF secret, which never leaves your authenticator, nothing on-chain connects them.
         </p>
       </section>
 
@@ -116,39 +117,38 @@ export function Accounts() {
         </button>
       </div>
 
-      <div className="vk-grid-3">
+      <div className="vk-grid-2">
         {DEMO_APPS.map(app => (
           <AccountCard key={app.key} app={app} state={accounts[app.key]} />
         ))}
-      </div>
-
-      <div className="vk-grid-2">
         <section className="vk-panel">
-          <div className="vk-panel-head"><span>What the chain can see</span><span>per account</span></div>
+          <div className="vk-panel-head"><span>What the chain can see</span><span>this account</span></div>
           <div className="vk-panel-body" style={{ padding: 0 }}>
             <table className="vk-matrix">
               <thead>
-                <tr><th>Field</th><th>Across your 3 accounts</th></tr>
+                <tr><th>Field</th><th>On Arbitrum</th></tr>
               </thead>
               <tbody>
                 <tr><td>Passkey public key</td><td><span className="vk-tag is-private">never on-chain</span></td></tr>
                 <tr><td>Passkey signature</td><td><span className="vk-tag is-private">never on-chain</span></td></tr>
                 <tr><td>PRF secret</td><td><span className="vk-tag is-private">never leaves the device</span></td></tr>
-                <tr><td>Account address</td><td><span className="vk-tag is-distinct">distinct</span></td></tr>
-                <tr><td>Owner nullifier</td><td><span className="vk-tag is-distinct">distinct</span></td></tr>
+                <tr><td>Account address</td><td><span className="vk-tag is-distinct">different in every app</span></td></tr>
+                <tr><td>Owner nullifier</td><td><span className="vk-tag is-distinct">different in every app</span></td></tr>
                 <tr><td>Amounts, recipients, timing</td><td><span className="vk-tag is-shared">public</span> per account</td></tr>
                 <tr><td>Factory, verifier, rpId, origin, relayer</td><td><span className="vk-tag is-shared">shared by every VeraKey user</span></td></tr>
               </tbody>
             </table>
           </div>
         </section>
+      </div>
 
+      <div>
         <section className="vk-panel">
           <div className="vk-panel-head"><span>Recent activity</span><span>this browser</span></div>
           <div className="vk-panel-body">
             {recent.length === 0 ? (
               <p style={{ margin: 0, color: "var(--vk-muted)", fontSize: 12 }}>
-                No payments yet. Get demo USDG on an account, then pay from it.
+                No payments yet. Get demo USDG on the account, then pay from it.
               </p>
             ) : (
               <div className="vk-activity">

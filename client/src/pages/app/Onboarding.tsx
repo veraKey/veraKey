@@ -100,7 +100,7 @@ export function Onboarding() {
           {DEMO_APPS.map(app => (
             <div key={app.key} className={`vk-fanout-row vk-tone-${app.tone}`}>
               <b style={{ color: "var(--tone)" }}>{app.name.toUpperCase()}</b>
-              <span style={{ color: "var(--vk-muted)" }}>own address · own nullifier · same passkey</span>
+              <span style={{ color: "var(--vk-muted)" }}>own address · own nullifier · no key on-chain</span>
             </div>
           ))}
         </div>

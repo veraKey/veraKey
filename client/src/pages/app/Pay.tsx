@@ -88,13 +88,19 @@ export function Pay() {
           <div className="vk-panel-body vk-form">
             <div className="vk-field">
               <span>From account</span>
-              <div className="vk-seg" role="radiogroup">
-                {DEMO_APPS.map(a => (
-                  <button key={a.key} role="radio" aria-checked={a.key === app.key} className={a.key === app.key ? "is-active" : ""} onClick={() => setAppKey(a.key)} disabled={busy}>
-                    {a.name} · {accounts[a.key] ? formatUsdg(accounts[a.key]!.balance) : "…"}
-                  </button>
-                ))}
-              </div>
+              {DEMO_APPS.length > 1 ? (
+                <div className="vk-seg" role="radiogroup">
+                  {DEMO_APPS.map(a => (
+                    <button key={a.key} role="radio" aria-checked={a.key === app.key} className={a.key === app.key ? "is-active" : ""} onClick={() => setAppKey(a.key)} disabled={busy}>
+                      {a.name} · {accounts[a.key] ? formatUsdg(accounts[a.key]!.balance) : "…"}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="vk-input is-mono">
+                  {app.name} · {account ? `${formatUsdg(account.balance)} USDG` : "loading…"}
+                </div>
+              )}
             </div>
             <label className="vk-field">
               <span>Recipient</span>

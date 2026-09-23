@@ -1,8 +1,11 @@
 import { appIdFromName } from "@verakey/sdk/nullifier";
 
-/** The three demo applications. Each gets its own account from the same passkey. */
+/**
+ * The demo application. Every app id gets its own account and nullifier from the same passkey; the
+ * demo shows one (Pay). Cross-app unlinkability is covered by the end-to-end tests.
+ */
 export interface DemoApp {
-  key: "pay" | "vault" | "tip";
+  key: "pay";
   name: string;
   tagline: string;
   appId: bigint;
@@ -11,8 +14,6 @@ export interface DemoApp {
 
 export const DEMO_APPS: DemoApp[] = [
   { key: "pay", name: "Pay", tagline: "Everyday USDG checkout", appId: appIdFromName("pay"), tone: "lime" },
-  { key: "vault", name: "Vault", tagline: "Savings you rarely touch", appId: appIdFromName("vault"), tone: "teal" },
-  { key: "tip", name: "Tip", tagline: "Small payments to creators", appId: appIdFromName("tip"), tone: "violet" },
 ];
 
 export function appByKey(key: string | undefined): DemoApp {

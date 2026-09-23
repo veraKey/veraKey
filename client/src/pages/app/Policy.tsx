@@ -124,6 +124,7 @@ export function PendingChanges({ appKey, action }: { appKey: string; action: Ret
 }
 
 export function AppSwitch({ value, onChange, disabled }: { value: string; onChange: (key: string) => void; disabled?: boolean }) {
+  if (DEMO_APPS.length < 2) return null;
   return (
     <div className="vk-seg">
       {DEMO_APPS.map(a => (
