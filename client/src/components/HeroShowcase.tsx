@@ -199,7 +199,7 @@ export function HeroShowcase() {
       {phase === "relaying" && (
         <span className="showcase-packet" aria-hidden="true"><LockKeyhole size={11} /> proof · {PROOF_BYTES.toLocaleString("en-US")} B · no key</span>
       )}
-      <p className="showcase-caption" aria-hidden="true">The app's own /app/pay views, playing one payment · proof time measured in Chrome</p>
+      <p className="showcase-caption" aria-hidden="true">The app's own /app/pay views, playing one payment · proof time measured in desktop Chrome</p>
     </div>
   );
 }

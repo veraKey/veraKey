@@ -266,6 +266,13 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outli
 .friction-note.is-facts ul { display: grid; gap: 14px; max-width: 230px; margin: 0; padding: 0; list-style: none; }
 .friction-note.is-facts li { font-size: 12px; line-height: 1.4; }
 .friction-note.is-facts b { display: block; color: #1f3a31; font-family: "DM Serif Display", Georgia, serif; font-size: 24px; font-weight: 400; letter-spacing: -.03em; line-height: 1.05; }
+.chart-cost { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 34px; padding-top: 18px; border-top: 1px solid #c5d5c8; }
+.chart-cost span { display: block; color: #789084; font-size: 8px; letter-spacing: .13em; }
+.chart-cost strong { display: block; margin-top: 8px; color: #1f3a31; font-family: "DM Serif Display", Georgia, serif; font-size: 28px; font-weight: 400; letter-spacing: -.03em; line-height: 1; }
+.chart-cost small { display: block; margin-top: 6px; color: #63736e; font-size: 10px; line-height: 1.45; }
+.chart-cost > div:last-child strong { color: #2d8a62; }
+.chart-cost + .chart-foot { margin-top: 22px; }
+@media (max-width: 740px) { .chart-cost { grid-template-columns: 1fr; gap: 14px; } }
 
 /* Hero proof points (what is live and measured, instead of social proof). */
 .hero-facts { display: flex; flex-wrap: wrap; gap: 10px 20px; margin: 0; padding: 0; list-style: none; }

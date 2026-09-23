@@ -388,26 +388,26 @@ export default function Home() {
           <div className="container">
               <div className="section-heading split-heading">
               <div><SectionKicker>THE PROBLEM</SectionKicker><h2>Passkeys fixed<br />the seed phrase.<br /><em>Not the tracking.</em></h2></div>
-              <div className="heading-aside"><p>Passkey smart wallets give you one address in every app, with your passkey's public key on-chain. Anyone reading the chain can join your activity across apps: the merchant you pay can see your savings.</p><span className="aside-line" /></div>
+              <div className="heading-aside"><p>Cross-app wallets turn one passkey into one global ID: one address in every app, or several accounts tied together on-chain by the same key. Anyone reading the chain can join that activity, and the merchant you pay can see your savings.</p><span className="aside-line" /></div>
             </div>
             <div className="friction-grid">
               <article className="friction-card friction-card-dark" data-reveal>
                 <div className="card-index">01 / A PASSKEY WALLET TODAY</div>
                 <div className="friction-icon warning-icon"><KeyRound size={22} /></div>
                 <h3>One key,<br />one address,<br />every app.</h3>
-                <p>Checkout, savings and tips share one address and one public key, so they read as one public history. One passkey per app avoids that, at the cost of an enrollment and a credential picker in every app.</p>
+                <p>Checkout, savings and tips read as one public history, and the passkey's public key sits on-chain: all eight passkey smart accounts we inspected store it or emit it in an event. One passkey per app avoids that, at the cost of an enrollment and a credential picker in every app.</p>
                 <div className="card-foot"><span className="status-bad"><span /> LINKABLE BY DESIGN</span><ArrowUpRight size={15} /></div>
               </article>
               <article className="friction-card friction-card-light" data-reveal>
                 <div className="card-index">02 / VERAKEY</div>
                 <div className="friction-icon fingerprint-icon"><Fingerprint size={22} /></div>
                 <h3>One passkey.<br /><em>No key on-chain.</em></h3>
-                <p>Your browser proves in zero knowledge that your passkey approved the payment. Every app gets its own account, derived from the passkey and a PRF secret only it can produce, and the chain never sees the key.</p>
-                <div className="card-foot"><span className="status-good"><span /> UNLINKABLE ACCOUNTS</span><ArrowUpRight size={15} /></div>
+                <p>Your browser proves in zero knowledge that your passkey approved the payment. Each app's account is owned by a per-app nullifier, made from the passkey and a PRF secret only it can produce. Amounts and recipients stay public, and USDG's issuer can still freeze any account.</p>
+                <div className="card-foot"><span className="status-good"><span /> UNLINKABLE, NOT ANONYMOUS</span><ArrowUpRight size={15} /></div>
               </article>
               <div className="friction-note is-facts"><Sparkles size={16} /><span>WHY NOW</span><ul>
                 <li><b>iOS 18.4</b> passkey PRF works the same on every Apple device</li>
-                <li><b>2.3 s</b> to prove a passkey signature in the browser</li>
+                <li><b>Kohaku</b> Ethereum's privacy wallet roadmap defaults to a new address per app</li>
                 <li><b>ArbOS 60</b> Stylus runs 40 KB Rust accounts</li>
               </ul></div>
             </div>
@@ -481,7 +481,7 @@ export default function Home() {
 
         <section className="usecases-section section-pad" id="usecases" data-reveal>
           <div className="container">
-            <div className="section-heading split-heading"><div><SectionKicker>ONE PASSKEY. EVERY APP.</SectionKicker><h2>Built for the<br /><em>human edge.</em></h2></div><div className="heading-aside"><p>VeraKey is an authentication primitive, not another destination wallet. Each app gets its own account and policy; the gesture stays the same.</p><span className="aside-line" /></div></div>
+            <div className="section-heading split-heading"><div><SectionKicker>ONE PASSKEY. EVERY APP.</SectionKicker><h2>Built for the<br /><em>human edge.</em></h2></div><div className="heading-aside"><p>VeraKey is the account layer under a passkey wallet, not another destination wallet. Each app gets its own account and policy; the gesture stays the same.</p><span className="aside-line" /></div></div>
             <div className="usecase-layout">
               <div className="usecase-list">
                 {useCases.map((useCase) => {
@@ -502,12 +502,17 @@ export default function Home() {
 
         <section className="metrics-section section-pad" data-reveal>
           <div className="container metrics-layout">
-            <div><SectionKicker>THE COST OF PRIVACY</SectionKicker><h2>Privacy has a price.<br /><em>We publish it.</em></h2><p className="metrics-lede">Arbitrum verifies an UltraHonk proof instead of a bare P-256 signature. That costs more gas than the precompile, and buys an account that shares no key with your other apps. Measured on a nitro devnode at ArbOS 61, without the L1 data fee that Arbitrum One adds for the proof's calldata.</p><button className="outline-button" onClick={openDocs}><ShieldCheck size={15} /> Read the threat model</button></div>
+            <div><SectionKicker>THE COST OF PRIVACY</SectionKicker><h2>Privacy has a price.<br /><em>We publish it.</em></h2><p className="metrics-lede">Arbitrum verifies an UltraHonk proof instead of a bare P-256 signature. That costs more gas than the precompile, and buys an account that shares no key with your other apps. Gas is measured on a nitro devnode at ArbOS 61; dollars use Arbitrum One's gas price and the ETH price on 24 Sep 2026.</p><button className="outline-button" onClick={openDocs}><ShieldCheck size={15} /> Read the threat model</button></div>
             <div className="metrics-chart">
               <div className="chart-header"><span>MEASURED GAS PER OPERATION</span><span>NITRO DEVNODE · ARBOS 61</span></div>
               <div className="bar-row"><div className="bar-label"><span>P256VERIFY precompile (no privacy)</span><strong>3,450</strong></div><div className="bar-track"><div className="bar-fill bar-new" style={{ width: "1%" }} /></div></div>
               <div className="bar-row"><div className="bar-label"><span>HonkVerifier.verify (the proof)</span><strong>3,781,398</strong></div><div className="bar-track"><div className="bar-fill bar-old" style={{ width: "91%" }} /></div></div>
               <div className="bar-row"><div className="bar-label"><span>VeraKey pay (proof + policy + 2 USDG transfers)</span><strong className="accent-number">4,171,302</strong></div><div className="bar-track"><div className="bar-fill bar-old" style={{ width: "100%" }} /></div></div>
+              <div className="chart-cost">
+                <div><span>PAY ON ARBITRUM ONE</span><strong>≈ $0.22</strong><small>0.02 gwei · ETH at $2,668</small></div>
+                <div><span>PROOF CALLDATA (L1)</span><strong>≈ $0.002</strong><small>about 10 KB per payment</small></div>
+                <div><span>NEXT MILESTONE</span><strong>&lt; $0.05</strong><small>a gas-optimized bb 5 verifier</small></div>
+              </div>
               <div className="chart-foot"><span><Zap size={14} /> account creation: <b>80,812 gas</b> (EIP-1167 clone)</span><span>STYLUS · RUST</span></div>
             </div>
           </div>
