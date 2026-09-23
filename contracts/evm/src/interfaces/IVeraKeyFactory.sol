@@ -13,7 +13,7 @@ interface IVeraKeyFactory  {
 
     function configHash() external view returns (bytes32);
 
-    function config() external view returns (address, address, address, bytes32, uint256, uint256, uint64, uint64);
+    function config() external view returns (address, address, address, bytes32, uint256, uint256, uint256, uint64, uint64);
 
     function origin() external view returns (bytes memory);
 

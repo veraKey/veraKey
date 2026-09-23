@@ -29,6 +29,7 @@ case "$NETWORK" in
     ORIGIN=${LOCAL_ORIGIN:-http://localhost:5190}
     PER_TX_CAP=50000000      # 50 USDG
     DAILY_CAP=200000000      # 200 USDG
+    NEW_PAYEE_CAP=5000000    # 5 USDG: largest first payment to an unknown recipient
     CHANGE_DELAY=10          # short so the end-to-end timelock tests finish quickly
     RECOVERY_DELAY=15
     ;;
@@ -43,6 +44,7 @@ case "$NETWORK" in
     USDG=${USDG_ADDRESS:-0xFFC95faa3d63Cde504a05B567C600B78C0b41892}
     PER_TX_CAP=${VERAKEY_PER_TX_CAP:-10000000}   # 10 USDG (PRD demo default)
     DAILY_CAP=${VERAKEY_DAILY_CAP:-25000000}     # 25 USDG
+    NEW_PAYEE_CAP=${VERAKEY_NEW_PAYEE_CAP:-2000000} # 2 USDG: largest first payment to an unknown recipient
     CHANGE_DELAY=${VERAKEY_CHANGE_DELAY:-120}      # demo value; production default is 86400
     RECOVERY_DELAY=${VERAKEY_RECOVERY_DELAY:-300}  # demo value; production default is 259200
     ;;
@@ -174,7 +176,7 @@ echo "    $IMPLEMENTATION"
 
 echo "==> VeraKeyFactory (Stylus)"
 FACTORY=$(stylus_deploy verakey-factory "$IMPLEMENTATION" "$VERIFIER" "$USDG" "$RP_ID_HASH" "$ORIGIN_HEX" \
-  "$PER_TX_CAP" "$DAILY_CAP" "$CHANGE_DELAY" "$RECOVERY_DELAY")
+  "$PER_TX_CAP" "$DAILY_CAP" "$NEW_PAYEE_CAP" "$CHANGE_DELAY" "$RECOVERY_DELAY")
 [ -n "$FACTORY" ] || { echo "factory deployment failed" >&2; exit 1; }
 echo "    $FACTORY"
 
@@ -184,9 +186,32 @@ if [ "$NETWORK" = local ]; then
   # never produce the same account address as the real factory.
   echo "==> VeraKeyFactory with a different verifier (local test fixture)"
   FACTORY_ALT=$(stylus_deploy verakey-factory "$IMPLEMENTATION" "$USDG" "$USDG" "$RP_ID_HASH" "$ORIGIN_HEX" \
-    "$PER_TX_CAP" "$DAILY_CAP" "$CHANGE_DELAY" "$RECOVERY_DELAY")
+    "$PER_TX_CAP" "$DAILY_CAP" "$NEW_PAYEE_CAP" "$CHANGE_DELAY" "$RECOVERY_DELAY")
   echo "    $FACTORY_ALT"
 fi
+
+# Cached Stylus programs skip most of their per-call initialization cost (~60k gas off every
+# createAccount, ~35k off every payment on the devnode). The devnode has no CacheManager, so the chain
+# owner caches directly; on public chains the programs are bid into the CacheManager's cache.
+cache_program() { # <address>
+  if [ "$NETWORK" = local ]; then
+    cast send 0x0000000000000000000000000000000000000072 "cacheProgram(address)" "$1" \
+      --private-key "$KEY" --rpc-url "$RPC" >/dev/null && echo "    cached $1"
+  else
+    local bid max=${VERAKEY_CACHE_MAX_BID_WEI:-1000000000000000} # 0.001 ETH
+    bid=$(cd "$ROOT/contracts/stylus" && cargo stylus cache suggest-bid "$1" --endpoint "$RPC" 2>/dev/null \
+      | sed 's/\x1b\[[0-9;]*m//g' | grep -Eo '[0-9]+' | tail -1)
+    if [ -z "$bid" ] || [ "$bid" -gt "$max" ]; then
+      echo "    not cached $1 (suggested bid: ${bid:-unknown} wei; cap $max)"
+      return 0
+    fi
+    (cd "$ROOT/contracts/stylus" && cargo stylus cache bid "$1" "$bid" --endpoint "$RPC" \
+      --private-key-path "$KEY_FILE" >/dev/null 2>&1) && echo "    cached $1 (bid $bid wei)" || echo "    cache bid failed for $1"
+  fi
+}
+echo "==> Stylus program cache"
+cache_program "$IMPLEMENTATION"
+cache_program "$FACTORY"
 
 CONFIG_HASH=$(cast call "$FACTORY" 'configHash()(bytes32)' --rpc-url "$RPC")
 VK_HASH=0x$(xxd -p "$ROOT/circuits/webauthn/target/vk_hash" | tr -d '\n')
@@ -209,6 +234,7 @@ cat > "$ROOT/deployments/$NETWORK.json" <<JSON
   "policy": {
     "perTxCap": "$PER_TX_CAP",
     "dailyCap": "$DAILY_CAP",
+    "newPayeeCap": "$NEW_PAYEE_CAP",
     "changeDelay": $CHANGE_DELAY,
     "recoveryDelay": $RECOVERY_DELAY
   },

@@ -15,6 +15,7 @@ export class RelayerError extends Error {
 export type RelayableFunction =
   | "pay"
   | "scheduleChange"
+  | "restrict"
   | "applyChange"
   | "cancelChange"
   | "cancelRecovery"

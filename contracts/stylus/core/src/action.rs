@@ -23,6 +23,8 @@ pub mod kind {
     pub const CANCEL_CHANGE: u8 = 3;
     /// Cancel a guardian-initiated recovery: `data_hash` = the pending recovery nullifier.
     pub const CANCEL_RECOVERY: u8 = 4;
+    /// Apply a tightening change at once: `data_hash` = keccak256(changeKind ‖ payload).
+    pub const RESTRICT: u8 = 5;
 }
 
 /// The typed fields of an action, before hashing.

@@ -3,7 +3,7 @@
 //
 //   scripts/deploy.sh local && pnpm --filter @verakey/sdk test:e2e
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { encodeFunctionData, parseEventLogs, toHex, type Address, type Hex } from "viem";
+import { encodeFunctionData, keccak256, parseEventLogs, toHex, type Address, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
   ActionKind,
@@ -14,6 +14,7 @@ import {
   changePayload,
   computeNullifier,
   erc20Abi,
+  guardianCommitment,
   veraKeyAccountAbi,
   veraKeyFactoryAbi,
 } from "../../src";
@@ -114,8 +115,38 @@ async function schedule(owner: Owner, appId: bigint, account: Address, change: {
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash: await relayer.writeContract(request) });
   const [event] = parseEventLogs({ abi: veraKeyAccountAbi, eventName: "ChangeScheduled", logs: receipt.logs });
-  return { changeId: event.args.changeId, eta: event.args.eta };
+  return { changeId: event.args.changeId, eta: event.args.eta, hash: receipt.transactionHash };
 }
+
+/** Signs and proves a tightening change; returns the simulation request (throws on revert). */
+async function restrictRequest(owner: Owner, appId: bigint, account: Address, change: { kind: number; payload: Hex }, signed = change) {
+  const dl = deadline();
+  const auth = await authorize(prover, owner, appId, account, {
+    kind: ActionKind.Restrict,
+    target: "0x0000000000000000000000000000000000000000",
+    amount: 0n,
+    dataHash: changeDataHash(signed.kind as never, signed.payload),
+    fee: FEE,
+    deadline: dl,
+  });
+  return publicClient.simulateContract({
+    address: account,
+    abi: veraKeyAccountAbi,
+    functionName: "restrict",
+    args: [change.kind, change.payload, FEE, dl, fieldHex(owner.nullifier), auth.clientDataJSON, auth.proof],
+    account: devAccount,
+  });
+}
+
+async function restrict(owner: Owner, appId: bigint, account: Address, change: { kind: number; payload: Hex }) {
+  const { request } = await restrictRequest(owner, appId, account, change);
+  const receipt = await publicClient.waitForTransactionReceipt({ hash: await relayer.writeContract(request) });
+  gas.restrict = receipt.gasUsed;
+  return receipt;
+}
+
+const protections = (account: Address) =>
+  publicClient.readContract({ address: account, abi: veraKeyAccountAbi, functionName: "protections" });
 
 async function apply(account: Address, changeId: Hex, change: { kind: number; payload: Hex }) {
   const { request } = await publicClient.simulateContract({
@@ -186,7 +217,7 @@ describe("factory", () => {
   it("init_twice_reverts", async () => {
     const name = await revertName(publicClient.simulateContract({
       address: accounts.pay, abi: veraKeyAccountAbi, functionName: "initialize",
-      args: [fieldHex(apps.pay), fieldHex(1n), usdg, usdg, deployment.rpIdHash, toHex("x"), 1n, 1n, 0n, 0n],
+      args: [fieldHex(apps.pay), fieldHex(1n), usdg, usdg, deployment.rpIdHash, toHex("x"), 1n, 1n, 0n, 0n, 0n],
       account: devAccount,
     }));
     expect(name).toBe("AlreadyInitialized");
@@ -208,12 +239,14 @@ describe("factory", () => {
     expect(factoryConfig[0].toLowerCase()).toBe(accountImplementation.toLowerCase());
     const [perTxCap, dailyCap, spent, , allowlist] = await publicClient.readContract({ address: accounts.vault, abi: veraKeyAccountAbi, functionName: "policy" });
     expect([perTxCap, dailyCap, spent, allowlist]).toEqual([BigInt(deployment.policy.perTxCap), BigInt(deployment.policy.dailyCap), 0n, false]);
+    const [newPayeeCap, frozen, guardian] = await publicClient.readContract({ address: accounts.vault, abi: veraKeyAccountAbi, functionName: "protections" });
+    expect([newPayeeCap, frozen, guardian]).toEqual([BigInt(deployment.policy.newPayeeCap), false, ZERO_HASH]);
   });
 
   it("implementation_is_locked", async () => {
     const name = await revertName(publicClient.simulateContract({
       address: accountImplementation, abi: veraKeyAccountAbi, functionName: "initialize",
-      args: [fieldHex(apps.pay), fieldHex(1n), usdg, usdg, deployment.rpIdHash, toHex("x"), 1n, 1n, 0n, 0n],
+      args: [fieldHex(apps.pay), fieldHex(1n), usdg, usdg, deployment.rpIdHash, toHex("x"), 1n, 1n, 0n, 0n, 0n],
       account: devAccount,
     }));
     expect(name).toBe("AlreadyInitialized");
@@ -451,7 +484,8 @@ describe("owners and recovery", () => {
   });
 
   it("guardian_recovery_rotates_owners_and_owner_can_cancel", async () => {
-    const setGuardian = changePayload.setGuardian(guardian.address);
+    const salt = keccak256(toHex("guardian salt for pay"));
+    const setGuardian = changePayload.setGuardian(guardianCommitment(accounts.pay, guardian.address, salt));
     const s = await schedule(backup, apps.pay, accounts.pay, setGuardian);
     await sleepUntil(s.eta);
     await apply(accounts.pay, s.changeId, setGuardian);
@@ -459,7 +493,7 @@ describe("owners and recovery", () => {
     const initiate = async () => {
       const { request } = await publicClient.simulateContract({
         address: accounts.pay, abi: veraKeyAccountAbi, functionName: "initiateRecovery",
-        args: [fieldHex(rescue.nullifier)], account: guardian,
+        args: [fieldHex(rescue.nullifier), salt], account: guardian,
       });
       const receipt = await publicClient.waitForTransactionReceipt({ hash: await guardianWallet.writeContract(request) });
       return parseEventLogs({ abi: veraKeyAccountAbi, eventName: "RecoveryInitiated", logs: receipt.logs })[0].args.eta;
@@ -501,5 +535,101 @@ describe("owners and recovery", () => {
       address: accounts.pay, abi: veraKeyAccountAbi, functionName: "applyChange",
       args: [pending.changeId, stale.kind, stale.payload], account: devAccount,
     }))).toBe("UnknownChange");
+  });
+});
+
+describe("protections", () => {
+  const cap = BigInt(deployment.policy.newPayeeCap);
+  const stranger = privateKeyToAccount(generatePrivateKey()).address;
+  const guardian = privateKeyToAccount(generatePrivateKey());
+  const salt = keccak256(toHex("guardian salt for tip"));
+
+  beforeAll(async () => {
+    const mint = await relayer.writeContract({
+      address: usdg,
+      abi: [{ type: "function", name: "mint", stateMutability: "nonpayable", inputs: [{ name: "to", type: "address" }, { name: "value", type: "uint256" }], outputs: [] }],
+      functionName: "mint",
+      args: [accounts.tip, USDG(200)],
+    });
+    await publicClient.waitForTransactionReceipt({ hash: mint });
+    await publicClient.waitForTransactionReceipt({ hash: await relayer.sendTransaction({ to: guardian.address, value: 10n ** 16n }) });
+  });
+
+  it("new_payee_cap_bounds_the_first_payment_to_an_unknown_recipient", async () => {
+    const dl = deadline();
+    const auth = await payArgs(owners.tip, apps.tip, accounts.tip, stranger, cap + 1n, { deadline: dl });
+    expect(await revertName(publicClient.simulateContract(payCall(accounts.tip, owners.tip, stranger, cap + 1n, auth, dl)))).toBe("NewPayeeCapExceeded");
+    const first = await pay(owners.tip, apps.tip, accounts.tip, stranger, cap);
+    gas.payFirstToNewRecipient = first.receipt.gasUsed;
+    expect(await publicClient.readContract({ address: accounts.tip, abi: veraKeyAccountAbi, functionName: "isKnownRecipient", args: [stranger] })).toBe(true);
+    // Once paid, the recipient is known and only the ordinary caps apply.
+    const second = await pay(owners.tip, apps.tip, accounts.tip, stranger, cap + USDG(1));
+    gas.payKnownRecipient = second.receipt.gasUsed;
+    expect(second.receipt.status).toBe("success");
+  });
+
+  it("allowlisted_recipient_is_exempt_from_the_new_payee_cap", async () => {
+    const friend = privateKeyToAccount(generatePrivateKey()).address;
+    const allow = changePayload.setRecipient(friend, true);
+    const scheduled = await schedule(owners.tip, apps.tip, accounts.tip, allow);
+    await sleepUntil(scheduled.eta);
+    await apply(accounts.tip, scheduled.changeId, allow);
+    expect((await pay(owners.tip, apps.tip, accounts.tip, friend, cap + USDG(2))).receipt.status).toBe("success");
+  });
+
+  it("restrict_tightens_at_once_and_refuses_to_loosen", async () => {
+    await restrict(owners.tip, apps.tip, accounts.tip, changePayload.setLimits(USDG(20), USDG(150)));
+    const [perTx, daily] = await publicClient.readContract({ address: accounts.tip, abi: veraKeyAccountAbi, functionName: "policy" });
+    expect([perTx, daily]).toEqual([USDG(20), USDG(150)]);
+    expect(await revertName(restrictRequest(owners.tip, apps.tip, accounts.tip, changePayload.setLimits(USDG(21), USDG(150))))).toBe("NotRestrictive");
+    expect(await revertName(restrictRequest(owners.tip, apps.tip, accounts.tip, changePayload.unfreeze()))).toBe("NotRestrictive");
+    expect(await revertName(restrictRequest(owners.tip, apps.tip, accounts.tip, changePayload.addOwner(fieldHex(7n))))).toBe("NotRestrictive");
+    // The proof binds the payload: a proof for one tightening cannot apply another.
+    expect(await revertName(restrictRequest(owners.tip, apps.tip, accounts.tip,
+      changePayload.setLimits(USDG(1), USDG(1)), changePayload.setLimits(USDG(10), USDG(100))))).toBe("InvalidClientData");
+    await restrict(owners.tip, apps.tip, accounts.tip, changePayload.setNewPayeeCap(USDG(1)));
+    expect((await protections(accounts.tip))[0]).toBe(USDG(1));
+  });
+
+  it("owner_freeze_stops_payments_until_a_timelocked_unfreeze", async () => {
+    await restrict(owners.tip, apps.tip, accounts.tip, changePayload.freeze());
+    expect((await protections(accounts.tip))[1]).toBe(true);
+    const dl = deadline();
+    const auth = await payArgs(owners.tip, apps.tip, accounts.tip, stranger, USDG(1), { deadline: dl });
+    expect(await revertName(publicClient.simulateContract(payCall(accounts.tip, owners.tip, stranger, USDG(1), auth, dl)))).toBe("AccountFrozen");
+    const unfreeze = changePayload.unfreeze();
+    const scheduled = await schedule(owners.tip, apps.tip, accounts.tip, unfreeze);
+    expect(await revertName(publicClient.simulateContract({
+      address: accounts.tip, abi: veraKeyAccountAbi, functionName: "applyChange",
+      args: [scheduled.changeId, unfreeze.kind, unfreeze.payload], account: devAccount,
+    }))).toBe("ChangeNotReady");
+    await sleepUntil(scheduled.eta);
+    await apply(accounts.tip, scheduled.changeId, unfreeze);
+    expect((await pay(owners.tip, apps.tip, accounts.tip, stranger, USDG(1))).receipt.status).toBe("success");
+  });
+
+  it("guardian_is_private_until_it_acts_and_freezes_with_its_salt_only", async () => {
+    const commitment = guardianCommitment(accounts.tip, guardian.address, salt);
+    const setGuardian = changePayload.setGuardian(commitment);
+    const scheduled = await schedule(owners.tip, apps.tip, accounts.tip, setGuardian);
+    await sleepUntil(scheduled.eta);
+    await apply(accounts.tip, scheduled.changeId, setGuardian);
+    expect((await protections(accounts.tip))[2]).toBe(commitment);
+    // Neither the schedule transaction nor storage carries the guardian's address, and the same
+    // guardian gives another account an unrelated commitment.
+    const tx = await publicClient.getTransaction({ hash: scheduled.hash });
+    expect(tx.input.toLowerCase().includes(guardian.address.slice(2).toLowerCase())).toBe(false);
+    expect(guardianCommitment(accounts.vault, guardian.address, salt)).not.toBe(commitment);
+
+    const freeze = (from: typeof guardian | typeof devAccount, withSalt: Hex) =>
+      publicClient.simulateContract({ address: accounts.tip, abi: veraKeyAccountAbi, functionName: "guardianFreeze", args: [withSalt], account: from });
+    expect(await revertName(freeze(guardian, keccak256(toHex("wrong salt"))))).toBe("NotGuardian");
+    expect(await revertName(freeze(devAccount, salt))).toBe("NotGuardian");
+    const { request } = await freeze(guardian, salt);
+    await publicClient.waitForTransactionReceipt({ hash: await walletFor(guardian).writeContract(request) });
+    expect((await protections(accounts.tip))[1]).toBe(true);
+    const dl = deadline();
+    const auth = await payArgs(owners.tip, apps.tip, accounts.tip, stranger, USDG(1), { deadline: dl });
+    expect(await revertName(publicClient.simulateContract(payCall(accounts.tip, owners.tip, stranger, USDG(1), auth, dl)))).toBe("AccountFrozen");
   });
 });

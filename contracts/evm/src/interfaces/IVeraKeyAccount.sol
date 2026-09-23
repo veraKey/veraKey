@@ -7,25 +7,29 @@
 pragma solidity ^0.8.23;
 
 interface IVeraKeyAccount  {
-    function initialize(bytes32 app_id, bytes32 owner_nullifier, address verifier, address usdg, bytes32 rp_id_hash, bytes calldata origin, uint256 per_tx_cap, uint256 daily_cap, uint64 change_delay, uint64 recovery_delay) external;
+    function initialize(bytes32 app_id, bytes32 owner_nullifier, address verifier, address usdg, bytes32 rp_id_hash, bytes calldata origin, uint256 per_tx_cap, uint256 daily_cap, uint256 new_payee_cap, uint64 change_delay, uint64 recovery_delay) external;
 
     function pay(address to, uint256 amount, uint256 fee, uint64 deadline, bytes32 nullifier, bytes calldata client_data_json, bytes calldata proof) external;
 
     function scheduleChange(uint8 change_kind, bytes calldata payload, uint256 fee, uint64 deadline, bytes32 nullifier, bytes calldata client_data_json, bytes calldata proof) external returns (bytes32);
 
+    function restrict(uint8 change_kind, bytes calldata payload, uint256 fee, uint64 deadline, bytes32 nullifier, bytes calldata client_data_json, bytes calldata proof) external returns (bytes32);
+
     function applyChange(bytes32 change_id, uint8 change_kind, bytes calldata payload) external;
 
     function cancelChange(bytes32 change_id, uint256 fee, uint64 deadline, bytes32 nullifier, bytes calldata client_data_json, bytes calldata proof) external;
 
-    function guardianCancelChange(bytes32 change_id) external;
+    function guardianCancelChange(bytes32 change_id, bytes32 salt) external;
 
-    function initiateRecovery(bytes32 new_nullifier) external;
+    function guardianFreeze(bytes32 salt) external;
+
+    function initiateRecovery(bytes32 new_nullifier, bytes32 salt) external;
 
     function executeRecovery() external;
 
     function cancelRecovery(uint256 fee, uint64 deadline, bytes32 nullifier, bytes calldata client_data_json, bytes calldata proof) external;
 
-    function guardianCancelRecovery() external;
+    function guardianCancelRecovery(bytes32 salt) external;
 
     function actionHash(uint8 action_kind, address target, uint256 amount, bytes32 data_hash, uint256 fee, uint64 deadline) external view returns (bytes32);
 
@@ -43,9 +47,11 @@ interface IVeraKeyAccount  {
 
     function policy() external view returns (uint256, uint256, uint256, uint64, bool);
 
+    function protections() external view returns (uint256, bool, bytes32);
+
     function isRecipientAllowed(address recipient) external view returns (bool);
 
-    function guardian() external view returns (address);
+    function isKnownRecipient(address recipient) external view returns (bool);
 
     function recovery() external view returns (bytes32, uint64);
 
@@ -81,7 +87,13 @@ interface IVeraKeyAccount  {
 
     error DailyCapExceeded();
 
+    error NewPayeeCapExceeded(uint256);
+
+    error AccountFrozen();
+
     error InvalidChange();
+
+    error NotRestrictive();
 
     error UnknownChange();
 

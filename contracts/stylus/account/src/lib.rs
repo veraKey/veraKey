@@ -8,17 +8,23 @@
 //! Security rules (each has a negative test in `packages/sdk/test/e2e`):
 //! - the account only moves USDG, through `transfer`, and every movement (payment plus fee) is
 //!   capped per transaction and per UTC day;
+//! - the first payment to a recipient that is neither known (paid before) nor allowlisted is capped
+//!   by `newPayeeCap`, which bounds what a look-alike address or a tampered page can take at once;
+//! - a frozen account makes no payments; owners (with a proof) and the guardian freeze at once,
+//!   unfreezing is a timelocked change;
 //! - the nonce is consumed before any token transfer and every action carries a deadline of at most
 //!   ten minutes;
-//! - configuration changes are scheduled with a proof and applied only after a timelock; owners and
-//!   the guardian can cancel them;
-//! - a guardian can replace all owners after a recovery delay, which any owner can cancel;
+//! - loosening configuration changes are scheduled with a proof and applied only after a timelock;
+//!   owners and the guardian can cancel them. Tightening changes (freeze, lower limits, enable the
+//!   allowlist, remove a recipient) apply immediately through `restrict`;
+//! - the guardian is stored as a salted commitment, so it stays private until it acts; it can
+//!   freeze the account and replace all owners after a recovery delay, which any owner can cancel;
 //! - `pay` and the other proof-authorized entry points are permissionless: anyone may submit.
 #![cfg_attr(not(any(test, feature = "export-abi")), no_main)]
 extern crate alloc;
 
 use alloc::{vec, vec::Vec};
-use alloy_primitives::{address, Address, FixedBytes, B256, U256, U64, U8};
+use alloy_primitives::{address, Address, FixedBytes, B256, U128, U256, U64, U8};
 use alloy_sol_types::sol;
 use openzeppelin_stylus::token::erc20::utils::safe_erc20::{ISafeErc20, SafeErc20};
 #[allow(deprecated)]
@@ -28,8 +34,8 @@ use stylus_sdk::{
     crypto::keccak,
     prelude::*,
     storage::{
-        StorageAddress, StorageB256, StorageBool, StorageBytes, StorageMap, StorageU256, StorageU64,
-        StorageU8,
+        StorageAddress, StorageB256, StorageBool, StorageBytes, StorageMap, StorageU128, StorageU256,
+        StorageU64, StorageU8,
     },
 };
 use verakey_core::{
@@ -59,6 +65,8 @@ sol! {
     event ChangeScheduled(bytes32 indexed changeId, uint8 changeKind, bytes payload, uint64 eta);
     event ChangeApplied(bytes32 indexed changeId, uint8 changeKind);
     event ChangeCancelled(bytes32 indexed changeId);
+    event Restricted(bytes32 indexed restrictionId, uint8 changeKind, bytes payload);
+    event GuardianFroze();
     event RecoveryInitiated(bytes32 indexed newNullifier, uint64 eta);
     event RecoveryExecuted(bytes32 indexed newNullifier, uint256 ownerEpoch);
     event RecoveryCancelled(bytes32 indexed newNullifier);
@@ -76,7 +84,10 @@ sol! {
     error RecipientNotAllowed();
     error PerTxCapExceeded();
     error DailyCapExceeded();
+    error NewPayeeCapExceeded(uint256 cap);
+    error AccountFrozen();
     error InvalidChange();
+    error NotRestrictive();
     error UnknownChange();
     error ChangeNotReady(uint64 eta);
     error NotGuardian();
@@ -102,7 +113,10 @@ pub enum AccountError {
     RecipientNotAllowed(RecipientNotAllowed),
     PerTxCapExceeded(PerTxCapExceeded),
     DailyCapExceeded(DailyCapExceeded),
+    NewPayeeCapExceeded(NewPayeeCapExceeded),
+    AccountFrozen(AccountFrozen),
     InvalidChange(InvalidChange),
+    NotRestrictive(NotRestrictive),
     UnknownChange(UnknownChange),
     ChangeNotReady(ChangeNotReady),
     NotGuardian(NotGuardian),
@@ -125,39 +139,51 @@ impl From<spending::SpendError> for AccountError {
 #[storage]
 pub struct PendingChange {
     change_kind: StorageU8,
-    payload_hash: StorageB256,
     eta: StorageU64,
+    payload_hash: StorageB256,
     owner_epoch: StorageU256,
 }
 
+/// Field order is the storage layout. Small fields are packed so that `initialize` writes nine
+/// slots and a payment updates its nonce and spending window in a single slot.
 #[storage]
 #[entrypoint]
 pub struct VeraKeyAccount {
+    // slot 0
     initialized: StorageBool,
     factory: StorageAddress,
+    change_delay: StorageU64,
+    frozen: StorageBool,
+    allowlist_enabled: StorageBool,
+    // slot 1
     verifier: StorageAddress,
+    recovery_delay: StorageU64,
+    // slot 2
     usdg: StorageAddress,
+    owner_count: StorageU64,
+    // slot 3
+    per_tx_cap: StorageU128,
+    daily_cap: StorageU128,
+    // slot 4
+    new_payee_cap: StorageU128,
+    recovery_eta: StorageU64,
+    // slot 5: everything a payment writes to this account
+    nonce: StorageU64,
+    spend_day: StorageU64,
+    spent_today: StorageU128,
+    // one slot each
     app_id: StorageB256,
     rp_id_hash: StorageB256,
     origin: StorageBytes,
-    nonce: StorageU256,
     // Owners are keyed by keccak256(ownerEpoch ‖ nullifier); recovery bumps the epoch, which
     // revokes every previous owner in O(1).
     owner_epoch: StorageU256,
-    owner_count: StorageU256,
-    owners: StorageMap<B256, StorageBool>,
-    per_tx_cap: StorageU256,
-    daily_cap: StorageU256,
-    spend_day: StorageU64,
-    spent_today: StorageU256,
-    allowlist_enabled: StorageBool,
-    allowed_recipients: StorageMap<Address, StorageBool>,
-    change_delay: StorageU64,
-    pending: StorageMap<B256, PendingChange>,
-    guardian: StorageAddress,
-    recovery_delay: StorageU64,
+    guardian_commitment: StorageB256,
     recovery_nullifier: StorageB256,
-    recovery_eta: StorageU64,
+    owners: StorageMap<B256, StorageBool>,
+    allowed_recipients: StorageMap<Address, StorageBool>,
+    known_recipients: StorageMap<Address, StorageBool>,
+    pending: StorageMap<B256, PendingChange>,
     safe_erc20: SafeErc20,
 }
 
@@ -166,6 +192,15 @@ fn change_data_hash(change_kind: u8, payload: &[u8]) -> B256 {
     preimage.push(change_kind);
     preimage.extend_from_slice(payload);
     keccak(preimage)
+}
+
+fn u128_to_u256(value: U128) -> U256 {
+    U256::from(value.to::<u128>())
+}
+
+/// Callers only pass values already bounded by a `u128` limit, so this never truncates.
+fn u256_to_u128(value: U256) -> U128 {
+    U128::from(value.to::<u128>())
 }
 
 impl VeraKeyAccount {
@@ -196,6 +231,18 @@ impl VeraKeyAccount {
         self.vm().block_timestamp()
     }
 
+    fn current_nonce(&self) -> U256 {
+        U256::from(self.nonce.get().to::<u64>())
+    }
+
+    fn limits(&self) -> change::Limits {
+        change::Limits {
+            per_tx_cap: u128_to_u256(self.per_tx_cap.get()),
+            daily_cap: u128_to_u256(self.daily_cap.get()),
+            new_payee_cap: u128_to_u256(self.new_payee_cap.get()),
+        }
+    }
+
     fn build_action(
         &self,
         action_kind: u8,
@@ -208,7 +255,7 @@ impl VeraKeyAccount {
         Action {
             chain_id: self.vm().chain_id(),
             account: self.vm().contract_address(),
-            nonce: self.nonce.get(),
+            nonce: self.current_nonce(),
             kind: action_kind,
             target,
             amount,
@@ -272,27 +319,28 @@ impl VeraKeyAccount {
             return Err(AccountError::InvalidProof(InvalidProof {}));
         }
 
-        self.nonce.set(action.nonce + U256::from(1));
+        self.nonce.set(U64::from(self.nonce.get().to::<u64>() + 1));
         Ok(action_hash)
     }
 
     fn check_spend(&self, amount: U256) -> Result<spending::Window, AccountError> {
         let window = spending::Window {
             day: self.spend_day.get().to::<u64>(),
-            spent: self.spent_today.get(),
+            spent: u128_to_u256(self.spent_today.get()),
         };
         Ok(spending::spend(
-            self.per_tx_cap.get(),
-            self.daily_cap.get(),
+            u128_to_u256(self.per_tx_cap.get()),
+            u128_to_u256(self.daily_cap.get()),
             window,
             self.now(),
             amount,
         )?)
     }
 
+    /// `window.spent` never exceeds the daily cap, which is stored as a `u128`.
     fn record_spend(&mut self, window: spending::Window) {
         self.spend_day.set(U64::from(window.day));
-        self.spent_today.set(window.spent);
+        self.spent_today.set(u256_to_u128(window.spent));
     }
 
     fn transfer_usdg(&mut self, to: Address, amount: U256) -> Result<(), AccountError> {
@@ -317,9 +365,16 @@ impl VeraKeyAccount {
         self.pending.getter(change_id).eta.get().to::<u64>()
     }
 
-    fn require_guardian(&self) -> Result<(), AccountError> {
-        let guardian = self.guardian.get();
-        if guardian == Address::ZERO || guardian != self.vm().msg_sender() {
+    /// The caller is the guardian if `keccak256(abi.encode(typehash, this, caller, salt))` equals
+    /// the stored commitment. The guardian reveals itself (and only for this account) by acting.
+    fn require_guardian(&self, salt: B256) -> Result<(), AccountError> {
+        let commitment = self.guardian_commitment.get();
+        let claimed = keccak(change::guardian_preimage(
+            self.vm().contract_address(),
+            self.vm().msg_sender(),
+            salt,
+        ));
+        if commitment == B256::ZERO || claimed != commitment {
             return Err(AccountError::NotGuardian(NotGuardian {}));
         }
         Ok(())
@@ -330,6 +385,60 @@ impl VeraKeyAccount {
         self.recovery_nullifier.set(B256::ZERO);
         self.recovery_eta.set(U64::ZERO);
         nullifier
+    }
+
+    /// Applies a validated change. Payloads were checked by `change::is_valid` when they were
+    /// scheduled or restricted; they are checked again here so no path can apply a malformed one.
+    fn apply(&mut self, change_kind: u8, payload: &[u8]) -> Result<(), AccountError> {
+        if !change::is_valid(change_kind, payload) {
+            return Err(AccountError::InvalidChange(InvalidChange {}));
+        }
+        match change_kind {
+            change::ADD_OWNER => {
+                let nullifier = B256::from_slice(payload);
+                if self.owner(nullifier) {
+                    return Err(AccountError::AlreadyOwner(AlreadyOwner {}));
+                }
+                self.set_owner(nullifier, true);
+                self.owner_count.set(U64::from(self.owner_count.get().to::<u64>() + 1));
+            }
+            change::REMOVE_OWNER => {
+                let nullifier = B256::from_slice(payload);
+                if !self.owner(nullifier) {
+                    return Err(AccountError::NotOwner(NotOwner {}));
+                }
+                let count = self.owner_count.get().to::<u64>();
+                if count <= 1 {
+                    return Err(AccountError::LastOwner(LastOwner {}));
+                }
+                self.set_owner(nullifier, false);
+                self.owner_count.set(U64::from(count - 1));
+            }
+            change::SET_LIMITS => {
+                let per_tx = change::word_u128(&payload[..32]).unwrap_or_default();
+                let daily = change::word_u128(&payload[32..]).unwrap_or_default();
+                self.per_tx_cap.set(U128::from(per_tx));
+                self.daily_cap.set(U128::from(daily));
+            }
+            change::SET_RECIPIENT => {
+                let recipient = change::word_address(&payload[..32]).unwrap_or_default();
+                let allowed = change::word_bool(&payload[32..]).unwrap_or(false);
+                self.allowed_recipients.setter(recipient).set(allowed);
+            }
+            change::SET_ALLOWLIST => {
+                self.allowlist_enabled.set(change::word_bool(payload).unwrap_or(false));
+            }
+            change::SET_GUARDIAN => {
+                self.guardian_commitment.set(B256::from_slice(payload));
+            }
+            change::SET_NEW_PAYEE_CAP => {
+                self.new_payee_cap.set(U128::from(change::word_u128(payload).unwrap_or_default()));
+            }
+            change::FREEZE => self.frozen.set(true),
+            change::UNFREEZE => self.frozen.set(false),
+            _ => return Err(AccountError::InvalidChange(InvalidChange {})),
+        }
+        Ok(())
     }
 }
 
@@ -353,12 +462,14 @@ impl VeraKeyAccount {
         origin: Bytes,
         per_tx_cap: U256,
         daily_cap: U256,
+        new_payee_cap: U256,
         change_delay: u64,
         recovery_delay: u64,
     ) -> Result<(), AccountError> {
         if self.initialized.get() {
             return Err(AccountError::AlreadyInitialized(AlreadyInitialized {}));
         }
+        let max = U256::from(u128::MAX);
         let valid = field::is_field_element(app_id)
             && field::is_field_element(owner_nullifier)
             && owner_nullifier != B256::ZERO
@@ -368,6 +479,8 @@ impl VeraKeyAccount {
             && origin.len() <= MAX_ORIGIN_LEN
             && !per_tx_cap.is_zero()
             && per_tx_cap <= daily_cap
+            && daily_cap <= max
+            && new_payee_cap <= max
             && change_delay <= MAX_DELAY
             && recovery_delay <= MAX_DELAY;
         if !valid {
@@ -375,17 +488,18 @@ impl VeraKeyAccount {
         }
         self.initialized.set(true);
         self.factory.set(self.vm().msg_sender());
+        self.change_delay.set(U64::from(change_delay));
         self.verifier.set(verifier);
+        self.recovery_delay.set(U64::from(recovery_delay));
         self.usdg.set(usdg);
+        self.owner_count.set(U64::from(1));
+        self.per_tx_cap.set(u256_to_u128(per_tx_cap));
+        self.daily_cap.set(u256_to_u128(daily_cap));
+        self.new_payee_cap.set(u256_to_u128(new_payee_cap));
         self.app_id.set(app_id);
         self.rp_id_hash.set(rp_id_hash);
         self.origin.set_bytes(&origin);
-        self.per_tx_cap.set(per_tx_cap);
-        self.daily_cap.set(daily_cap);
-        self.change_delay.set(U64::from(change_delay));
-        self.recovery_delay.set(U64::from(recovery_delay));
         self.set_owner(owner_nullifier, true);
-        self.owner_count.set(U256::from(1));
         log(self.vm(), Initialized {
             appId: app_id,
             ownerNullifier: owner_nullifier,
@@ -406,20 +520,33 @@ impl VeraKeyAccount {
         client_data_json: Bytes,
         proof: Bytes,
     ) -> Result<(), AccountError> {
+        if self.frozen.get() {
+            return Err(AccountError::AccountFrozen(AccountFrozen {}));
+        }
         if amount.is_zero() {
             return Err(AccountError::InvalidAmount(InvalidAmount {}));
         }
         if to == Address::ZERO || to == self.vm().contract_address() {
             return Err(AccountError::InvalidRecipient(InvalidRecipient {}));
         }
-        if self.allowlist_enabled.get() && !self.allowed_recipients.get(to) {
+        let allowlisted = self.allowed_recipients.get(to);
+        if self.allowlist_enabled.get() && !allowlisted {
             return Err(AccountError::RecipientNotAllowed(RecipientNotAllowed {}));
         }
         let total = amount
             .checked_add(fee)
             .ok_or(AccountError::InvalidAmount(InvalidAmount {}))?;
         let window = self.check_spend(total)?;
-        let nonce = self.nonce.get();
+        // Within the caps, a first payment to a recipient that is neither known nor allowlisted is
+        // bounded again: a look-alike address or a tampered page can take at most `newPayeeCap`.
+        let known = self.known_recipients.get(to);
+        if !known && !allowlisted {
+            let cap = u128_to_u256(self.new_payee_cap.get());
+            if amount > cap {
+                return Err(AccountError::NewPayeeCapExceeded(NewPayeeCapExceeded { cap }));
+            }
+        }
+        let nonce = self.current_nonce();
         self.authorize(
             kind::PAY,
             to,
@@ -432,6 +559,9 @@ impl VeraKeyAccount {
             &proof,
         )?;
         self.record_spend(window);
+        if !known {
+            self.known_recipients.setter(to).set(true);
+        }
 
         let submitter = self.vm().msg_sender();
         self.transfer_usdg(to, amount)?;
@@ -495,6 +625,48 @@ impl VeraKeyAccount {
         Ok(change_id)
     }
 
+    /// Applies a tightening change immediately (freeze, lower limits, enable the allowlist, remove
+    /// a recipient). Anything that loosens the account must go through `schedule_change`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn restrict(
+        &mut self,
+        change_kind: u8,
+        payload: Bytes,
+        fee: U256,
+        deadline: u64,
+        nullifier: B256,
+        client_data_json: Bytes,
+        proof: Bytes,
+    ) -> Result<B256, AccountError> {
+        if !change::is_restrictive(change_kind, &payload, &self.limits()) {
+            return Err(AccountError::NotRestrictive(NotRestrictive {}));
+        }
+        let data_hash = change_data_hash(change_kind, &payload);
+        let window = self.check_spend(fee)?;
+        let restriction_id = self.authorize(
+            kind::RESTRICT,
+            Address::ZERO,
+            U256::ZERO,
+            data_hash,
+            fee,
+            deadline,
+            nullifier,
+            &client_data_json,
+            &proof,
+        )?;
+        self.record_spend(window);
+        self.apply(change_kind, &payload)?;
+
+        let submitter = self.vm().msg_sender();
+        self.transfer_usdg(submitter, fee)?;
+        log(self.vm(), Restricted {
+            restrictionId: restriction_id,
+            changeKind: change_kind,
+            payload: payload.0.into(),
+        });
+        Ok(restriction_id)
+    }
+
     /// Applies a scheduled change once its timelock has passed. Anyone may call it.
     pub fn apply_change(
         &mut self,
@@ -523,44 +695,7 @@ impl VeraKeyAccount {
             return Err(AccountError::ChangeNotReady(ChangeNotReady { eta }));
         }
         self.clear_pending(change_id);
-
-        match change_kind {
-            change::ADD_OWNER => {
-                let nullifier = B256::from_slice(&payload);
-                if self.owner(nullifier) {
-                    return Err(AccountError::AlreadyOwner(AlreadyOwner {}));
-                }
-                self.set_owner(nullifier, true);
-                self.owner_count.set(self.owner_count.get() + U256::from(1));
-            }
-            change::REMOVE_OWNER => {
-                let nullifier = B256::from_slice(&payload);
-                if !self.owner(nullifier) {
-                    return Err(AccountError::NotOwner(NotOwner {}));
-                }
-                if self.owner_count.get() <= U256::from(1) {
-                    return Err(AccountError::LastOwner(LastOwner {}));
-                }
-                self.set_owner(nullifier, false);
-                self.owner_count.set(self.owner_count.get() - U256::from(1));
-            }
-            change::SET_LIMITS => {
-                self.per_tx_cap.set(U256::from_be_slice(&payload[..32]));
-                self.daily_cap.set(U256::from_be_slice(&payload[32..]));
-            }
-            change::SET_RECIPIENT => {
-                let recipient = change::word_address(&payload[..32]).unwrap_or_default();
-                let allowed = change::word_bool(&payload[32..]).unwrap_or(false);
-                self.allowed_recipients.setter(recipient).set(allowed);
-            }
-            change::SET_ALLOWLIST => {
-                self.allowlist_enabled.set(change::word_bool(&payload).unwrap_or(false));
-            }
-            change::SET_GUARDIAN => {
-                self.guardian.set(change::word_address(&payload).unwrap_or_default());
-            }
-            _ => return Err(AccountError::InvalidChange(InvalidChange {})),
-        }
+        self.apply(change_kind, &payload)?;
         log(self.vm(), ChangeApplied {
             changeId: change_id,
             changeKind: change_kind,
@@ -602,8 +737,8 @@ impl VeraKeyAccount {
     }
 
     /// Lets the guardian veto a scheduled change (for example after a device theft).
-    pub fn guardian_cancel_change(&mut self, change_id: B256) -> Result<(), AccountError> {
-        self.require_guardian()?;
+    pub fn guardian_cancel_change(&mut self, change_id: B256, salt: B256) -> Result<(), AccountError> {
+        self.require_guardian(salt)?;
         if self.pending_eta(change_id) == 0 {
             return Err(AccountError::UnknownChange(UnknownChange {}));
         }
@@ -612,10 +747,19 @@ impl VeraKeyAccount {
         Ok(())
     }
 
-    /// Starts replacing every owner with `new_nullifier`, effective after the recovery delay.
-    pub fn initiate_recovery(&mut self, new_nullifier: B256) -> Result<(), AccountError> {
+    /// Lets the guardian stop all payments at once. Unfreezing is a timelocked owner change.
+    pub fn guardian_freeze(&mut self, salt: B256) -> Result<(), AccountError> {
         self.require_initialized()?;
-        self.require_guardian()?;
+        self.require_guardian(salt)?;
+        self.frozen.set(true);
+        log(self.vm(), GuardianFroze {});
+        Ok(())
+    }
+
+    /// Starts replacing every owner with `new_nullifier`, effective after the recovery delay.
+    pub fn initiate_recovery(&mut self, new_nullifier: B256, salt: B256) -> Result<(), AccountError> {
+        self.require_initialized()?;
+        self.require_guardian(salt)?;
         if new_nullifier == B256::ZERO || !field::is_field_element(new_nullifier) {
             return Err(AccountError::InvalidChange(InvalidChange {}));
         }
@@ -642,7 +786,7 @@ impl VeraKeyAccount {
         let epoch = self.owner_epoch.get() + U256::from(1);
         self.owner_epoch.set(epoch);
         self.set_owner(nullifier, true);
-        self.owner_count.set(U256::from(1));
+        self.owner_count.set(U64::from(1));
         log(self.vm(), RecoveryExecuted {
             newNullifier: nullifier,
             ownerEpoch: epoch,
@@ -686,8 +830,8 @@ impl VeraKeyAccount {
     }
 
     /// Lets the guardian withdraw its own recovery.
-    pub fn guardian_cancel_recovery(&mut self) -> Result<(), AccountError> {
-        self.require_guardian()?;
+    pub fn guardian_cancel_recovery(&mut self, salt: B256) -> Result<(), AccountError> {
+        self.require_guardian(salt)?;
         if self.recovery_eta.get().is_zero() {
             return Err(AccountError::NoRecovery(NoRecovery {}));
         }
@@ -719,7 +863,7 @@ impl VeraKeyAccount {
     }
 
     pub fn nonce(&self) -> U256 {
-        self.nonce.get()
+        self.current_nonce()
     }
 
     pub fn app_id(&self) -> B256 {
@@ -731,7 +875,7 @@ impl VeraKeyAccount {
     }
 
     pub fn owner_count(&self) -> U256 {
-        self.owner_count.get()
+        U256::from(self.owner_count.get().to::<u64>())
     }
 
     pub fn owner_epoch(&self) -> U256 {
@@ -744,16 +888,25 @@ impl VeraKeyAccount {
         let today = self.now() / spending::SECONDS_PER_DAY;
         let day = self.spend_day.get().to::<u64>();
         let spent = if day == today {
-            self.spent_today.get()
+            u128_to_u256(self.spent_today.get())
         } else {
             U256::ZERO
         };
         (
-            self.per_tx_cap.get(),
-            self.daily_cap.get(),
+            u128_to_u256(self.per_tx_cap.get()),
+            u128_to_u256(self.daily_cap.get()),
             spent,
             today,
             self.allowlist_enabled.get(),
+        )
+    }
+
+    /// `(newPayeeCap, frozen, guardianCommitment)`.
+    pub fn protections(&self) -> (U256, bool, B256) {
+        (
+            u128_to_u256(self.new_payee_cap.get()),
+            self.frozen.get(),
+            self.guardian_commitment.get(),
         )
     }
 
@@ -761,8 +914,9 @@ impl VeraKeyAccount {
         !self.allowlist_enabled.get() || self.allowed_recipients.get(recipient)
     }
 
-    pub fn guardian(&self) -> Address {
-        self.guardian.get()
+    /// Whether `recipient` has been paid before (so the new-payee cap no longer applies to it).
+    pub fn is_known_recipient(&self, recipient: Address) -> bool {
+        self.known_recipients.get(recipient)
     }
 
     /// `(newNullifier, eta)`; `eta` is zero when no recovery is pending.

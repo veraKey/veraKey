@@ -1,15 +1,18 @@
 import {
+  concat,
   createPublicClient,
   defineChain,
   formatUnits,
   http,
+  keccak256,
   parseEventLogs,
+  stringToHex,
   type Address,
   type Hex,
   type TransactionReceipt,
 } from "viem";
 import { erc20Abi, veraKeyAccountAbi, veraKeyFactoryAbi } from "./abi";
-import { ZERO_HASH, changeDataHash, hashAction } from "./action";
+import { ZERO_HASH, changeDataHash, changePayload, guardianCommitment, hashAction } from "./action";
 import { base64UrlEncode, bytesToHex, hexToBytes, toFieldHex } from "./bytes";
 import { ActionKind, MAX_DEADLINE_WINDOW, type ChangeKind } from "./constants";
 import { computeNullifier } from "./nullifier";
@@ -100,6 +103,9 @@ export const POLICY_REVERTS = new Set([
   "AlreadyOwner",
   "RecoveryNotReady",
   "NoRecovery",
+  "NewPayeeCapExceeded",
+  "AccountFrozen",
+  "NotRestrictive",
 ]);
 
 export interface AccountState {
@@ -113,11 +119,24 @@ export interface AccountState {
   dailyCap: bigint;
   spentToday: bigint;
   allowlistEnabled: boolean;
+  /** Largest first payment to a recipient that is neither known nor allowlisted. */
+  newPayeeCap: bigint;
+  frozen: boolean;
   ownerCount: bigint;
-  guardian: Address;
+  /** The zero hash when no guardian is set; the guardian's address is never stored. */
+  guardianCommitment: Hex;
   recovery: { nullifier: Hex; eta: bigint } | null;
   changeDelay: bigint;
   recoveryDelay: bigint;
+}
+
+/** What a guardian needs to act for one account; share it with the guardian, not with anyone else. */
+export interface GuardianCard {
+  chainId: number;
+  account: Address;
+  guardian: Address;
+  salt: Hex;
+  commitment: Hex;
 }
 
 export interface TrackedChange {
@@ -329,15 +348,15 @@ export class VeraKeyClient {
     const base = { appId, nullifier, address, balance };
     if (!code || code === "0x") {
       return {
-        ...base, deployed: false, nonce: 0n, perTxCap: 0n, dailyCap: 0n, spentToday: 0n,
-        allowlistEnabled: false, ownerCount: 1n, guardian: ZERO_ADDRESS, recovery: null, changeDelay: 0n, recoveryDelay: 0n,
+        ...base, deployed: false, nonce: 0n, perTxCap: 0n, dailyCap: 0n, spentToday: 0n, allowlistEnabled: false,
+        newPayeeCap: 0n, frozen: false, ownerCount: 1n, guardianCommitment: ZERO_HASH, recovery: null, changeDelay: 0n, recoveryDelay: 0n,
       };
     }
-    const read = <F extends "nonce" | "policy" | "ownerCount" | "guardian" | "recovery" | "config">(functionName: F) =>
+    const read = <F extends "nonce" | "policy" | "ownerCount" | "protections" | "recovery" | "config">(functionName: F) =>
       this.publicClient.readContract({ address, abi: veraKeyAccountAbi, functionName } as never) as Promise<unknown>;
-    const [nonce, policy, ownerCount, guardian, recovery, config] = (await Promise.all([
-      read("nonce"), read("policy"), read("ownerCount"), read("guardian"), read("recovery"), read("config"),
-    ])) as [bigint, readonly [bigint, bigint, bigint, bigint, boolean], bigint, Address, readonly [Hex, bigint], readonly unknown[]];
+    const [nonce, policy, ownerCount, protections, recovery, config] = (await Promise.all([
+      read("nonce"), read("policy"), read("ownerCount"), read("protections"), read("recovery"), read("config"),
+    ])) as [bigint, readonly [bigint, bigint, bigint, bigint, boolean], bigint, readonly [bigint, boolean, Hex], readonly [Hex, bigint], readonly unknown[]];
     return {
       ...base,
       deployed: true,
@@ -346,8 +365,10 @@ export class VeraKeyClient {
       dailyCap: policy[1],
       spentToday: policy[2],
       allowlistEnabled: policy[4],
+      newPayeeCap: protections[0],
+      frozen: protections[1],
       ownerCount,
-      guardian,
+      guardianCommitment: protections[2],
       recovery: recovery[1] === 0n ? null : { nullifier: recovery[0], eta: recovery[1] },
       changeDelay: config[4] as bigint,
       recoveryDelay: config[5] as bigint,
@@ -520,6 +541,51 @@ export class VeraKeyClient {
       const [event] = parseEventLogs({ abi: veraKeyAccountAbi, eventName: "ChangeScheduled", logs: receipt.logs });
       return { account: auth.account, changeId: event.args.changeId, kind: change.kind, payload: change.payload, eta: Number(event.args.eta) };
     });
+  }
+
+  /**
+   * Applies a tightening change at once (freeze, lower limits or new-payee cap, enable the allowlist,
+   * remove a recipient). The account refuses anything that would loosen it (`NotRestrictive`).
+   */
+  restrict(appId: bigint, change: { kind: ChangeKind; payload: Hex }, emit: Listener = () => {}): Promise<{ account: Address; restrictionId: Hex }> {
+    return this.run(emit, async () => {
+      await this.ensureAccount(appId);
+      const auth = await this.authorize(
+        appId,
+        { kind: ActionKind.Restrict, target: ZERO_ADDRESS, amount: 0n, dataHash: changeDataHash(change.kind, change.payload) },
+        emit
+      );
+      const receipt = await this.submit(
+        auth.account, "restrict",
+        [change.kind, change.payload, auth.fee, auth.deadline, auth.nullifier, auth.clientDataJSON, auth.proof],
+        auth.provingMs, emit
+      );
+      const [event] = parseEventLogs({ abi: veraKeyAccountAbi, eventName: "Restricted", logs: receipt.logs });
+      return { account: auth.account, restrictionId: event.args.restrictionId };
+    });
+  }
+
+  /** Stops every payment from the `appId` account at once; unfreezing is a timelocked change. */
+  freeze(appId: bigint, emit: Listener = () => {}) {
+    return this.restrict(appId, changePayload.freeze(), emit);
+  }
+
+  /**
+   * The salt that hides `guardian` behind a commitment in the `appId` account. It is derived from the
+   * passkey's PRF secret, so the owner can always rebuild the guardian card, and it differs per app, so
+   * one guardian used by several apps leaves nothing on-chain that links them.
+   */
+  async guardianSalt(appId: bigint, guardian: Address, session = this.requireSession()): Promise<Hex> {
+    return keccak256(
+      concat([stringToHex("VeraKey guardian salt v1"), bytesToHex(session.prfSecret), toFieldHex(appId), guardian.toLowerCase() as Hex])
+    );
+  }
+
+  /** The card to hand to `guardian`, and the commitment to schedule with `changePayload.setGuardian`. */
+  async guardianCard(appId: bigint, guardian: Address): Promise<GuardianCard> {
+    const account = await this.predictAddress(appId, await this.nullifier(appId));
+    const salt = await this.guardianSalt(appId, guardian);
+    return { chainId: this.config.chainId, account, guardian, salt, commitment: guardianCommitment(account, guardian, salt) };
   }
 
   cancelChange(appId: bigint, changeId: Hex, emit: Listener = () => {}): Promise<TransactionReceipt> {

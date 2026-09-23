@@ -198,23 +198,15 @@ export const veraKeyAccountAbi = [
   },
   {
     "type": "function",
-    "name": "guardian",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "guardianCancelChange",
     "inputs": [
       {
         "name": "change_id",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "salt",
         "type": "bytes32",
         "internalType": "bytes32"
       }
@@ -225,7 +217,26 @@ export const veraKeyAccountAbi = [
   {
     "type": "function",
     "name": "guardianCancelRecovery",
-    "inputs": [],
+    "inputs": [
+      {
+        "name": "salt",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "guardianFreeze",
+    "inputs": [
+      {
+        "name": "salt",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -274,6 +285,11 @@ export const veraKeyAccountAbi = [
         "internalType": "uint256"
       },
       {
+        "name": "new_payee_cap",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
         "name": "change_delay",
         "type": "uint64",
         "internalType": "uint64"
@@ -308,10 +324,34 @@ export const veraKeyAccountAbi = [
         "name": "new_nullifier",
         "type": "bytes32",
         "internalType": "bytes32"
+      },
+      {
+        "name": "salt",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "isKnownRecipient",
+    "inputs": [
+      {
+        "name": "recipient",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -515,6 +555,29 @@ export const veraKeyAccountAbi = [
   },
   {
     "type": "function",
+    "name": "protections",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "recovery",
     "inputs": [],
     "outputs": [
@@ -530,6 +593,55 @@ export const veraKeyAccountAbi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "restrict",
+    "inputs": [
+      {
+        "name": "change_kind",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "payload",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "fee",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "deadline",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "nullifier",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "client_data_json",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "proof",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -579,6 +691,11 @@ export const veraKeyAccountAbi = [
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "error",
+    "name": "AccountFrozen",
+    "inputs": []
   },
   {
     "type": "error",
@@ -659,6 +776,17 @@ export const veraKeyAccountAbi = [
   },
   {
     "type": "error",
+    "name": "NewPayeeCapExceeded",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "NoRecovery",
     "inputs": []
   },
@@ -675,6 +803,11 @@ export const veraKeyAccountAbi = [
   {
     "type": "error",
     "name": "NotOwner",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotRestrictive",
     "inputs": []
   },
   {
@@ -820,6 +953,34 @@ export const veraKeyAccountAbi = [
   },
   {
     "type": "event",
+    "name": "Restricted",
+    "anonymous": false,
+    "inputs": [
+      {
+        "name": "restrictionId",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "changeKind",
+        "type": "uint8",
+        "indexed": false
+      },
+      {
+        "name": "payload",
+        "type": "bytes",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "GuardianFroze",
+    "anonymous": false,
+    "inputs": []
+  },
+  {
+    "type": "event",
     "name": "RecoveryInitiated",
     "anonymous": false,
     "inputs": [
@@ -915,6 +1076,11 @@ export const veraKeyFactoryAbi = [
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
         "name": "",

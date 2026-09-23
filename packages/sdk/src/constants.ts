@@ -24,6 +24,7 @@ export const ActionKind = {
   ScheduleChange: 2,
   CancelChange: 3,
   CancelRecovery: 4,
+  Restrict: 5,
 } as const;
 export type ActionKind = (typeof ActionKind)[keyof typeof ActionKind];
 
@@ -33,8 +34,16 @@ export const ChangeKind = {
   SetLimits: 3,
   SetRecipient: 4,
   SetAllowlist: 5,
+  /** payload: the guardian commitment (see `guardianCommitment`); zero removes the guardian */
   SetGuardian: 6,
+  SetNewPayeeCap: 7,
+  Freeze: 8,
+  Unfreeze: 9,
 } as const;
+
+/** `keccak256("VeraKeyGuardian(address account,address guardian,bytes32 salt)")` */
+export const GUARDIAN_TYPEHASH =
+  "0xf33d4055d6c5cd8cf1e8584e7625a8e778a2e5abf8168ed8b7f88c28dbf6c8e8" as const;
 export type ChangeKind = (typeof ChangeKind)[keyof typeof ChangeKind];
 
 /** USDG has 6 decimals. */

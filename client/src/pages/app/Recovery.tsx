@@ -1,6 +1,7 @@
-import { changePayload } from "@verakey/sdk/action";
+import { ZERO_HASH, changePayload } from "@verakey/sdk/action";
 import { toFieldHex } from "@verakey/sdk/bytes";
-import { KeyRound, LifeBuoy, ShieldAlert, UserPlus } from "lucide-react";
+import type { GuardianCard } from "@verakey/sdk/client";
+import { Download, KeyRound, LifeBuoy, ShieldAlert, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { isAddress, type Address } from "viem";
@@ -12,7 +13,22 @@ import { Kicker, ProofTimeline, RejectionNote, useNow } from "./components";
 import { AppSwitch, PendingChanges } from "./Policy";
 import { useAuthorizedAction } from "./useAuthorizedAction";
 
-const ZERO = "0x0000000000000000000000000000000000000000";
+/** The file a guardian keeps: without its salt a guardian cannot act, and nobody else learns it. */
+function downloadCard(card: GuardianCard, appName: string) {
+  const body = {
+    ...card,
+    app: appName,
+    howToAct: {
+      freeze: `guardianFreeze(bytes32 salt) on ${card.account}, sent from ${card.guardian}`,
+      recover: `initiateRecovery(bytes32 newOwnerNullifier, bytes32 salt) on ${card.account}, sent from ${card.guardian}`,
+      cancelRecovery: `guardianCancelRecovery(bytes32 salt)`,
+    },
+  };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(body, null, 2)], { type: "application/json" }));
+  const link = Object.assign(document.createElement("a"), { href: url, download: `verakey-guardian-${appName.toLowerCase()}.json` });
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export function Recovery() {
   const { client, accounts, refreshAccounts, refreshPasskeys, passkeys, session } = useVeraKey();
@@ -21,6 +37,7 @@ export function Recovery() {
   const account = accounts[app.key];
   const action = useAuthorizedAction();
   const [guardian, setGuardian] = useState("");
+  const [card, setCard] = useState<GuardianCard | null>(null);
   const [backupBusy, setBackupBusy] = useState(false);
   const now = useNow(!!account?.recovery, 1000);
 
@@ -97,28 +114,59 @@ export function Recovery() {
             </div>
 
             <div className="vk-panel">
-              <div className="vk-panel-head"><span>Guardian</span><span>{account.guardian === ZERO ? "none" : shortHex(account.guardian)}</span></div>
+              <div className="vk-panel-head"><span>Guardian</span><span>{account.guardianCommitment === ZERO_HASH ? "none" : "set · private"}</span></div>
               <div className="vk-panel-body vk-form">
                 <p style={{ margin: 0, color: "var(--vk-muted)", fontSize: 12, lineHeight: 1.6 }}>
-                  A guardian (a friend's wallet, a multisig, another account) can start replacing the owners.
-                  The change waits {formatDuration(Number(account.recoveryDelay))}; any owner passkey can cancel
-                  it. The guardian address is public, so reusing one guardian across apps links those accounts.
+                  A guardian (a friend's wallet, a multisig, another account) can freeze this account at once and
+                  start replacing its owners; the replacement waits {formatDuration(Number(account.recoveryDelay))} and
+                  any owner passkey can cancel it. The account stores only a salted commitment, so the guardian stays
+                  private until it acts, and one guardian used by several apps leaves nothing on-chain that links them.
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "end" }}>
-                  <label className="vk-field"><span>Guardian address</span><input className="vk-input is-mono" placeholder="0x…" value={guardian} onChange={e => setGuardian(e.target.value.trim())} spellCheck={false} /></label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 10, alignItems: "end" }}>
+                  <label className="vk-field"><span>Guardian address</span><input className="vk-input is-mono" placeholder="0x…" value={guardian} onChange={e => { setGuardian(e.target.value.trim()); setCard(null); }} spellCheck={false} /></label>
                   <button
                     className="vk-btn vk-btn-ghost"
                     style={{ minHeight: 44 }}
                     disabled={action.busy || !isAddress(guardian)}
                     onClick={() => action.run("Set guardian", async emit => {
-                      const tracked = await client!.scheduleChange(app.appId, changePayload.setGuardian(guardian as Address), emit);
+                      const next = await client!.guardianCard(app.appId, guardian as Address);
+                      const tracked = await client!.scheduleChange(app.appId, changePayload.setGuardian(next.commitment), emit);
                       trackedChanges.add(tracked);
+                      setCard(next);
                       await refreshAccounts();
                     })}
                   >
                     <LifeBuoy size={14} /> Set
                   </button>
+                  <button
+                    className="vk-btn vk-btn-quiet"
+                    style={{ minHeight: 44 }}
+                    disabled={action.busy || !isAddress(guardian) || account.guardianCommitment === ZERO_HASH}
+                    title="Rebuild the guardian card from your passkey"
+                    onClick={async () => {
+                      const rebuilt = await client!.guardianCard(app.appId, guardian as Address);
+                      if (rebuilt.commitment !== account.guardianCommitment) {
+                        toast.error("That address is not this account's guardian (or the change is still pending).");
+                        return;
+                      }
+                      setCard(rebuilt);
+                    }}
+                  >
+                    Card
+                  </button>
                 </div>
+                {card && (
+                  <div className="vk-note">
+                    <div style={{ display: "grid", gap: 6 }}>
+                      <b>Guardian card for {shortHex(card.guardian)}</b>
+                      <span>Give this file to the guardian only. It needs the salt to act; the salt is derived from your passkey, so you can rebuild the card here at any time.</span>
+                      <code className="vk-mono" style={{ fontSize: 11, wordBreak: "break-all" }}>salt {card.salt}</code>
+                      <button className="vk-btn vk-btn-ghost" style={{ justifySelf: "start" }} onClick={() => downloadCard(card, app.name)}>
+                        <Download size={14} /> Download guardian card
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

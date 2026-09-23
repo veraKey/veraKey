@@ -43,7 +43,7 @@ export const deployment = JSON.parse(
     factoryAlt: Address;
     usdg: Address;
   };
-  policy: { perTxCap: string; dailyCap: string; changeDelay: number; recoveryDelay: number };
+  policy: { perTxCap: string; dailyCap: string; newPayeeCap: string; changeDelay: number; recoveryDelay: number };
 };
 
 export const chain = defineChain({

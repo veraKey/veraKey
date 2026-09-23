@@ -17,6 +17,8 @@ const accountEvents = [
   event("ChangeScheduled", [p("changeId", "bytes32", true), p("changeKind", "uint8"), p("payload", "bytes"), p("eta", "uint64")]),
   event("ChangeApplied", [p("changeId", "bytes32", true), p("changeKind", "uint8")]),
   event("ChangeCancelled", [p("changeId", "bytes32", true)]),
+  event("Restricted", [p("restrictionId", "bytes32", true), p("changeKind", "uint8"), p("payload", "bytes")]),
+  event("GuardianFroze", []),
   event("RecoveryInitiated", [p("newNullifier", "bytes32", true), p("eta", "uint64")]),
   event("RecoveryExecuted", [p("newNullifier", "bytes32", true), p("ownerEpoch", "uint256")]),
   event("RecoveryCancelled", [p("newNullifier", "bytes32", true)]),
