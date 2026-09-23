@@ -1,6 +1,7 @@
 import {
   createPublicClient,
   defineChain,
+  formatUnits,
   http,
   parseEventLogs,
   type Address,
@@ -72,7 +73,7 @@ export type ProofState =
   | { status: "verified"; provingMs: number; hash: Hex; receipt: TransactionReceipt; publicKeyOccurrences: number }
   | { status: "rejected"; stage: RejectionStage; message: string; revert?: string };
 
-export type RejectionStage = "authentication" | "device" | "proof" | "policy" | "relay";
+export type RejectionStage = "funds" | "authentication" | "device" | "proof" | "policy" | "relay";
 
 export class VeraKeyError extends Error {
   constructor(
@@ -385,6 +386,13 @@ export class VeraKeyClient {
         ? await this.publicClient.readContract({ address: account, abi: veraKeyAccountAbi, functionName: "nonce" })
         : 0n;
     const fee = this.config.relayerFee;
+    // Every proof-authorized call pays the relayer fee in USDG: do not ask for the passkey when the
+    // account cannot cover it. A payment's amount is left to the contract, which must still see a
+    // payment above the account's caps in order to refuse it.
+    const balance = await this.publicClient.readContract({ address: this.config.usdg, abi: erc20Abi, functionName: "balanceOf", args: [account] });
+    if (balance < fee) {
+      throw new VeraKeyError("funds", `The account holds ${formatUnits(balance, 6)} USDG and every action pays a ${formatUnits(fee, 6)} USDG relayer fee.`);
+    }
     const deadline = BigInt(Math.floor(Date.now() / 1000) + MAX_DEADLINE_WINDOW / 2);
     const actionHash = hashAction({
       chainId: this.config.chainId, account, nonce, kind: action.kind as never, target: action.target,

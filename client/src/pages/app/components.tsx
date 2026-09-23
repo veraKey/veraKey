@@ -35,6 +35,7 @@ function stepIndex(state: ProofState): number {
 }
 
 const REJECTION_STEP: Record<string, StepKey> = {
+  funds: "authenticating",
   authentication: "authenticating",
   device: "authenticating",
   proof: "proving",
@@ -104,17 +105,27 @@ const POLICY_COPY: Record<string, string> = {
   ChangeNotReady: "The timelock has not passed yet.",
   UnknownChange: "That change is no longer pending.",
   LastOwner: "An account must keep at least one owner passkey.",
+  TokenTransferFailed: "Your proof is valid, but this account holds less USDG than the amount plus the relayer fee. Get demo USDG on the Accounts page.",
+};
+
+const HEADLINE: Record<string, string> = {
+  funds: "Not enough USDG.",
+  policy: "Authenticated, not authorized.",
+  device: "This device can't be used.",
 };
 
 export function RejectionNote({ state }: { state: Extract<ProofState, { status: "rejected" }> }) {
-  const policy = state.stage === "policy";
+  // A valid proof whose payment or fee the account cannot cover.
+  const unfunded = state.revert === "TokenTransferFailed";
+  const soft = unfunded || state.stage === "policy" || state.stage === "funds";
   const message = (state.revert && POLICY_COPY[state.revert]) ?? state.message;
   return (
-    <div className={`vk-note ${policy ? "is-policy" : "is-error"}`} role="alert">
+    <div className={`vk-note ${soft ? "is-policy" : "is-error"}`} role="alert">
       <AlertTriangle size={15} />
       <span>
-        <b>{policy ? "Authenticated, not authorized." : state.stage === "device" ? "This device can't be used." : "Not completed."}</b>{" "}
+        <b>{unfunded ? "Authenticated, not funded." : (HEADLINE[state.stage] ?? "Not completed.")}</b>{" "}
         {message}
+        {state.stage === "funds" && " Get demo USDG on the Accounts page."}
         {state.revert && <span className="vk-mono"> ({state.revert})</span>}
       </span>
     </div>

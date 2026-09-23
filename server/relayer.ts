@@ -162,6 +162,10 @@ export class Relayer {
     if (this.funded.has(account.toLowerCase())) throw new RelayError(409, "This account already received demo USDG.");
     const amount = BigInt(this.config.network.relayer.faucetAmount);
     const usdg = this.config.network.contracts.usdg;
+    if (!this.config.mintableUsdg) {
+      const treasury = await this.publicClient.readContract({ address: usdg, abi: erc20Abi, functionName: "balanceOf", args: [this.address] });
+      if (treasury < amount) throw new RelayError(503, "The demo faucet is out of USDG. Try again later.");
+    }
     const hash = this.config.mintableUsdg
       ? await this.submit({
           address: usdg,

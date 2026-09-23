@@ -33,6 +33,7 @@ export function Pay() {
   const problem = useMemo(() => {
     if (!isAddress(to)) return "Enter a valid recipient address.";
     if (units === null || units === 0n) return "Enter an amount.";
+    if (!account) return "Loading this account's balance…";
     // Above the cap the contract refuses before it looks at the balance, which is the point of the
     // "try over the cap" demo; within the cap, an unaffordable payment is blocked here.
     if (account && units + fee > account.balance && units + fee <= perTxCap) return "Not enough USDG in this account (amount + relayer fee).";
