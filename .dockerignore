@@ -1,0 +1,14 @@
+# Only the web app, the relayer, the SDK and deployments/ go into the image.
+**/node_modules
+**/target
+.git
+.github
+.env
+.env.*
+!.env.example
+data
+dist
+circuits
+contracts
+docs
+*.log

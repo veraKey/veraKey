@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = ["core", "account", "factory"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/mdlog/verakey"
+
+[workspace.dependencies]
+alloy-primitives = { version = "=0.8.20", default-features = false }
+alloy-sol-types = { version = "=0.8.20", default-features = false }
+stylus-sdk = { version = "=0.9.0" }
+openzeppelin-stylus = { version = "=0.3.0" }
+# stylus-sdk 0.9.0 fails const evaluation with ruint >= 1.17; OpenZeppelin Stylus 0.3 needs >= 1.13.
+ruint = { version = "=1.16.0", default-features = false }
+verakey-core = { path = "core" }
+
+[profile.release]
+codegen-units = 1
+strip = true
+lto = true
+panic = "abort"
+opt-level = "z"

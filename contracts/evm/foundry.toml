@@ -1,0 +1,15 @@
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.27"
+optimizer = true
+optimizer_runs = 1
+evm_version = "cancun"
+fs_permissions = [{ access = "read", path = "./test/fixtures" }]
+
+[rpc_endpoints]
+local = "http://127.0.0.1:8649"
+arbitrum_sepolia = "https://sepolia-rollup.arbitrum.io/rpc"

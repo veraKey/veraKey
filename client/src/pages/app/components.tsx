@@ -1,0 +1,163 @@
+import type { NetworkConfig } from "@shared/api";
+import type { ProofState } from "@verakey/sdk/client";
+import { AlertTriangle, Check, Cpu, Fingerprint, Link2, Radio, ShieldX } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { explorerTx } from "@/lib/config";
+import { formatGas, shortHex } from "@/lib/format";
+
+export function Kicker({ children }: { children: ReactNode }) {
+  return <div className="vk-kicker">{children}</div>;
+}
+
+/** Re-renders every `intervalMs` while `active`; returns the current time in ms. */
+export function useNow(active = true, intervalMs = 100): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const id = window.setInterval(() => setNow(Date.now()), intervalMs);
+    return () => window.clearInterval(id);
+  }, [active, intervalMs]);
+  return now;
+}
+
+type StepKey = "authenticating" | "proving" | "relaying" | "confirming";
+const ORDER: StepKey[] = ["authenticating", "proving", "relaying", "confirming"];
+
+function stepIndex(state: ProofState): number {
+  switch (state.status) {
+    case "authenticating": return 0;
+    case "proving": return 1;
+    case "relaying": return 2;
+    case "confirming": return 3;
+    case "verified": return 4;
+    default: return -1;
+  }
+}
+
+const REJECTION_STEP: Record<string, StepKey> = {
+  authentication: "authenticating",
+  device: "authenticating",
+  proof: "proving",
+  policy: "relaying",
+  relay: "relaying",
+};
+
+/** The authorization pipeline, step by step: passkey, proof, relay, chain. */
+export function ProofTimeline({ state, lastProvingMs }: { state: ProofState; lastProvingMs?: number }) {
+  const failedAt = state.status === "rejected" ? ORDER.indexOf(REJECTION_STEP[state.stage]) : -1;
+  // A rejection at step k means every earlier step succeeded (e.g. a valid proof blocked by policy).
+  const current = state.status === "rejected" ? failedAt : stepIndex(state);
+  const now = useNow(state.status === "proving");
+  // Remember the proving time across a policy rejection: the proof itself succeeded.
+  const lastProving = useRef<number | undefined>(undefined);
+  if (state.status === "authenticating") lastProving.current = undefined;
+  if ("provingMs" in state) lastProving.current = state.provingMs;
+  const provingMs =
+    state.status === "proving" ? now - state.startedAt
+      : "provingMs" in state ? state.provingMs
+        : state.status === "rejected" ? lastProving.current
+          : lastProvingMs;
+
+  const steps: { key: StepKey; icon: ReactNode; title: string; detail: string; meta?: string }[] = [
+    { key: "authenticating", icon: <Fingerprint size={15} />, title: "Passkey", detail: "Face ID, Touch ID or PIN signs this exact action on your device." },
+    {
+      key: "proving", icon: <Cpu size={15} />, title: "Zero-knowledge proof",
+      detail: "Your public key, signature and PRF secret stay in this browser. Only the proof leaves.",
+      meta: provingMs !== undefined ? `${(provingMs / 1000).toFixed(1)}s` : undefined,
+    },
+    { key: "relaying", icon: <Radio size={15} />, title: "Gasless relay", detail: "The relayer simulates the call, then submits it. It never sees your key." },
+    {
+      key: "confirming", icon: <Link2 size={15} />, title: "Arbitrum",
+      detail: "The Stylus account verifies the proof, applies your policy and moves USDG.",
+      meta: state.status === "verified" ? `block ${state.receipt.blockNumber}` : undefined,
+    },
+  ];
+
+  return (
+    <div className="vk-timeline" aria-live="polite">
+      {steps.map((step, i) => {
+        const failed = failedAt === i;
+        const done = current > i || (state.status === "verified" && i <= 3);
+        const active = current === i && !done;
+        const cls = failed ? "is-failed" : done ? "is-done" : active ? "is-active" : "";
+        return (
+          <div key={step.key} className={`vk-step ${cls}`}>
+            <span className="vk-step-icon">{failed ? <ShieldX size={15} /> : done ? <Check size={15} /> : step.icon}</span>
+            <span>
+              <b>{step.title}</b>
+              <small>{step.detail}</small>
+            </span>
+            <span className="vk-step-meta">{step.meta ?? (active ? <span className="vk-spinner" /> : "")}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const POLICY_COPY: Record<string, string> = {
+  PerTxCapExceeded: "Your proof is valid, but this amount is above the account's per-payment cap.",
+  DailyCapExceeded: "Your proof is valid, but this payment would go over today's spending cap.",
+  RecipientNotAllowed: "Your proof is valid, but this recipient is not on the account's allowlist.",
+  InvalidRecipient: "That recipient address cannot receive payments from this account.",
+  NotOwner: "This passkey is not an owner of this account.",
+  ChangeNotReady: "The timelock has not passed yet.",
+  UnknownChange: "That change is no longer pending.",
+  LastOwner: "An account must keep at least one owner passkey.",
+};
+
+export function RejectionNote({ state }: { state: Extract<ProofState, { status: "rejected" }> }) {
+  const policy = state.stage === "policy";
+  const message = (state.revert && POLICY_COPY[state.revert]) ?? state.message;
+  return (
+    <div className={`vk-note ${policy ? "is-policy" : "is-error"}`} role="alert">
+      <AlertTriangle size={15} />
+      <span>
+        <b>{policy ? "Authenticated, not authorized." : state.stage === "device" ? "This device can't be used." : "Not completed."}</b>{" "}
+        {message}
+        {state.revert && <span className="vk-mono"> ({state.revert})</span>}
+      </span>
+    </div>
+  );
+}
+
+export interface ReceiptData {
+  title: string;
+  hash: `0x${string}`;
+  gasUsed: bigint;
+  provingMs: number;
+  publicKeyOccurrences: number;
+  proofBytes: number;
+  rows: [string, ReactNode][];
+}
+
+/** The artifact a user keeps: what happened, and proof that their key never reached the chain. */
+export function ProofReceipt({ receipt, config }: { receipt: ReceiptData; config: NetworkConfig }) {
+  const link = explorerTx(config, receipt.hash);
+  return (
+    <div className="vk-receipt">
+      <div className="vk-stamp">ZK<br />VERIFIED</div>
+      <div style={{ fontSize: 9, letterSpacing: "0.16em", color: "#4d6a5b" }}>VERAKEY RECEIPT</div>
+      <div style={{ margin: "6px 0 14px", fontSize: 22, fontWeight: 600, letterSpacing: "-0.05em" }}>{receipt.title}</div>
+      {receipt.rows.map(([label, value]) => (
+        <div className="vk-receipt-row" key={label}>
+          <span>{label}</span>
+          <span>{value}</span>
+        </div>
+      ))}
+      <div className="vk-receipt-row">
+        <span>Transaction</span>
+        {link ? <a href={link} target="_blank" rel="noreferrer">{shortHex(receipt.hash, 10, 8)} ↗</a> : <code>{shortHex(receipt.hash, 10, 8)}</code>}
+      </div>
+      <div className="vk-receipt-row"><span>Proof</span><code>UltraHonk · {receipt.proofBytes.toLocaleString("en-US")} bytes · {(receipt.provingMs / 1000).toFixed(1)}s in-browser</code></div>
+      <div className="vk-receipt-row"><span>Gas used</span><code>{formatGas(receipt.gasUsed)}</code></div>
+      <div className="vk-receipt-zero">
+        <strong>{receipt.publicKeyOccurrences}</strong>
+        <p>
+          times your passkey's public key appears in this transaction's calldata. The chain received a
+          proof, a per-app nullifier and the browser's clientDataJSON. Nothing else.
+        </p>
+      </div>
+    </div>
+  );
+}

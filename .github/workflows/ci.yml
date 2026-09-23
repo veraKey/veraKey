@@ -1,0 +1,78 @@
+# Circuit, contracts, app and end-to-end tests. The end-to-end suite deploys the real contracts to a
+# nitro devnode (scripts/devnode.sh) and exercises them, and the relayer, with real UltraHonk proofs.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install nargo 1.0.0-beta.22 and bb 5.0.0-nightly.20260522
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/noir-lang/noirup/refs/heads/main/install | bash
+          "$HOME/.nargo/bin/noirup" --version 1.0.0-beta.22
+          curl -fsSL https://raw.githubusercontent.com/AztecProtocol/aztec-packages/refs/heads/next/barretenberg/bbup/install | bash
+          "$HOME/.bb/bbup" --version 5.0.0-nightly.20260522
+          echo "$HOME/.nargo/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.bb" >> "$GITHUB_PATH"
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install Rust 1.91.0 (wasm32)
+        run: rustup toolchain install 1.91.0 --profile minimal --target wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts/stylus
+      - name: Cache cargo-stylus
+        id: cargo-stylus
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-stylus
+          key: cargo-stylus-0.10.9-${{ runner.os }}
+      - name: Install cargo-stylus 0.10.9
+        if: steps.cargo-stylus.outputs.cache-hit != 'true'
+        run: cargo install --locked cargo-stylus --version 0.10.9
+
+      - name: Circuit tests, verification key and verifier
+        run: scripts/build-circuit.sh
+      - name: Committed verifier and circuit artifact match the circuit source
+        run: git diff --exit-code -- contracts/evm/src/HonkVerifier.sol packages/sdk/src/circuit/verakey_webauthn.json
+
+      - name: Rust unit tests
+        run: pnpm contracts:test
+      - name: Typecheck
+        run: pnpm check && pnpm --filter @verakey/sdk check
+      - name: Build the app and the relayer
+        run: pnpm build
+
+      - name: Start the nitro devnode (ArbOS 61)
+        run: scripts/devnode.sh up
+      - name: Deploy the contracts to the devnode
+        run: scripts/deploy.sh local
+      - name: End-to-end tests with real proofs
+        run: pnpm test:e2e
+      - name: Devnode logs
+        if: failure()
+        run: docker logs --tail 200 verakey-nitro-dev || true
