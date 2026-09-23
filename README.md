@@ -128,6 +128,12 @@ again.
    proxy with `RELAYER_PRIVATE_KEY` set (see `Dockerfile`). Without Docker: `pnpm build && pnpm start`,
    which reads `.env`.
 
+On Railway, `railway.json` builds the Dockerfile. Generate the service's `*.up.railway.app` domain
+before step 1 and use it as the origin, then set `RELAYER_PRIVATE_KEY` in the service variables
+(`VERAKEY_NETWORK` defaults to `sepolia` in the image). Without a volume, the faucet forgets which
+accounts it funded on every redeploy. To keep that record, mount a volume at `/data` and set
+`RAILWAY_RUN_UID=0`, because the image runs as a non-root user and Railway volumes are owned by root.
+
 ## Using the SDK
 
 ```ts
