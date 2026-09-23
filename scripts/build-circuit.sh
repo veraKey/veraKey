@@ -8,7 +8,9 @@ cd "$ROOT/circuits/webauthn"
 nargo test
 nargo compile
 bb write_vk -b target/verakey_webauthn.json -o target -t evm
-bb write_solidity_verifier -k target/vk -o "$ROOT/contracts/evm/src/HonkVerifier.sol" -t evm
+# --optimized: bb's gas-optimized ZK verifier (one contract, batched field inversions). The default
+# generator spends about half of verify() on hundreds of separate modexp inversions.
+bb write_solidity_verifier -k target/vk -o "$ROOT/contracts/evm/src/HonkVerifier.sol" -t evm --optimized
 mkdir -p "$ROOT/packages/sdk/src/circuit"
 # The artifact's file_map holds absolute source paths; keep them relative so the shipped copy is the
 # same on every machine (and CI can check it is up to date).

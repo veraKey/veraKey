@@ -65,7 +65,7 @@ export function Docs() {
         <ol>
           <li><b>Challenge.</b> The action (chain, account, nonce, recipient, amount, fee, deadline ≤10 min) is hashed; the hash is the WebAuthn challenge.</li>
           <li><b>Passkey.</b> The authenticator signs it after Face ID / Touch ID / PIN. Signing assertions request no extensions, so authenticator data stays 37 bytes.</li>
-          <li><b>Proof.</b> In the browser, a Noir circuit (UltraHonk, 81,605 gates) proves: a valid P-256 signature over the WebAuthn message, the rpId hash, UP+UV flags, and <code>nullifier = Poseidon2(domain, pk, prfSecret, appId)</code>.</li>
+          <li><b>Proof.</b> In the browser, a Noir circuit (UltraHonk, 56,528 gates) proves: a valid P-256 signature over the WebAuthn message, the rpId hash, UP+UV flags, and <code>nullifier = Poseidon2(domain, pk, prfSecret, appId)</code>.</li>
           <li><b>Account.</b> The Stylus account parses <code>clientDataJSON</code> (type, base64url challenge, origin), hashes it, calls the verifier with six public inputs, consumes the nonce, applies the USDG policy and pays.</li>
         </ol>
 
@@ -97,10 +97,10 @@ export function Docs() {
         <table className="vk-matrix">
           <thead><tr><th>Operation</th><th>Gas</th><th>Where</th></tr></thead>
           <tbody>
-            <tr><td>HonkVerifier.verify, called by the account</td><td className="vk-mono">3,781,398</td><td>nitro devnode, ArbOS 61 (466 modexp inversions ≈ 1.88M)</td></tr>
-            <tr><td>Account pay (proof + policy + 2 USDG transfers)</td><td className="vk-mono">4,171,302</td><td>nitro devnode, ArbOS 61</td></tr>
-            <tr><td>Account logic alone (Stylus: parsing, nonce, policy, transfers)</td><td className="vk-mono">~217,000</td><td>from the call trace</td></tr>
-            <tr><td>Factory createAccount (EIP-1167 clone + init)</td><td className="vk-mono">80,812</td><td>local nitro devnode, ArbOS 61</td></tr>
+            <tr><td>HonkVerifier.verify, called by the account</td><td className="vk-mono">712,554</td><td>nitro devnode, ArbOS 61 (bb 5.2.0 optimized ZK verifier; 3,781,398 with the default one)</td></tr>
+            <tr><td>Account pay (proof + policy + 2 USDG transfers)</td><td className="vk-mono">1,073,882</td><td>nitro devnode, ArbOS 61 (≈ $0.06 on Arbitrum One at 0.02 gwei, ETH $2,668)</td></tr>
+            <tr><td>Account logic alone (Stylus: parsing, nonce, policy, transfers)</td><td className="vk-mono">~195,000</td><td>from the call trace</td></tr>
+            <tr><td>Factory createAccount (EIP-1167 clone + storage init)</td><td className="vk-mono">~479,000</td><td>nitro devnode, ArbOS 61; mostly first writes to storage</td></tr>
             <tr><td>P256VERIFY precompile (non-ZK baseline)</td><td className="vk-mono">3,450</td><td>RIP-7212</td></tr>
           </tbody>
         </table>

@@ -52,6 +52,8 @@ function createClient(config: NetworkConfig): VeraKeyClient {
       const { VeraKeyProver } = await import("@verakey/sdk/prover");
       return VeraKeyProver.create({
         threads: proverThreads(),
+        // The circuit needs 2^16 points, but bb.js 5.2.0 decompresses the CRS in 4 MiB chunks, so 2^17
+        // (4 MiB) is the smallest size it accepts.
         srsSize: 2 ** 17,
       });
     },

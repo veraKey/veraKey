@@ -36,7 +36,7 @@ leaves the secure enclave in any passkey wallet.
 
 1. **Passkey (browser).** `navigator.credentials.create` with the PRF extension; `get` with PRF once per
    session to unlock; `get` without extensions for every action, so authenticator data is 37 bytes.
-2. **Prover (browser).** A Noir circuit, proven with UltraHonk by bb.js (about 2–3 s on a laptop). It
+2. **Prover (browser).** A Noir circuit, proven with UltraHonk by bb.js (about 2 s on a laptop). It
    proves a valid P-256 signature over `sha256(authenticatorData || sha256(clientDataJSON))`, the rpId
    hash, the UP and UV flags, and `nullifier = Poseidon2(domain, pk, prfSecret, appId)`. The public key,
    signature and PRF secret are private inputs.
@@ -127,9 +127,9 @@ on any device where the passkey syncs.
 
 | Operation | Gas |
 |---|---|
-| `HonkVerifier.verify` (inside `pay`) | 3,781,398 |
-| `pay` (proof + policy + two USDG transfers) | 4,171,302 |
-| `createAccount` | 80,812 |
+| `HonkVerifier.verify` (inside `pay`), bb 5.2.0 optimized ZK verifier | 712,554 |
+| `pay` (proof + policy + two USDG transfers) | 1,073,882 |
+| `createAccount` (clone + storage init) | ~479,000 |
 | `P256VERIFY` precompile, for comparison (no privacy) | 3,450 |
 
 ## Threat model and implementation limits

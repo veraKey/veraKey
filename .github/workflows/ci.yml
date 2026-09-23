@@ -29,12 +29,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      - name: Install nargo 1.0.0-beta.22 and bb 5.0.0-nightly.20260522
+      - name: Install nargo 1.0.0-beta.25 and bb 5.2.0
         run: |
           curl -fsSL https://raw.githubusercontent.com/noir-lang/noirup/refs/heads/main/install | bash
-          "$HOME/.nargo/bin/noirup" --version 1.0.0-beta.22
+          "$HOME/.nargo/bin/noirup" --version 1.0.0-beta.25
           curl -fsSL https://raw.githubusercontent.com/AztecProtocol/aztec-packages/refs/heads/next/barretenberg/bbup/install | bash
-          "$HOME/.bb/bbup" --version 5.0.0-nightly.20260522
+          "$HOME/.bb/bbup" --version 5.2.0
           echo "$HOME/.nargo/bin" >> "$GITHUB_PATH"
           echo "$HOME/.bb" >> "$GITHUB_PATH"
 

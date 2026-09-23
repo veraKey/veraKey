@@ -6,9 +6,9 @@
   "origin": "https://verakey.mdloglabs.org",
   "rpIdHash": "0x0fe14846fe0610bfa7471c5396156cdf8b0c6594cc04194ffadcf8e8a490f4e1",
   "contracts": {
-    "honkVerifier": "0xebfE5E9600e22B358279d3744DeEC517BF384DC4",
-    "accountImplementation": "0xfdf12a4843a9ac9529f50e369a1f314ee5538ee3",
-    "factory": "0x384146ad0da662fe5373a74b1eef63b36b532660",
+    "honkVerifier": "0x9d79c603a39df96b2bE254719B99e4592094678f",
+    "accountImplementation": "0x88abfff2cdc7a5ffd6990204dc4ee3fffe34cc9d",
+    "factory": "0x6217e8372aa97b1d48730347b44a636c5878f1dd",
     "factoryAlt": "",
     "usdg": "0xFFC95faa3d63Cde504a05B567C600B78C0b41892"
   },
@@ -18,8 +18,8 @@
     "changeDelay": 120,
     "recoveryDelay": 300
   },
-  "configHash": "0xdeaab016c89d46f9b190bb6e7a18067cf048968bb01f2f41c69bad2081d484e3",
-  "circuitVkHash": "0x1f3e7f53c1c536a694bfee043892e3426f9c3409383be60ac1e7cdf47cb3d7e9",
+  "configHash": "0xbbd8d1a12b46db2b4d31e73de4a086667ce5b24e1a6ddded741ccd0240c86e0b",
+  "circuitVkHash": "0x16378935c4dee31e952a8c42d2f20d4d5dbd00ee2e8225a1eb16e908caf37f12",
   "deployer": "0x841CE1e27407EB9Bb6D14AC91374DAE60B41590A",
-  "deployedAt": "2026-09-23T12:09:07Z"
+  "deployedAt": "2026-09-23T21:45:25Z"
 }

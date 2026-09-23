@@ -9,9 +9,9 @@ import { explorerTx } from "@/lib/config";
 import { formatUsdg, parseUsdg, shortHex } from "@/lib/format";
 import { Kicker, ProofReceipt, ProofTimeline, RejectionNote, useNow, type ReceiptData } from "./components";
 
-export const PROOF_BYTES = 9152;
+export const PROOF_BYTES = 8768;
 /** Typical in-browser proving time (Chrome, 8 threads). It paces the phone layout's progress ring. */
-const PROVING_ESTIMATE_MS = 2300;
+const PROVING_ESTIMATE_MS = 1900;
 
 export interface PayViewProps {
   accountName: string;

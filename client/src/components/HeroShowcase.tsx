@@ -13,18 +13,18 @@ import { PROOF_BYTES, PayDesktop, PayMobile, type PayViewProps } from "@/pages/a
 
 type Phase = "idle" | "tap" | "sheet" | "faceid" | "proving" | "relaying" | "confirming" | "paid";
 
-/** The payment, beat by beat (ms). Proving lasts the 2.3 s measured in Chrome with 8 threads. */
+/** The payment, beat by beat (ms). Proving lasts the 1.85 s measured in Chrome with 8 threads. */
 const SCRIPT: readonly (readonly [Phase, number])[] = [
   ["idle", 1500],
   ["tap", 450],
   ["sheet", 950],
   ["faceid", 1100],
-  ["proving", 2300],
+  ["proving", 1850],
   ["relaying", 900],
   ["confirming", 1000],
   ["paid", 4200],
 ];
-const PROVING_MS = 2300;
+const PROVING_MS = 1850;
 /** CSS widths the two screens are laid out at before they are scaled into their frames. */
 const DESKTOP_WIDTH = 1180;
 const PHONE_WIDTH = 390;
@@ -41,7 +41,7 @@ const BLOCK = 311_900_418n;
 const RECEIPT: ReceiptData = {
   title: "Paid 2.00 USDG",
   hash: TX_HASH,
-  gasUsed: 4_171_302n,
+  gasUsed: 1_073_882n,
   provingMs: PROVING_MS,
   publicKeyOccurrences: 0,
   proofBytes: PROOF_BYTES,

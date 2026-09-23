@@ -8,9 +8,9 @@ overrides:
   tailwindcss>nanoid: 3.3.7
 
 patchedDependencies:
-  '@aztec/bb.js@5.0.0-nightly.20260522':
-    hash: fc04994e3ba4435d50474ddf19eb3ded1db324a872407d5cbd7513e08e483482
-    path: patches/@aztec__bb.js@5.0.0-nightly.20260522.patch
+  '@aztec/bb.js@5.2.0':
+    hash: 85ec11980234272e8e14e4d401e897105d2d1166e367bfdbd7aefaea484ac150
+    path: patches/@aztec__bb.js@5.2.0.patch
   wouter@3.7.1:
     hash: 4e16e6ff3fde7d6c1024d3e0c8605dc9eb6afb690d0d49958c2f449091813072
     path: patches/wouter@3.7.1.patch
@@ -240,8 +240,8 @@ importers:
   packages/sdk:
     dependencies:
       '@aztec/bb.js':
-        specifier: 5.0.0-nightly.20260522
-        version: 5.0.0-nightly.20260522(patch_hash=fc04994e3ba4435d50474ddf19eb3ded1db324a872407d5cbd7513e08e483482)
+        specifier: 5.2.0
+        version: 5.2.0(patch_hash=85ec11980234272e8e14e4d401e897105d2d1166e367bfdbd7aefaea484ac150)
       '@noble/curves':
         specifier: ^1.9.7
         version: 1.9.7
@@ -249,8 +249,8 @@ importers:
         specifier: ^1.8.0
         version: 1.8.0
       '@noir-lang/noir_js':
-        specifier: 1.0.0-beta.22
-        version: 1.0.0-beta.22
+        specifier: 1.0.0-beta.25
+        version: 1.0.0-beta.25
       viem:
         specifier: ^2.37.0
         version: 2.56.8(typescript@5.6.3)(zod@4.1.12)
@@ -273,8 +273,8 @@ packages:
   '@antfu/utils@9.3.0':
     resolution: {integrity: sha512-9hFT4RauhcUzqOE4f1+frMKLZrgNog5b06I7VmZQV1BkvwvqrbC8EBZf3L1eEL2AKb6rNKjER0sEvJiSP1FXEA==}
 
-  '@aztec/bb.js@5.0.0-nightly.20260522':
-    resolution: {integrity: sha512-3QCyPPQrPaFKgXcHw+7Mk+ScGJiMoeOtc6FpQFPTwTVbyFj9FGFdB6bceS6ulyNsmM6JfFmJRcbGerTAjzfbhw==}
+  '@aztec/bb.js@5.2.0':
+    resolution: {integrity: sha512-XQRbl6TfHg7xXwf4b3cNSggtwsIxl2z2/zV49/Ahxa1Nc1D7x05NY0QL5mYSRdOJlGKZ3TUTH48lDWAwJSVulg==}
     hasBin: true
 
   '@babel/code-frame@7.27.1':
@@ -774,17 +774,17 @@ packages:
     resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
     engines: {node: ^14.21.3 || >=16}
 
-  '@noir-lang/acvm_js@1.0.0-beta.22':
-    resolution: {integrity: sha512-2xXfSKrnskUNmPiG/Kj6yvWi1E6wJBl/1ZsmzVaHEEyJsUBf15xaSRBZR7X1361whUR2vqyG80ck2huLZPb5bA==}
+  '@noir-lang/acvm_js@1.0.0-beta.25':
+    resolution: {integrity: sha512-FDLST/Sya92n0dHVFM5B/LiscvKnhYiXfn1RmYQFPdxtA+GLUrGEW1RYF6Pot49Mi8u1Q4TDydylVgwSfBvDPQ==}
 
-  '@noir-lang/noir_js@1.0.0-beta.22':
-    resolution: {integrity: sha512-Ts+QI2fN2PsrVjx38CszFSR0TyWpip9TgJ6HM17DIK05Jku4TSKtHMIjrE6lRii4Y+JV0rn70v+TrunJmt/X4w==}
+  '@noir-lang/noir_js@1.0.0-beta.25':
+    resolution: {integrity: sha512-Lr+CmJzOGFNR3txRJ7s3hT2RTGQEpYagRaj9XfRJDaHA+Z2FJbSSYWZ+BXwEjtXxVcXsA1fSpCa3yqNOhvzVIw==}
 
-  '@noir-lang/noirc_abi@1.0.0-beta.22':
-    resolution: {integrity: sha512-vpZtWb946eb4ZxERxY32I4Fv62SAAjhAyJpb2YzWYvnDVTyFVIvr/MSVunrM1osUP35nnRPRGuXVTWy4sBQkIg==}
+  '@noir-lang/noirc_abi@1.0.0-beta.25':
+    resolution: {integrity: sha512-bB11NuEeq7Qz26fkBiY0upzdByr8KJG2lvXX9Kl9vgZnuO4HKfajHyEAInNupnxkgH1DVwVyD/1RDXXwsjTOmA==}
 
-  '@noir-lang/types@1.0.0-beta.22':
-    resolution: {integrity: sha512-PXD8cmvMT4wybDe1pUPwv2Uz1FYh9B/hdXrY5eOMf1elNVxomj2tHDDYoKI/zNDrJ1JzTL0xhbAX1vBTMMFvBw==}
+  '@noir-lang/types@1.0.0-beta.25':
+    resolution: {integrity: sha512-rgCgzyPLw2WHQGlP9EBqIT0tLQu0SIJRvc7RafV3aMQJ18oqmpq3X5p5l9BGhzOscrrfzcxKMjCvmag+Wk0ElQ==}
 
   '@radix-ui/number@1.1.1':
     resolution: {integrity: sha512-MkKCwxlXTgz6CFoJx3pCwn07GKp36+aZyu/u2Ln2VrA5DcdyCZkASEDBTd8x5whTQQL5CiYf4prXKLcgQdv29g==}
@@ -3764,7 +3764,7 @@ snapshots:
 
   '@antfu/utils@9.3.0': {}
 
-  '@aztec/bb.js@5.0.0-nightly.20260522(patch_hash=fc04994e3ba4435d50474ddf19eb3ded1db324a872407d5cbd7513e08e483482)':
+  '@aztec/bb.js@5.2.0(patch_hash=85ec11980234272e8e14e4d401e897105d2d1166e367bfdbd7aefaea484ac150)':
     dependencies:
       comlink: 4.4.2
       commander: 12.1.0
@@ -4149,20 +4149,20 @@ snapshots:
 
   '@noble/hashes@1.8.0': {}
 
-  '@noir-lang/acvm_js@1.0.0-beta.22': {}
+  '@noir-lang/acvm_js@1.0.0-beta.25': {}
 
-  '@noir-lang/noir_js@1.0.0-beta.22':
+  '@noir-lang/noir_js@1.0.0-beta.25':
     dependencies:
-      '@noir-lang/acvm_js': 1.0.0-beta.22
-      '@noir-lang/noirc_abi': 1.0.0-beta.22
-      '@noir-lang/types': 1.0.0-beta.22
+      '@noir-lang/acvm_js': 1.0.0-beta.25
+      '@noir-lang/noirc_abi': 1.0.0-beta.25
+      '@noir-lang/types': 1.0.0-beta.25
       pako: 2.2.0
 
-  '@noir-lang/noirc_abi@1.0.0-beta.22':
+  '@noir-lang/noirc_abi@1.0.0-beta.25':
     dependencies:
-      '@noir-lang/types': 1.0.0-beta.22
+      '@noir-lang/types': 1.0.0-beta.25
 
-  '@noir-lang/types@1.0.0-beta.22': {}
+  '@noir-lang/types@1.0.0-beta.25': {}
 
   '@radix-ui/number@1.1.1': {}
 

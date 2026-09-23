@@ -53,7 +53,7 @@ const pillars = [
     copy: "Your browser proves, with a Noir circuit, that your passkey signed this exact action. The chain gets the proof and a per-app nullifier, never your public key or signature.",
     icon: ShieldCheck,
     metric: "UltraHonk",
-    metricCopy: "Proven in-browser in 2.3 s",
+    metricCopy: "Proven in-browser in 1.9 s",
     color: "lime",
   },
   {
@@ -352,7 +352,7 @@ export default function Home() {
               <div className="hero-trust-row">
                 <ul className="hero-facts">
                   <li><Check size={13} /> Live on Arbitrum Sepolia</li>
-                  <li><Check size={13} /> 2.3 s proof in your browser</li>
+                  <li><Check size={13} /> 1.9 s proof in your browser</li>
                   <li><Check size={13} /> 34 end-to-end tests</li>
                 </ul>
               </div>
@@ -502,18 +502,19 @@ export default function Home() {
 
         <section className="metrics-section section-pad" data-reveal>
           <div className="container metrics-layout">
-            <div><SectionKicker>THE COST OF PRIVACY</SectionKicker><h2>Privacy has a price.<br /><em>We publish it.</em></h2><p className="metrics-lede">Arbitrum verifies an UltraHonk proof instead of a bare P-256 signature. That costs more gas than the precompile, and buys an account that shares no key with your other apps. Gas is measured on a nitro devnode at ArbOS 61; dollars use Arbitrum One's gas price and the ETH price on 24 Sep 2026.</p><button className="outline-button" onClick={openDocs}><ShieldCheck size={15} /> Read the threat model</button></div>
+            <div><SectionKicker>THE COST OF PRIVACY</SectionKicker><h2>Privacy has a price.<br /><em>We publish it.</em></h2><p className="metrics-lede">Arbitrum verifies an UltraHonk proof instead of a bare P-256 signature. That costs more gas than the precompile, and buys an account that shares no key with your other apps. Moving to bb 5's optimized verifier cut a payment from 4.17M to 1.07M gas. Gas is measured on a nitro devnode at ArbOS 61; dollars use Arbitrum One's gas price and the ETH price on 24 Sep 2026.</p><button className="outline-button" onClick={openDocs}><ShieldCheck size={15} /> Read the threat model</button></div>
             <div className="metrics-chart">
               <div className="chart-header"><span>MEASURED GAS PER OPERATION</span><span>NITRO DEVNODE · ARBOS 61</span></div>
               <div className="bar-row"><div className="bar-label"><span>P256VERIFY precompile (no privacy)</span><strong>3,450</strong></div><div className="bar-track"><div className="bar-fill bar-new" style={{ width: "1%" }} /></div></div>
-              <div className="bar-row"><div className="bar-label"><span>HonkVerifier.verify (the proof)</span><strong>3,781,398</strong></div><div className="bar-track"><div className="bar-fill bar-old" style={{ width: "91%" }} /></div></div>
-              <div className="bar-row"><div className="bar-label"><span>VeraKey pay (proof + policy + 2 USDG transfers)</span><strong className="accent-number">4,171,302</strong></div><div className="bar-track"><div className="bar-fill bar-old" style={{ width: "100%" }} /></div></div>
+              <div className="bar-row"><div className="bar-label"><span>HonkVerifier.verify (the proof)</span><strong>712,554</strong></div><div className="bar-track"><div className="bar-fill bar-old" style={{ width: "17%" }} /></div></div>
+              <div className="bar-row"><div className="bar-label"><span>VeraKey pay (proof + policy + 2 USDG transfers)</span><strong className="accent-number">1,073,882</strong></div><div className="bar-track"><div className="bar-fill bar-old" style={{ width: "26%" }} /></div></div>
+              <div className="bar-row"><div className="bar-label"><span>The same pay with bb's default verifier (before)</span><strong className="muted-number">4,171,302</strong></div><div className="bar-track"><div className="bar-fill bar-muted" style={{ width: "100%" }} /></div></div>
               <div className="chart-cost">
-                <div><span>PAY ON ARBITRUM ONE</span><strong>≈ $0.22</strong><small>0.02 gwei · ETH at $2,668</small></div>
-                <div><span>PROOF CALLDATA (L1)</span><strong>≈ $0.002</strong><small>about 10 KB per payment</small></div>
-                <div><span>NEXT MILESTONE</span><strong>&lt; $0.05</strong><small>a gas-optimized bb 5 verifier</small></div>
+                <div><span>PAY ON ARBITRUM ONE</span><strong>≈ $0.06</strong><small>0.02 gwei · ETH at $2,668</small></div>
+                <div><span>BEFORE THE OPTIMIZED VERIFIER</span><strong>≈ $0.22</strong><small>the same payment, 4.17M gas</small></div>
+                <div><span>PROOF CALLDATA (L1)</span><strong>≈ $0.002</strong><small>about 9 KB per payment</small></div>
               </div>
-              <div className="chart-foot"><span><Zap size={14} /> account creation: <b>80,812 gas</b> (EIP-1167 clone)</span><span>STYLUS · RUST</span></div>
+              <div className="chart-foot"><span><Zap size={14} /> account creation: <b>≈479k gas</b> (clone + storage init)</span><span>STYLUS · RUST</span></div>
             </div>
           </div>
         </section>

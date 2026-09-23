@@ -8,7 +8,7 @@ interface Vm {
     function stopBroadcast() external;
 }
 
-/// @notice Deploys the bb-generated UltraHonk verifier; forge deploys and links its libraries.
+/// @notice Deploys the bb-generated (optimized, ZK) UltraHonk verifier.
 contract DeployVerifier {
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 

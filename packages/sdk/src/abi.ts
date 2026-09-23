@@ -1039,100 +1039,24 @@ export const honkVerifierAbi = [
     "name": "verify",
     "inputs": [
       {
-        "name": "proof",
+        "name": "",
         "type": "bytes",
         "internalType": "bytes"
       },
       {
-        "name": "publicInputs",
+        "name": "",
         "type": "bytes32[]",
         "internalType": "bytes32[]"
       }
     ],
     "outputs": [
       {
-        "name": "verified",
+        "name": "",
         "type": "bool",
         "internalType": "bool"
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "error",
-    "name": "ConsistencyCheckFailed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "GeminiChallengeInSubgroup",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvertOfZero",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotPowerOfTwo",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "PointAtInfinity",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ProofLengthWrongWithLogN",
-    "inputs": [
-      {
-        "name": "logN",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "actualLength",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "expectedLength",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "PublicInputsLengthWrong",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ShpleminiFailed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "SumcheckFailed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ValueGeFieldOrder",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ValueGeGroupOrder",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ValueGeLimbMax",
-    "inputs": []
   }
 ] as const;
 
