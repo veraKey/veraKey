@@ -1,0 +1,25 @@
+{
+  "network": "sepolia",
+  "chainId": 421614,
+  "rpcUrl": "https://sepolia-rollup.arbitrum.io/rpc",
+  "rpId": "verakey.mdloglabs.org",
+  "origin": "https://verakey.mdloglabs.org",
+  "rpIdHash": "0x0fe14846fe0610bfa7471c5396156cdf8b0c6594cc04194ffadcf8e8a490f4e1",
+  "contracts": {
+    "honkVerifier": "0xebfE5E9600e22B358279d3744DeEC517BF384DC4",
+    "accountImplementation": "0xfdf12a4843a9ac9529f50e369a1f314ee5538ee3",
+    "factory": "0x384146ad0da662fe5373a74b1eef63b36b532660",
+    "factoryAlt": "",
+    "usdg": "0xFFC95faa3d63Cde504a05B567C600B78C0b41892"
+  },
+  "policy": {
+    "perTxCap": "10000000",
+    "dailyCap": "25000000",
+    "changeDelay": 120,
+    "recoveryDelay": 300
+  },
+  "configHash": "0xdeaab016c89d46f9b190bb6e7a18067cf048968bb01f2f41c69bad2081d484e3",
+  "circuitVkHash": "0x1f3e7f53c1c536a694bfee043892e3426f9c3409383be60ac1e7cdf47cb3d7e9",
+  "deployer": "0x841CE1e27407EB9Bb6D14AC91374DAE60B41590A",
+  "deployedAt": "2026-09-23T12:09:07Z"
+}

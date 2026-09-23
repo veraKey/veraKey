@@ -147,8 +147,12 @@ stylus_deploy() { # <package> [constructor args...] -> deployed address
   local package=$1; shift
   local args=()
   [ $# -gt 0 ] && args=(--constructor-args "$@")
+  # cargo-stylus bids exactly the current gas price, so the transaction is rejected as soon as the
+  # base fee ticks up before inclusion. Bid twice that: Arbitrum charges the base fee, not the bid.
+  local max_fee
+  max_fee=$(cast gas-price --rpc-url "$RPC" | awk '{ printf "%.9f", 2 * $1 / 1e9 }')
   (cd "$ROOT/contracts/stylus" && cargo stylus deploy --contract "$package" --endpoint "$RPC" \
-      --private-key-path "$KEY_FILE" --no-verify "${args[@]}" 2>&1) \
+      --private-key-path "$KEY_FILE" --max-fee-per-gas-gwei "$max_fee" --no-verify "${args[@]}" 2>&1) \
     | sed 's/\x1b\[[0-9;]*m//g' | tee -a /dev/stderr | awk '/deployed code at address:/{print $NF}' | tail -1
 }
 
