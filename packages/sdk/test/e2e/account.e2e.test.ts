@@ -633,3 +633,64 @@ describe("protections", () => {
     expect(await revertName(publicClient.simulateContract(payCall(accounts.tip, owners.tip, stranger, USDG(1), auth, dl)))).toBe("AccountFrozen");
   });
 });
+
+describe("secure payment confirmation", () => {
+  const shop = privateKeyToAccount(generatePrivateKey()).address;
+  const amount = USDG(2);
+
+  beforeAll(async () => {
+    const mint = await relayer.writeContract({
+      address: usdg,
+      abi: [{ type: "function", name: "mint", stateMutability: "nonpayable", inputs: [{ name: "to", type: "address" }, { name: "value", type: "uint256" }], outputs: [] }],
+      functionName: "mint",
+      args: [accounts.vault, USDG(50)],
+    });
+    await publicClient.waitForTransactionReceipt({ hash: mint });
+  });
+
+  const spcPay = async (spc: { payee: Address; total: bigint; rpId?: string; logos?: boolean }) => {
+    const dl = deadline();
+    const auth = await authorize(prover, owners.vault, apps.vault, accounts.vault,
+      { kind: ActionKind.Pay, target: shop, amount, dataHash: ZERO_HASH, fee: FEE, deadline: dl }, { spc });
+    return { call: payCall(accounts.vault, owners.vault, shop, amount, auth, dl), auth };
+  };
+
+  it("payment_sheet_showing_this_payee_and_total_is_accepted", async () => {
+    for (const logos of [true, false]) {
+      const { call, auth } = await spcPay({ payee: shop, total: amount + FEE, logos });
+      expect(Buffer.from(auth.clientDataJSON.slice(2), "hex").toString()).toContain('"type":"payment.get"');
+      const { request } = await publicClient.simulateContract(call);
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: await relayer.writeContract(request) });
+      gas.paySecureConfirmation = receipt.gasUsed;
+      expect(receipt.status).toBe("success");
+    }
+  });
+
+  it("payment_sheet_showing_another_total_reverts", async () => {
+    const { call } = await spcPay({ payee: shop, total: amount });
+    expect(await revertName(publicClient.simulateContract(call))).toBe("InvalidClientData");
+  });
+
+  it("payment_sheet_showing_another_payee_reverts", async () => {
+    const { call } = await spcPay({ payee: recipient, total: amount + FEE });
+    expect(await revertName(publicClient.simulateContract(call))).toBe("InvalidClientData");
+  });
+
+  it("payment_sheet_rp_id_must_hash_to_the_account_rp_id_hash", async () => {
+    const { call } = await spcPay({ payee: shop, total: amount + FEE, rpId: "evil.example" });
+    expect(await revertName(publicClient.simulateContract(call))).toBe("InvalidClientData");
+  });
+
+  it("payment_sheet_client_data_cannot_authorize_other_actions", async () => {
+    const change = changePayload.setNewPayeeCap(USDG(1));
+    const dl = deadline();
+    const auth = await authorize(prover, owners.vault, apps.vault, accounts.vault, {
+      kind: ActionKind.Restrict, target: "0x0000000000000000000000000000000000000000", amount: 0n,
+      dataHash: changeDataHash(change.kind as never, change.payload), fee: FEE, deadline: dl,
+    }, { spc: { payee: shop, total: FEE } });
+    expect(await revertName(publicClient.simulateContract({
+      address: accounts.vault, abi: veraKeyAccountAbi, functionName: "restrict",
+      args: [change.kind, change.payload, FEE, dl, fieldHex(owners.vault.nullifier), auth.clientDataJSON, auth.proof], account: devAccount,
+    }))).toBe("InvalidClientData");
+  });
+});

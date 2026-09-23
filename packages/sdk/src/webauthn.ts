@@ -100,6 +100,11 @@ export interface CreatePasskeyOptions {
   rpName: string;
   userName: string;
   userDisplayName?: string;
+  /**
+   * Also enroll the passkey for Secure Payment Confirmation (Chromium): the browser then shows the
+   * payee and total of each payment in its own sheet and signs them. Requires a platform authenticator.
+   */
+  payment?: boolean;
 }
 
 export interface RegisteredPasskey {
@@ -107,6 +112,32 @@ export interface RegisteredPasskey {
   publicKey: PasskeyPublicKey;
   /** Present when the authenticator evaluates PRF during registration (not guaranteed). */
   prfSecret?: Uint8Array;
+  /** Enrolled for Secure Payment Confirmation in this browser profile. */
+  payment: boolean;
+}
+
+/**
+ * "available" when this browser can show Secure Payment Confirmation. Chromium ships it on macOS,
+ * Windows and Android; Safari, Firefox, iOS and Linux do not.
+ */
+export async function spcAvailability(): Promise<string> {
+  const api = (globalThis as { PaymentRequest?: { securePaymentConfirmationAvailability?: () => Promise<string> } }).PaymentRequest;
+  if (!api?.securePaymentConfirmationAvailability) return "unavailable-no-api";
+  try {
+    return await api.securePaymentConfirmationAvailability();
+  } catch {
+    return "unavailable-error";
+  }
+}
+
+/**
+ * The SPC `total.value` for USDG base units (6 decimals), byte for byte what the account expects
+ * (`verakey_core::client_data::format_total`): at least two decimals, trailing zeros trimmed.
+ */
+export function formatSpcTotal(units: bigint): string {
+  let fraction = (units % 1_000_000n).toString().padStart(6, "0");
+  while (fraction.length > 2 && fraction.endsWith("0")) fraction = fraction.slice(0, -1);
+  return `${units / 1_000_000n}.${fraction}`;
 }
 
 /** Creates a discoverable ES256 passkey with PRF enabled (browser only). */
@@ -122,9 +153,16 @@ export async function createPasskey(options: CreatePasskeyOptions): Promise<Regi
       },
       challenge: randomChallenge(),
       pubKeyCredParams: [{ type: "public-key", alg: -7 }],
-      authenticatorSelection: { residentKey: "required", userVerification: "required" },
+      authenticatorSelection: {
+        residentKey: "required",
+        userVerification: "required",
+        ...(options.payment ? { authenticatorAttachment: "platform" as const } : {}),
+      },
       attestation: "none",
-      extensions: { prf: { eval: { first: salt } } } as AuthenticationExtensionsClientInputs,
+      extensions: {
+        prf: { eval: { first: salt } },
+        ...(options.payment ? { payment: { isPayment: true } } : {}),
+      } as AuthenticationExtensionsClientInputs,
     },
   })) as PublicKeyCredential | null;
   if (!credential) throw new Error("Passkey creation was cancelled.");
@@ -140,6 +178,7 @@ export async function createPasskey(options: CreatePasskeyOptions): Promise<Regi
     credentialId: new Uint8Array(credential.rawId),
     publicKey: publicKeyFromSpki(asBytes(spki)),
     prfSecret: prf.results?.first ? asBytes(prf.results.first as ArrayBuffer) : undefined,
+    payment: !!options.payment,
   };
 }
 
@@ -176,5 +215,50 @@ export async function getAssertion(options: GetAssertionOptions): Promise<Passke
     signature: derToLowS(asBytes(response.signature)),
     userHandle: response.userHandle ? asBytes(response.userHandle) : undefined,
     prfSecret: prf?.results?.first ? asBytes(prf.results.first as ArrayBuffer) : undefined,
+  };
+}
+
+export interface SpcAssertionOptions {
+  rpId: string;
+  challenge: Uint8Array;
+  credentialIds: Uint8Array[];
+  /** The recipient, as `0x` + 40 lowercase hex digits (the account compares it byte for byte). */
+  payee: string;
+  /** USDG base units that leave the account (amount plus relayer fee). */
+  total: bigint;
+  instrument: { displayName: string; icon: string };
+}
+
+/**
+ * Asks the browser to confirm a payment in its own Secure Payment Confirmation sheet, which shows the
+ * payee and total and signs them into the client data (`"type":"payment.get"`).
+ */
+export async function getSpcAssertion(options: SpcAssertionOptions): Promise<PasskeyAssertion> {
+  const request = new PaymentRequest(
+    [
+      {
+        supportedMethods: "secure-payment-confirmation",
+        data: {
+          credentialIds: options.credentialIds,
+          challenge: options.challenge,
+          rpId: options.rpId,
+          payeeName: options.payee,
+          instrument: { ...options.instrument, iconMustBeShown: false },
+          timeout: 120_000,
+        },
+      },
+    ] as never,
+    { total: { label: "Total", amount: { currency: "USD", value: formatSpcTotal(options.total) } } }
+  );
+  const response = await request.show();
+  await response.complete("success");
+  const credential = response.details as PublicKeyCredential;
+  const assertion = credential.response as AuthenticatorAssertionResponse;
+  return {
+    credentialId: new Uint8Array(credential.rawId),
+    authenticatorData: asBytes(assertion.authenticatorData),
+    clientDataJSON: asBytes(assertion.clientDataJSON),
+    signature: derToLowS(asBytes(assertion.signature)),
+    userHandle: assertion.userHandle ? asBytes(assertion.userHandle) : undefined,
   };
 }

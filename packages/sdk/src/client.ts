@@ -34,9 +34,12 @@ import {
   UnsupportedAuthenticatorError,
   createPasskey,
   getAssertion,
+  getSpcAssertion,
   randomChallenge,
   recoverPublicKeys,
+  spcAvailability,
   webauthnDigest,
+  type PasskeyAssertion,
   type PasskeyPublicKey,
 } from "./webauthn";
 
@@ -57,6 +60,8 @@ export interface VeraKeyConfig {
   /** Loads the prover lazily: bb.js and the CRS are several megabytes. */
   loadProver: () => Promise<VeraKeyProver>;
   store?: PasskeyStore;
+  /** Shown in the browser's Secure Payment Confirmation sheet (an https or same-origin image URL). */
+  paymentInstrument?: { displayName: string; icon: string };
 }
 
 /** An unlocked passkey. The PRF secret lives only in memory for the page's lifetime. */
@@ -219,15 +224,15 @@ export class VeraKeyClient {
    */
   async register(
     label: string,
-    { userName = label, activate = true }: { userName?: string; activate?: boolean } = {}
+    { userName = label, activate = true, payment = false }: { userName?: string; activate?: boolean; payment?: boolean } = {}
   ): Promise<{ passkey: StoredPasskey; session: Session | null }> {
     let created;
     try {
-      created = await createPasskey({ rpId: this.config.rpId, rpName: this.config.rpName ?? "VeraKey", userName });
+      created = await createPasskey({ rpId: this.config.rpId, rpName: this.config.rpName ?? "VeraKey", userName, payment });
     } catch (error) {
       throw describeWebAuthnError(error);
     }
-    const passkey = toStoredPasskey(created.credentialId, created.publicKey, label);
+    const passkey = toStoredPasskey(created.credentialId, created.publicKey, label, created.payment);
     this.store.save(passkey);
     if (!created.prfSecret) return { passkey, session: null };
     const session = { passkey, publicKey: created.publicKey, prfSecret: created.prfSecret };
@@ -393,10 +398,19 @@ export class VeraKeyClient {
    * Signs `action` with the session's passkey (no extensions, so authenticatorData stays 37 bytes)
    * and proves the assertion. Returns the calldata pieces every authorized entry point takes.
    */
+  /**
+   * Whether payments from this session can be confirmed in the browser's Secure Payment Confirmation
+   * sheet: the passkey was enrolled for it in this browser, and the browser supports it.
+   */
+  async canConfirmPayments(session = this.currentSession): Promise<boolean> {
+    return !!session?.passkey.payment && !!this.config.paymentInstrument && (await spcAvailability()) === "available";
+  }
+
   async authorize(
     appId: bigint,
     action: { kind: number; target: Address; amount: bigint; dataHash: Hex },
-    emit: Listener = () => {}
+    emit: Listener = () => {},
+    { secureConfirmation = false }: { secureConfirmation?: boolean } = {}
   ) {
     const session = this.requireSession();
     const nullifier = await this.nullifier(appId);
@@ -422,15 +436,30 @@ export class VeraKeyClient {
     const proverReady = this.prover();
 
     emit({ status: "authenticating" });
-    let assertion;
-    try {
-      assertion = await getAssertion({
-        rpId: this.config.rpId,
-        challenge: hexToBytes(actionHash),
-        credentialIds: [credentialIdBytes(session.passkey)],
-      });
-    } catch (error) {
-      throw describeWebAuthnError(error);
+    const request = { rpId: this.config.rpId, challenge: hexToBytes(actionHash), credentialIds: [credentialIdBytes(session.passkey)] };
+    let assertion: PasskeyAssertion | undefined;
+    let confirmedBy: "payment-sheet" | "passkey" = "passkey";
+    if (secureConfirmation && action.kind === ActionKind.Pay && (await this.canConfirmPayments(session))) {
+      try {
+        assertion = await getSpcAssertion({
+          ...request,
+          payee: action.target.toLowerCase(),
+          total: action.amount + fee,
+          instrument: this.config.paymentInstrument!,
+        });
+        confirmedBy = "payment-sheet";
+      } catch (error) {
+        // The user closed the sheet: stop. Anything else (the passkey is not enrolled in this browser
+        // profile, the sheet is unavailable): fall back to the ordinary passkey prompt.
+        if (error instanceof DOMException && error.name === "AbortError") throw describeWebAuthnError(error);
+      }
+    }
+    if (!assertion) {
+      try {
+        assertion = await getAssertion(request);
+      } catch (error) {
+        throw describeWebAuthnError(error);
+      }
     }
     if (assertion.authenticatorData.length !== AUTHENTICATOR_DATA_LENGTH) {
       throw new VeraKeyError(
@@ -465,6 +494,7 @@ export class VeraKeyClient {
       clientDataJSON: bytesToHex(assertion.clientDataJSON),
       proof: proof.proof,
       provingMs: proof.provingMs,
+      confirmedBy,
     };
   }
 
@@ -511,11 +541,14 @@ export class VeraKeyClient {
     }
   }
 
-  /** Pays `amount` USDG from the `appId` account to `to`. */
-  pay(appId: bigint, to: Address, amount: bigint, emit: Listener = () => {}): Promise<TransactionReceipt> {
+  /**
+   * Pays `amount` USDG from the `appId` account to `to`. With `secureConfirmation`, a passkey enrolled
+   * for Secure Payment Confirmation confirms in the browser's own payment sheet (payee and total signed).
+   */
+  pay(appId: bigint, to: Address, amount: bigint, emit: Listener = () => {}, options: { secureConfirmation?: boolean } = {}): Promise<TransactionReceipt> {
     return this.run(emit, async () => {
       await this.ensureAccount(appId);
-      const auth = await this.authorize(appId, { kind: ActionKind.Pay, target: to, amount, dataHash: ZERO_HASH }, emit);
+      const auth = await this.authorize(appId, { kind: ActionKind.Pay, target: to, amount, dataHash: ZERO_HASH }, emit, options);
       return this.submit(
         auth.account, "pay",
         [to, amount, auth.fee, auth.deadline, auth.nullifier, auth.clientDataJSON, auth.proof],

@@ -12,6 +12,8 @@ export interface StoredPasskey {
   publicKey: { x: Hex; y: Hex };
   label: string;
   createdAt: number;
+  /** Enrolled for Secure Payment Confirmation in this browser profile. */
+  payment?: boolean;
 }
 
 export interface PasskeyStore {
@@ -21,12 +23,13 @@ export interface PasskeyStore {
   remove(credentialId: string): void;
 }
 
-export function toStoredPasskey(credentialId: Uint8Array, publicKey: PasskeyPublicKey, label: string): StoredPasskey {
+export function toStoredPasskey(credentialId: Uint8Array, publicKey: PasskeyPublicKey, label: string, payment = false): StoredPasskey {
   return {
     credentialId: base64UrlEncode(credentialId),
     publicKey: { x: bytesToHex(publicKey.x), y: bytesToHex(publicKey.y) },
     label,
     createdAt: Date.now(),
+    ...(payment ? { payment: true } : {}),
   };
 }
 

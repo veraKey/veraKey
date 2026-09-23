@@ -16,6 +16,7 @@ import {
   base64UrlEncode,
   bytesToHex,
   concatBytes,
+  formatSpcTotal,
   hashAction,
   hexToBytes,
   normalizeLowS,
@@ -71,6 +72,8 @@ interface SignOptions {
   /** Appended after the standard keys, the way Chrome injects `other_keys_can_be_added_here`. */
   extraJson?: string;
   flags?: number;
+  /** Produce Secure Payment Confirmation client data showing this payee and total. */
+  spc?: { payee: Address; total: bigint; rpId?: string; logos?: boolean };
 }
 
 /**
@@ -99,9 +102,15 @@ export class VirtualPasskey {
   async sign(challenge: Uint8Array, options: SignOptions = {}): Promise<PasskeyAssertion> {
     const rpIdHash = await sha256(new TextEncoder().encode(this.rpId));
     const authenticatorData = concatBytes(rpIdHash, new Uint8Array([options.flags ?? 0x1d]), new Uint8Array(4));
-    const json =
-      `{"type":"${options.type ?? "webauthn.get"}","challenge":"${base64UrlEncode(challenge)}",` +
-      `"origin":"${options.origin ?? deployment.origin}","crossOrigin":false${options.extraJson ?? ""}}`;
+    const origin = options.origin ?? deployment.origin;
+    const json = options.spc
+      ? `{"type":"payment.get","challenge":"${base64UrlEncode(challenge)}","origin":"${origin}","crossOrigin":false,` +
+        `"payment":{"rpId":"${options.spc.rpId ?? this.rpId}","topOrigin":"${origin}","payeeName":"${options.spc.payee.toLowerCase()}",` +
+        `${options.spc.logos === false ? "" : `"paymentEntitiesLogos":[],`}` +
+        `"total":{"value":"${formatSpcTotal(options.spc.total)}","currency":"USD"},` +
+        `"instrument":{"icon":"${origin}/verakey-icon.png","displayName":"VeraKey USDG"}}${options.extraJson ?? ""}}`
+      : `{"type":"${options.type ?? "webauthn.get"}","challenge":"${base64UrlEncode(challenge)}",` +
+        `"origin":"${origin}","crossOrigin":false${options.extraJson ?? ""}}`;
     const clientDataJSON = new TextEncoder().encode(json);
     const signed = concatBytes(authenticatorData, await sha256(clientDataJSON));
     const raw = new Uint8Array(

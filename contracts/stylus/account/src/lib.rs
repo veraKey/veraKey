@@ -275,7 +275,9 @@ impl VeraKeyAccount {
     }
 
     /// Verifies that an owner's passkey authorized exactly this action, then consumes the nonce.
-    /// Returns the action hash (the WebAuthn challenge), which doubles as a unique id.
+    /// Returns the action hash (the WebAuthn challenge), which doubles as a unique id. A payment may
+    /// be confirmed through Secure Payment Confirmation (`payment`), in which case the payee and
+    /// total the browser showed must equal the payment.
     #[allow(clippy::too_many_arguments)]
     fn authorize(
         &mut self,
@@ -288,6 +290,7 @@ impl VeraKeyAccount {
         nullifier: B256,
         client_data_json: &[u8],
         proof: &[u8],
+        payment: Option<client_data::Payment>,
     ) -> Result<B256, AccountError> {
         self.require_initialized()?;
         let now = self.now();
@@ -303,8 +306,17 @@ impl VeraKeyAccount {
 
         let action = self.build_action(action_kind, target, amount, data_hash, fee, deadline);
         let action_hash = keccak(action.encode());
-        client_data::verify(client_data_json, &action_hash.0, &self.origin.get_bytes())
-            .map_err(|e| AccountError::InvalidClientData(InvalidClientData { code: e as u8 }))?;
+        let origin = self.origin.get_bytes();
+        let invalid = |e: client_data::ClientDataError| AccountError::InvalidClientData(InvalidClientData { code: e as u8 });
+        if client_data_json.starts_with(client_data::SPC_PREFIX) {
+            let payment = payment.ok_or(invalid(client_data::ClientDataError::NotAnAssertion))?;
+            let rp_id = client_data::verify_payment(client_data_json, &action_hash.0, &origin, &payment).map_err(invalid)?;
+            if Self::sha256(rp_id)? != self.rp_id_hash.get().0 {
+                return Err(invalid(client_data::ClientDataError::RpIdMismatch));
+            }
+        } else {
+            client_data::verify(client_data_json, &action_hash.0, &origin).map_err(invalid)?;
+        }
 
         let client_data_hash = Self::sha256(client_data_json)?;
         let (cdh_hi, cdh_lo) = field::split_limbs(&client_data_hash);
@@ -547,6 +559,8 @@ impl VeraKeyAccount {
             }
         }
         let nonce = self.current_nonce();
+        // `total` passed the caps above, so it fits the u128 the caps are stored in.
+        let payment = client_data::Payment { payee: to, total: total.to::<u128>() };
         self.authorize(
             kind::PAY,
             to,
@@ -557,6 +571,7 @@ impl VeraKeyAccount {
             nullifier,
             &client_data_json,
             &proof,
+            Some(payment),
         )?;
         self.record_spend(window);
         if !known {
@@ -603,6 +618,7 @@ impl VeraKeyAccount {
             nullifier,
             &client_data_json,
             &proof,
+            None,
         )?;
         self.record_spend(window);
 
@@ -653,6 +669,7 @@ impl VeraKeyAccount {
             nullifier,
             &client_data_json,
             &proof,
+            None,
         )?;
         self.record_spend(window);
         self.apply(change_kind, &payload)?;
@@ -727,6 +744,7 @@ impl VeraKeyAccount {
             nullifier,
             &client_data_json,
             &proof,
+            None,
         )?;
         self.record_spend(window);
         self.clear_pending(change_id);
@@ -818,6 +836,7 @@ impl VeraKeyAccount {
             nullifier,
             &client_data_json,
             &proof,
+            None,
         )?;
         self.record_spend(window);
         self.clear_recovery();
