@@ -55,7 +55,7 @@ Accounts are EIP-1167 clones created by the factory; the full configuration is i
 | Stylus account + factory, Solidity verifier | real, deployed with `scripts/deploy.sh` |
 | USDG | Paxos Global Dollar on Arbitrum Sepolia `0xFFC95faa3d63Cde504a05B567C600B78C0b41892` (a mintable stand-in is used only on a local devnode) |
 | Relayer (gasless, USDG fee) | real (`server/`) |
-| Landing-page receipt and phone prompt | illustrations; the real flow is `/app` |
+| Landing-page hero (phone + dashboard playing one payment) | an illustration built from the app's own components; the real flow is `/app` |
 
 ## Measured
 

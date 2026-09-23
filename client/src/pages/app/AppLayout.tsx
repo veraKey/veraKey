@@ -1,6 +1,7 @@
 import { Lock } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
+import { BrandMark } from "@/components/BrandMark";
 import { useVeraKey } from "@/state/VeraKeyProvider";
 import { Onboarding } from "./Onboarding";
 
@@ -11,15 +12,6 @@ const NAV = [
   { href: "/app/recovery", label: "Recovery", no: "04" },
   { href: "/docs", label: "Developer docs", no: "05" },
 ];
-
-function BrandMark() {
-  return (
-    <span className="brand-mark" aria-hidden="true">
-      <span className="brand-mark-ring" />
-      <span className="brand-mark-core" />
-    </span>
-  );
-}
 
 export function AppLayout({ children, requiresSession = true }: { children: ReactNode; requiresSession?: boolean }) {
   const { config, configError, session, proverStatus, isolated, lock, warmProver, client } = useVeraKey();

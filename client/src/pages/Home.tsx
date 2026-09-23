@@ -11,7 +11,6 @@ import {
   ChevronRight,
   CircleCheck,
   CircleDashed,
-  Copy,
   Cpu,
   CreditCard,
   ExternalLink,
@@ -34,6 +33,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { BrandMark } from "@/components/BrandMark";
+import { HeroShowcase } from "@/components/HeroShowcase";
 
 const pillars = [
   {
@@ -173,15 +174,6 @@ const proofStages = [
   { label: "Prove", title: "UltraHonk proof generated", detail: "bb.js proves the P-256 signature, rpId and UV flag in your browser. The key and signature are private inputs; they never leave the device.", code: "backend.generateProof(witness)", icon: Cpu },
   { label: "Verify", title: "Proof verified on Arbitrum", detail: "The Stylus account checks clientDataJSON, the proof, the nonce and the USDG policy before it pays.", code: "account.pay(to, amount, …, proof)", icon: ShieldCheck },
 ];
-
-function BrandMark() {
-  return (
-    <span className="brand-mark" aria-hidden="true">
-      <span className="brand-mark-ring" />
-      <span className="brand-mark-core" />
-    </span>
-  );
-}
 
 function SectionKicker({ children, light = false }: { children: React.ReactNode; light?: boolean }) {
   return (
@@ -403,26 +395,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className={`hero-visual receipt-visual receipt-${demoStatus}`} aria-label="Simulated passkey authorization receipt">
-              <div className="visual-topline"><span>PASSKEY AUTHORIZATION / 001</span><span className="live-chip"><span /> PREVIEW</span></div>
-              <div className="receipt-stage">
-                <div className="device-mockup" aria-label="Simulated mobile passkey prompt">
-                  <div className="device-frame"><div className="device-speaker" /><div className="device-screen"><div className="device-statusbar"><span>9:41</span><span>•••</span></div><div className="device-app-mark"><BrandMark /></div><span className="device-kicker">VERAKEY REQUEST</span><h4>Confirm payment</h4><strong>2 USDG</strong><span className="device-to">to 0x7a…4b</span><div className="face-id-ring"><Fingerprint size={25} /></div><b className="device-face-label">Use Face ID</b><span className="device-safe"><LockKeyhole size={10} /> stays on this device</span></div></div>
-                  <span className="device-caption"><i /> PASSKEY / LOCAL DEVICE</span>
-                </div>
-                <div className="receipt-card">
-                  <div className="receipt-brand"><span className="receipt-brand-icon"><Fingerprint size={16} /></span><span><b>VeraKey</b><small>authorization layer</small></span><span className={`receipt-status receipt-status-${demoStatus}`}>{demoStatus === "verified" ? <Check size={12} /> : demoStatus === "signing" ? <span className="receipt-status-spinner" /> : <CircleDashed size={12} />} {demoStatus === "verified" ? "VERIFIED" : demoStatus === "signing" ? "SIGNING" : "READY TO SIGN"}</span></div>
-                  <div className="receipt-title-row"><div><span className="receipt-label">AUTHORIZATION RECEIPT</span><h3>{demoStatus === "verified" ? "Passkey approved" : demoStatus === "signing" ? "Signing in progress" : "Awaiting passkey"}</h3></div><span className="receipt-date">22 SEP 2026<br />09:31:14 UTC</span></div>
-                  <div className="receipt-intent"><span className="receipt-label">TRANSACTION INTENT</span><strong>2.00 USDG <small>→</small> 0x7a…4b</strong><span className="receipt-subline">Pay account · USDG transfer</span></div>
-                  <div className="receipt-grid"><div><span className="receipt-label">CREDENTIAL</span><strong><Fingerprint size={13} /> device-bound</strong></div><div><span className="receipt-label">ORIGIN</span><strong><LockKeyhole size={13} /> VeraKey origin</strong></div><div><span className="receipt-label">NETWORK</span><strong><Orbit size={13} /> Arbitrum Sepolia</strong></div><div><span className="receipt-label">POLICY</span><strong><ShieldCheck size={13} /> within limit</strong></div></div>
-                  <div className="receipt-proof"><div><span className="receipt-label">PROOF FINGERPRINT</span><code>ultrahonk · 9,152 bytes</code></div><span className="receipt-proof-badge"><BadgeCheck size={15} /> ZK VERIFIED</span></div>
-                  <div className="receipt-foot"><span>AUTHENTICATE · PROVE · USE</span><span>VKEY / 001</span></div>
-                  {demoStatus === "verified" && <div className="receipt-stamp"><Check size={20} /><span>AUTH<br />VERIFIED</span></div>}
-                </div>
-                <div className="receipt-side-note"><span className="receipt-side-dot" /><span>PRIVATE WITNESS<br /><b>STAYS LOCAL</b></span></div>
-              </div>
-              <div className="receipt-footer"><span><Check size={13} /> ORIGIN BOUND</span><span><Check size={13} /> NONCE CONSUMED</span><span><Check size={13} /> POLICY CHECKED</span></div>
-            </div>
+            <HeroShowcase />
           </div>
           <div className="scroll-cue"><span>SCROLL TO COMPOSE</span><ArrowDownRight size={14} /></div>
         </section>

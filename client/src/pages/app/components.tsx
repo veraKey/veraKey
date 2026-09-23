@@ -143,7 +143,7 @@ export interface ReceiptData {
 }
 
 /** The artifact a user keeps: what happened, and proof that their key never reached the chain. */
-export function ProofReceipt({ receipt, config }: { receipt: ReceiptData; config: NetworkConfig }) {
+export function ProofReceipt({ receipt, config }: { receipt: ReceiptData; config: Pick<NetworkConfig, "explorerUrl"> }) {
   const link = explorerTx(config, receipt.hash);
   return (
     <div className="vk-receipt">

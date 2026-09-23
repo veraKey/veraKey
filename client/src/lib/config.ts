@@ -11,7 +11,7 @@ export function loadNetworkConfig(): Promise<NetworkConfig> {
   return pending;
 }
 
-export function explorerTx(config: NetworkConfig, hash: string): string | null {
+export function explorerTx(config: Pick<NetworkConfig, "explorerUrl">, hash: string): string | null {
   return config.explorerUrl ? `${config.explorerUrl}/tx/${hash}` : null;
 }
 
