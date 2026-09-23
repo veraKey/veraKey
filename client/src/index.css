@@ -262,6 +262,16 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outli
 .orbit-one { border-color: rgba(127,225,208,.2); }.orbit-two { border-color: rgba(201,255,91,.15); }.orbit-three { border-color: rgba(164,148,255,.18); }
 @media (prefers-reduced-motion: reduce) { .cursor-trail { display: none; } .hero-visual, .hero-visual:hover, .orbit-core, .hero-visual:hover .orbit-core, .proof-orb-core { transform: none; transition: none; } }
 
+/* "Why now" in the problem section: three dated facts. */
+.friction-note.is-facts ul { display: grid; gap: 14px; max-width: 230px; margin: 0; padding: 0; list-style: none; }
+.friction-note.is-facts li { font-size: 12px; line-height: 1.4; }
+.friction-note.is-facts b { display: block; color: #1f3a31; font-family: "DM Serif Display", Georgia, serif; font-size: 24px; font-weight: 400; letter-spacing: -.03em; line-height: 1.05; }
+
+/* Hero proof points (what is live and measured, instead of social proof). */
+.hero-facts { display: flex; flex-wrap: wrap; gap: 10px 20px; margin: 0; padding: 0; list-style: none; }
+.hero-facts li { display: inline-flex; align-items: center; gap: 7px; }
+.hero-facts svg { color: #c9ff5b; }
+
 /* Hero: one payment on a phone and in the dashboard, played in step (components/HeroShowcase.tsx).
    Both screens are laid out at device size, then scaled into their frames. */
 .hero-visual.hero-showcase { container-type: inline-size; min-height: 0; aspect-ratio: 100 / 97; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; transform: none; transition: none; }

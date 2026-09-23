@@ -13,8 +13,6 @@ import {
   CircleDashed,
   Cpu,
   CreditCard,
-  ExternalLink,
-  Gamepad2,
   Fingerprint,
   KeyRound,
   Layers3,
@@ -27,7 +25,6 @@ import {
   ShieldCheck,
   Sparkles,
   Terminal,
-  WalletCards,
   X,
   Zap,
 } from "lucide-react";
@@ -40,9 +37,9 @@ const pillars = [
   {
     id: "passkey",
     number: "01",
-    eyebrow: "HARDWARE-BOUND",
-    title: "Your face is the key.",
-    copy: "WebAuthn signs directly from the Secure Enclave. No seed phrase, no browser extension, no custodial middle layer.",
+    eyebrow: "PASSKEY-NATIVE",
+    title: "The passkey you already use.",
+    copy: "iCloud Keychain or Google Password Manager signs each action after Face ID, Touch ID or a PIN. No seed phrase, no browser extension, no custodial middle layer.",
     icon: Fingerprint,
     metric: "Origin-bound",
     metricCopy: "Phishing-resistant by design",
@@ -56,7 +53,7 @@ const pillars = [
     copy: "Your browser proves, with a Noir circuit, that your passkey signed this exact action. The chain gets the proof and a per-app nullifier, never your public key or signature.",
     icon: ShieldCheck,
     metric: "UltraHonk",
-    metricCopy: "Proven in-browser in ~3 s",
+    metricCopy: "Proven in-browser in 2.3 s",
     color: "lime",
   },
   {
@@ -74,8 +71,8 @@ const pillars = [
     id: "settlement",
     number: "04",
     eyebrow: "ARBITRUM-NATIVE",
-    title: "Settlement at the speed of intent.",
-    copy: "A Rust smart account on Stylus parses WebAuthn data, checks the proof and pays in Paxos USDG on Arbitrum. Gasless: the relayer's fee is paid in USDG and signed into your approval.",
+    title: "Settled in USDG on Arbitrum.",
+    copy: "A Rust smart account on Stylus parses the WebAuthn data, hands the proof to a Solidity UltraHonk verifier and pays in Paxos USDG. Gasless: the relayer's fee is paid in USDG and signed into your approval.",
     icon: Orbit,
     metric: "USDG",
     metricCopy: "Stylus account · Arbitrum Sepolia",
@@ -86,9 +83,9 @@ const pillars = [
 const architecture = [
   {
     label: "01",
-    title: "Biometric device",
-    subtitle: "WebAuthn / Secure Enclave",
-    detail: "The device creates a P-256 signature after a local face, fingerprint, or PIN check. The private key never leaves the hardware.",
+    title: "Your passkey",
+    subtitle: "WebAuthn / PRF",
+    detail: "Your passkey provider signs this exact action with a P-256 key after Face ID, Touch ID or a PIN, and returns a PRF secret when you unlock. The private key never leaves the provider, which keeps it end-to-end encrypted across your devices.",
     icon: ScanFace,
   },
   {
@@ -101,8 +98,8 @@ const architecture = [
   {
     label: "03",
     title: "Stylus account",
-    subtitle: "Rust / WASM / UltraHonk verifier",
-    detail: "The Stylus account checks clientDataJSON (type, challenge, origin), calls the verifier with six public inputs, consumes its nonce and applies the USDG policy.",
+    subtitle: "Rust / WASM · Solidity verifier",
+    detail: "The Stylus account checks clientDataJSON (type, challenge, origin), passes the proof and six public inputs to the bb-generated Solidity HonkVerifier, consumes its nonce and applies the USDG policy.",
     icon: Cpu,
   },
   {
@@ -123,41 +120,19 @@ const signalRows = [
 
 const useCases = [
   {
-    id: "defi",
-    label: "01",
-    title: "Savings",
-    subtitle: "A vault you rarely touch",
-    copy: "A separate account for savings, owned by the same passkey, that no other app can connect to your spending account.",
-    detail: "Tight daily caps and a recipient allowlist; raising them waits out a timelock that any owner can cancel.",
-    icon: WalletCards,
-    color: "cyan",
-    tags: ["daily caps", "allowlist", "timelocks"],
-  },
-  {
-    id: "gaming",
-    label: "02",
-    title: "Creator tips",
-    subtitle: "Small payments, separate identity",
-    copy: "Tip creators from an account that shares no key material with your savings or your checkout history.",
-    detail: "One Face ID per tip; the per-payment cap keeps a compromised session small.",
-    icon: Gamepad2,
-    color: "violet",
-    tags: ["per-app account", "small caps", "no seed phrase"],
-  },
-  {
     id: "payments",
-    label: "03",
+    label: "01",
     title: "Payments",
-    subtitle: "Biometric-native checkout",
-    copy: "Turn a stablecoin payment into the interaction people already know: Pay → Face ID → Confirmed.",
-    detail: "A consumer-ready path to Arbitrum payments where the network disappears and authorization remains intuitive.",
+    subtitle: "Face ID checkout in USDG",
+    copy: "Pay → Face ID → Confirmed. The proof is made on the device, the relayer pays the gas, and the account's caps decide what goes through.",
+    detail: "Other apps on the same passkey get their own accounts, and none of them shares key material with this one.",
     icon: CreditCard,
     color: "lime",
-    tags: ["stablecoins", "checkout", "account abstraction"],
+    tags: ["usdg", "gasless", "per-app account"],
   },
   {
-    id: "rwa",
-    label: "04",
+    id: "sdk",
+    label: "02",
     title: "Your app",
     subtitle: "@verakey/sdk",
     copy: "Add passkey accounts to any Arbitrum app with the SDK: register, derive the account, authorize, pay. Proving runs in your users' browsers.",
@@ -169,10 +144,10 @@ const useCases = [
 ];
 
 const proofStages = [
-  { label: "Capture", title: "Passkey assertion captured", detail: "The authenticator signs a challenge locally. The biometric signal never leaves the device.", code: "navigator.credentials.get()", icon: ScanFace },
+  { label: "Capture", title: "Passkey signs the action", detail: "The WebAuthn challenge commits to this exact payment: chain, account, nonce, amount, recipient, fee and a deadline. Your passkey signs it on the device.", code: "navigator.credentials.get()", icon: ScanFace },
   { label: "Derive", title: "Per-app nullifier derived", detail: "Your owner ID in this app mixes the public key with a PRF secret only the passkey can produce, so a leaked key alone cannot link your accounts.", code: "nullifier = Poseidon2(pk, prf, appId)", icon: LockKeyhole },
   { label: "Prove", title: "UltraHonk proof generated", detail: "bb.js proves the P-256 signature, rpId and UV flag in your browser. The key and signature are private inputs; they never leave the device.", code: "backend.generateProof(witness)", icon: Cpu },
-  { label: "Verify", title: "Proof verified on Arbitrum", detail: "The Stylus account checks clientDataJSON, the proof, the nonce and the USDG policy before it pays.", code: "account.pay(to, amount, …, proof)", icon: ShieldCheck },
+  { label: "Verify", title: "Proof verified on Arbitrum", detail: "The Stylus account checks clientDataJSON, has the Solidity verifier check the proof, then applies the nonce and the USDG policy before it pays.", code: "account.pay(to, amount, …, proof)", icon: ShieldCheck },
 ];
 
 function SectionKicker({ children, light = false }: { children: React.ReactNode; light?: boolean }) {
@@ -189,8 +164,7 @@ export default function Home() {
   const [activePillar, setActivePillar] = useState("passkey");
   const [activeArchitecture, setActiveArchitecture] = useState(0);
   const [mobileMenu, setMobileMenu] = useState(false);
-  const [demoStatus, setDemoStatus] = useState<"idle" | "signing" | "verified">("idle");
-  const [activeUseCase, setActiveUseCase] = useState("defi");
+  const [activeUseCase, setActiveUseCase] = useState("payments");
   const [proofStage, setProofStage] = useState(-1);
   const [proofRunning, setProofRunning] = useState(false);
 
@@ -203,12 +177,6 @@ export default function Home() {
   const ArchitectureIcon = selectedArchitecture.icon;
   const selectedUseCase = useCases.find((useCase) => useCase.id === activeUseCase) ?? useCases[0];
   const SelectedUseCaseIcon = selectedUseCase.icon;
-
-  useEffect(() => {
-    if (demoStatus !== "signing") return;
-    const timeout = window.setTimeout(() => setDemoStatus("verified"), 1700);
-    return () => window.clearTimeout(timeout);
-  }, [demoStatus]);
 
   useEffect(() => {
     const revealObserver = new IntersectionObserver(
@@ -305,14 +273,6 @@ export default function Home() {
     return () => window.clearInterval(timer);
   }, [proofRunning]);
 
-  const runDemo = () => {
-    if (demoStatus === "signing") return;
-    setDemoStatus("signing");
-    window.setTimeout(() => {
-      document.getElementById("demo-result")?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 80);
-  };
-
   const runProofSimulation = () => {
     setProofStage(0);
     setProofRunning(true);
@@ -384,14 +344,17 @@ export default function Home() {
             <div className="hero-copy">
               <div className="eyebrow-row"><span className="eyebrow-dot" /> HIDE-MY-EMAIL FOR WALLETS</div>
               <h1>One passkey.<br /><em>Unlinkable accounts.</em></h1>
-              <p className="hero-lede">VeraKey gives every app its own USDG smart account behind one passkey. Your browser proves in zero knowledge that the passkey approved each payment, so Arbitrum never sees your key and nothing on-chain ties your accounts together.</p>
+              <p className="hero-lede">VeraKey gives every app its own USDG smart account behind one passkey. Your browser proves in zero knowledge that the passkey approved each payment, so Arbitrum never sees your key and no key material on-chain ties your accounts together.</p>
               <div className="hero-actions">
                 <button className="button button-primary button-large magnetic-button" onClick={openApp}>Open the app <ArrowRight size={17} /></button>
                 <button className="text-button" onClick={() => scrollTo("architecture")}>Explore the stack <ChevronRight size={16} /></button>
               </div>
               <div className="hero-trust-row">
-                <div className="avatar-stack" aria-hidden="true"><span>F</span><span>R</span><span>A</span></div>
-                <span>One passkey. Multiple experiences.<br />For apps that put people first.</span>
+                <ul className="hero-facts">
+                  <li><Check size={13} /> Live on Arbitrum Sepolia</li>
+                  <li><Check size={13} /> 2.3 s proof in your browser</li>
+                  <li><Check size={13} /> 34 end-to-end tests</li>
+                </ul>
               </div>
             </div>
 
@@ -400,13 +363,13 @@ export default function Home() {
           <div className="scroll-cue"><span>SCROLL TO COMPOSE</span><ArrowDownRight size={14} /></div>
         </section>
 
-        <section className="network-strip" aria-label="Technology partners">
+        <section className="network-strip" aria-label="Built with">
           <div className="container network-strip-inner">
-            <span className="network-label">STACKED ON</span>
+            <span className="network-label">BUILT WITH</span>
             <div className="network-item"><Orbit size={17} /> <span>ARBITRUM <b>STYLUS</b></span></div>
+            <div className="network-item"><Cpu size={17} /> <span>NOIR <b>ULTRAHONK</b></span></div>
             <div className="network-item"><KeyRound size={17} /> <span>W3C <b>WEBAUTHN</b></span></div>
-            <div className="network-item"><Terminal size={17} /> <span>RUST <b>WASM</b></span></div>
-            <div className="network-item"><LockKeyhole size={17} /> <span>FIDO2 <b>READY</b></span></div>
+            <div className="network-item"><CreditCard size={17} /> <span>PAXOS <b>USDG</b></span></div>
           </div>
         </section>
 
@@ -424,25 +387,29 @@ export default function Home() {
         <section className="why-section section-pad" id="why" data-reveal>
           <div className="container">
               <div className="section-heading split-heading">
-              <div><SectionKicker>THE FRICTION</SectionKicker><h2>Blockchain asks humans<br /><em>to adapt to infrastructure.</em></h2></div>
-              <div className="heading-aside"><p>VeraKey reverses the relationship. The user sees a familiar authentication experience; the application receives authorization; the chain verifies a proof.</p><span className="aside-line" /></div>
+              <div><SectionKicker>THE PROBLEM</SectionKicker><h2>Passkeys fixed<br />the seed phrase.<br /><em>Not the tracking.</em></h2></div>
+              <div className="heading-aside"><p>Passkey smart wallets give you one address in every app, with your passkey's public key on-chain. Anyone reading the chain can join your activity across apps: the merchant you pay can see your savings.</p><span className="aside-line" /></div>
             </div>
             <div className="friction-grid">
               <article className="friction-card friction-card-dark" data-reveal>
-                <div className="card-index">01 / OLD DEFAULT</div>
+                <div className="card-index">01 / A PASSKEY WALLET TODAY</div>
                 <div className="friction-icon warning-icon"><KeyRound size={22} /></div>
-                <h3>Secret words<br />as a single point<br />of failure.</h3>
-                <p>Connect wallet. Select network. Check gas. A 12–24 word phrase is not a user experience—it is infrastructure leaking into the moment.</p>
-                <div className="card-foot"><span className="status-bad"><span /> FRAGILE BY DESIGN</span><ArrowUpRight size={15} /></div>
+                <h3>One key,<br />one address,<br />every app.</h3>
+                <p>Checkout, savings and tips share one address and one public key, so they read as one public history. One passkey per app avoids that, at the cost of an enrollment and a credential picker in every app.</p>
+                <div className="card-foot"><span className="status-bad"><span /> LINKABLE BY DESIGN</span><ArrowUpRight size={15} /></div>
               </article>
               <article className="friction-card friction-card-light" data-reveal>
-                <div className="card-index">02 / NEW PRIMITIVE</div>
+                <div className="card-index">02 / VERAKEY</div>
                 <div className="friction-icon fingerprint-icon"><Fingerprint size={22} /></div>
-                <h3>One familiar gesture.<br /><em>Zero unnecessary exposure.</em></h3>
-                <p>Face ID approves the action. Your key never reaches the chain, and every app sees a different account.</p>
-                <div className="card-foot"><span className="status-good"><span /> HARDWARE-BOUND</span><ArrowUpRight size={15} /></div>
+                <h3>One passkey.<br /><em>No key on-chain.</em></h3>
+                <p>Your browser proves in zero knowledge that your passkey approved the payment. Every app gets its own account, derived from the passkey and a PRF secret only it can produce, and the chain never sees the key.</p>
+                <div className="card-foot"><span className="status-good"><span /> UNLINKABLE ACCOUNTS</span><ArrowUpRight size={15} /></div>
               </article>
-              <div className="friction-note"><Sparkles size={16} /><span>THE HUMAN LAYER</span><p>Make onchain applications feel natural without making privacy an afterthought.</p></div>
+              <div className="friction-note is-facts"><Sparkles size={16} /><span>WHY NOW</span><ul>
+                <li><b>iOS 18.4</b> passkey PRF works the same on every Apple device</li>
+                <li><b>2.3 s</b> to prove a passkey signature in the browser</li>
+                <li><b>ArbOS 60</b> Stylus runs 40 KB Rust accounts</li>
+              </ul></div>
             </div>
           </div>
         </section>
@@ -472,7 +439,7 @@ export default function Home() {
 
         <section className="architecture-section section-pad" id="architecture" data-reveal>
           <div className="container">
-            <div className="section-heading split-heading"><div><SectionKicker>THE ARCHITECTURE</SectionKicker><h2>From a face scan<br /><em>to finality.</em></h2></div><div className="heading-aside"><p>Four layers. No black boxes. Click through the path an assertion takes from secure hardware to a settled state.</p><span className="aside-line" /></div></div>
+            <div className="section-heading split-heading"><div><SectionKicker>THE ARCHITECTURE</SectionKicker><h2>From Face ID<br /><em>to finality.</em></h2></div><div className="heading-aside"><p>Four layers. No black boxes. Click through the path an approval takes from your passkey to a settled payment.</p><span className="aside-line" /></div></div>
             <div className="architecture-layout">
               <div className="architecture-steps">
                 {architecture.map((step, index) => { const Icon = step.icon; const isActive = activeArchitecture === index; return <button key={step.label} className={`architecture-step ${isActive ? "is-active" : ""}`} onClick={() => setActiveArchitecture(index)}><span className="step-no">{step.label}</span><span className="step-icon"><Icon size={18} /></span><span><strong>{step.title}</strong><small>{step.subtitle}</small></span><ChevronRight size={16} className="step-chevron" /></button>; })}
@@ -481,29 +448,7 @@ export default function Home() {
                 <div className="detail-topline"><span>EXECUTION TRACE / {selectedArchitecture.label}</span><span className="trace-status"><CircleCheck size={14} /> VERIFIED PATH</span></div>
                 <div className="detail-graphic"><div className="detail-grid" /><div className="detail-scan"><span /></div><div className="detail-icon"><ArchitectureIcon size={32} /></div><span className="detail-coord">{selectedArchitecture.label} / 04</span><span className="detail-coord coord-right">DETERMINISTIC</span></div>
                 <div className="detail-copy"><div><div className="detail-eyebrow">LAYER {selectedArchitecture.label}</div><h3>{selectedArchitecture.title}</h3></div><p>{selectedArchitecture.detail}</p></div>
-                <div className="detail-tags"><span>trustless</span><span>auditable</span><span>composable</span></div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="demo-section section-pad" id="demo" data-reveal>
-          <div className="container">
-            <div className="demo-shell">
-              <div className="demo-intro"><SectionKicker light>THE INTERACTION</SectionKicker><h2>Let the device<br /><em>do the talking.</em></h2><p>Pay, play, or transact with the authentication experience you already understand. Face ID unlocks a proof; VeraKey turns it into policy-aware authorization.</p><div className="demo-note"><CircleDashed size={15} /><span>PREVIEW ONLY · THE REAL FLOW RUNS IN THE APP</span></div><button className="text-button light-button" style={{ marginTop: 18 }} onClick={openApp}>Run it for real <ArrowRight size={16} /></button></div>
-              <div className="demo-console" id="demo-result">
-                <div className="console-header"><span><span className="console-dot" /> VERAKEY / DEMO CONSOLE</span><span>LOCAL PREVIEW</span></div>
-                <div className="console-body">
-                  <div className="console-wallet"><div className="wallet-icon"><WalletCards size={23} /></div><div><small>PAY ACCOUNT</small><strong>Pay <span className="verified-badge"><BadgeCheck size={12} /> deployed</span></strong></div><span className="wallet-network"><Orbit size={13} /> ARBITRUM SEPOLIA</span></div>
-                  <div className="console-amount"><span>TRANSACTION INTENT</span><strong>2.00 USDG <small>→</small> 0x7a…4b</strong><div className="intent-rule"><span /> Policy / within daily cap</div></div>
-                  <div className="console-progress">
-                    <div className={`progress-item ${demoStatus !== "idle" ? "done" : "current"}`}><span className="progress-icon">{demoStatus !== "idle" ? <Check size={14} /> : <Fingerprint size={14} />}</span><span><b>Biometric proof</b><small>{demoStatus === "idle" ? "Awaiting local gesture" : "P-256 signature captured"}</small></span></div>
-                    <div className={`progress-connector ${demoStatus === "verified" ? "done" : ""}`} />
-                    <div className={`progress-item ${demoStatus === "verified" ? "done" : demoStatus === "signing" ? "current" : "pending"}`}><span className="progress-icon">{demoStatus === "verified" ? <Check size={14} /> : <ShieldCheck size={14} />}</span><span><b>ZK proof + policy</b><small>{demoStatus === "verified" ? "UltraHonk proof verified" : demoStatus === "signing" ? "Generating proof…" : "Locked until signed"}</small></span></div>
-                  </div>
-                  <button className={`button demo-button magnetic-button ${demoStatus === "verified" ? "demo-button-success" : ""}`} onClick={demoStatus === "verified" ? () => setDemoStatus("idle") : runDemo}>{demoStatus === "idle" ? <><ScanFace size={17} /> Approve with biometrics</> : demoStatus === "signing" ? <><span className="button-loader" /> Verifying locally…</> : <><CircleCheck size={17} /> Transaction authorized · Reset</>}</button>
-                  {demoStatus === "verified" && <div className="console-success"><CircleCheck size={15} /><span>Authorization complete. State mutation is ready for settlement.</span><ExternalLink size={14} /></div>}
-                </div>
+                <div className="detail-tags"><span>open source</span><span>verifiable on-chain</span><span>testnet</span></div>
               </div>
             </div>
           </div>
@@ -525,7 +470,7 @@ export default function Home() {
                 <div className="proof-output-top"><span><span className="console-dot" /> LOCAL PROVER / TRACE</span><span>DEMO ONLY</span></div>
                 <div className="proof-output-body">
                   <div className="proof-output-orb"><div className="proof-orb-rings" /><div className="proof-orb-core">{proofStage >= 0 ? <Check size={23} /> : <CircleDashed size={23} />}<span>{proofStage >= 3 ? "VALID" : proofStage >= 0 ? "PROVING" : "IDLE"}</span></div></div>
-                  <div className="proof-output-copy"><span className="proof-output-label">{proofStage >= 0 ? `STEP 0${proofStage + 1} / ${proofStages.length}` : "READY TO SIMULATE"}</span><h3>{proofStage >= 0 ? proofStages[proofStage].title : "A proof, not a profile."}</h3><p>{proofStage >= 0 ? proofStages[proofStage].detail : "The biometric unlocks a local assertion. VeraKey transforms it into a proof the application can verify—without receiving the biometric itself."}</p>{proofStage >= 0 && <code>{proofStages[proofStage].code}</code>}</div>
+                  <div className="proof-output-copy"><span className="proof-output-label">{proofStage >= 0 ? `STEP 0${proofStage + 1} / ${proofStages.length}` : "READY TO SIMULATE"}</span><h3>{proofStage >= 0 ? proofStages[proofStage].title : "A proof, not a profile."}</h3><p>{proofStage >= 0 ? proofStages[proofStage].detail : "Your passkey signs on the device. VeraKey turns that signature into a proof the chain can verify, without receiving your public key or the signature."}</p>{proofStage >= 0 && <code>{proofStages[proofStage].code}</code>}</div>
                 </div>
                 <div className="proof-output-footer"><span>PRIVATE WITNESS <b>{proofStage >= 1 ? "SEALED" : "LOCAL"}</b></span><span>PUBLIC SIGNALS <b>{proofStage >= 2 ? "READY" : "WAITING"}</b></span><span>ONCHAIN VERIFIER <b>{proofStage >= 3 ? "PASS" : "LOCKED"}</b></span></div>
               </div>
@@ -536,7 +481,7 @@ export default function Home() {
 
         <section className="usecases-section section-pad" id="usecases" data-reveal>
           <div className="container">
-            <div className="section-heading split-heading"><div><SectionKicker>ONE PASSKEY. MANY WORLDS.</SectionKicker><h2>Built for the<br /><em>human edge.</em></h2></div><div className="heading-aside"><p>VeraKey is an authentication primitive, not another destination wallet. The policy changes by application; the familiar gesture stays.</p><span className="aside-line" /></div></div>
+            <div className="section-heading split-heading"><div><SectionKicker>ONE PASSKEY. EVERY APP.</SectionKicker><h2>Built for the<br /><em>human edge.</em></h2></div><div className="heading-aside"><p>VeraKey is an authentication primitive, not another destination wallet. Each app gets its own account and policy; the gesture stays the same.</p><span className="aside-line" /></div></div>
             <div className="usecase-layout">
               <div className="usecase-list">
                 {useCases.map((useCase) => {
@@ -557,7 +502,7 @@ export default function Home() {
 
         <section className="metrics-section section-pad" data-reveal>
           <div className="container metrics-layout">
-            <div><SectionKicker>THE COST OF PRIVACY</SectionKicker><h2>Privacy has a price.<br /><em>We publish it.</em></h2><p className="metrics-lede">Arbitrum verifies an UltraHonk proof instead of a bare P-256 signature. That costs more gas than the precompile, and buys an account that shares no key with your other apps. Measured on a nitro devnode running ArbOS 61; on Arbitrum One that is cents per payment.</p><button className="outline-button" onClick={openDocs}><ShieldCheck size={15} /> Read the threat model</button></div>
+            <div><SectionKicker>THE COST OF PRIVACY</SectionKicker><h2>Privacy has a price.<br /><em>We publish it.</em></h2><p className="metrics-lede">Arbitrum verifies an UltraHonk proof instead of a bare P-256 signature. That costs more gas than the precompile, and buys an account that shares no key with your other apps. Measured on a nitro devnode at ArbOS 61, without the L1 data fee that Arbitrum One adds for the proof's calldata.</p><button className="outline-button" onClick={openDocs}><ShieldCheck size={15} /> Read the threat model</button></div>
             <div className="metrics-chart">
               <div className="chart-header"><span>MEASURED GAS PER OPERATION</span><span>NITRO DEVNODE · ARBOS 61</span></div>
               <div className="bar-row"><div className="bar-label"><span>P256VERIFY precompile (no privacy)</span><strong>3,450</strong></div><div className="bar-track"><div className="bar-fill bar-new" style={{ width: "1%" }} /></div></div>
