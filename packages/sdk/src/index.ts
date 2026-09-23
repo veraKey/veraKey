@@ -9,4 +9,5 @@ export * from "./abi";
 export * from "./store";
 export * from "./relayer";
 export * from "./privacy";
+export * from "./disclosure";
 export * from "./client";

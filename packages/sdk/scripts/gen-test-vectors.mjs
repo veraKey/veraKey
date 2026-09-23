@@ -87,6 +87,8 @@ pub global NULLIFIER: Field = ${f(nullifier)};
 pub global NULLIFIER_OTHER_APP: Field = ${f(nullifierOtherApp)};
 `;
 writeFileSync(circuitVectors, nr);
+// The consent-to-link circuit tests use the same assertion.
+writeFileSync(resolve(here, "../../../circuits/link/src/test_vectors.nr"), nr);
 
 mkdirSync(dirname(sdkFixture), { recursive: true });
 writeFileSync(

@@ -15,6 +15,8 @@ import { erc20Abi, veraKeyAccountAbi, veraKeyFactoryAbi } from "./abi";
 import { ZERO_HASH, changeDataHash, changePayload, guardianCommitment, hashAction } from "./action";
 import { base64UrlEncode, bytesToHex, hexToBytes, toFieldHex } from "./bytes";
 import { ActionKind, MAX_DEADLINE_WINDOW, type ChangeKind } from "./constants";
+import { linkDisclosureChallenge, type DisclosurePackage, type LinkStatement } from "./disclosure";
+import type { LinkProver } from "./link-prover";
 import { computeNullifier } from "./nullifier";
 import { countPublicKeyOccurrences } from "./privacy";
 import { ProofGenerationError } from "./errors";
@@ -175,6 +177,7 @@ export class VeraKeyClient {
   readonly relayer: RelayerClient;
   readonly store: PasskeyStore;
   private proverPromise?: Promise<VeraKeyProver>;
+  private linkProverPromise?: Promise<LinkProver>;
   private currentSession: Session | null = null;
   private readonly nullifiers = new Map<bigint, bigint>();
 
@@ -207,6 +210,14 @@ export class VeraKeyClient {
   prover(): Promise<VeraKeyProver> {
     this.proverPromise ??= this.config.loadProver();
     return this.proverPromise;
+  }
+
+  /** The consent-to-link prover, loaded on first use; it shares the Barretenberg instance. */
+  linkProver(): Promise<LinkProver> {
+    this.linkProverPromise ??= Promise.all([this.prover(), import("./link-prover")]).then(
+      ([prover, { LinkProver }]) => new LinkProver(prover.barretenberg)
+    );
+    return this.linkProverPromise;
   }
 
   get session(): Session | null {
@@ -665,6 +676,77 @@ export class VeraKeyClient {
       address: account, abi: veraKeyAccountAbi, functionName: "pendingChange", args: [changeId],
     });
     return eta !== 0n;
+  }
+
+  /**
+   * "Linkable by consent": proves to `audience` that this passkey owns the accounts of `appIdA` and
+   * `appIdB`, with a fresh passkey approval over a statement that expires. Nothing is sent anywhere;
+   * the owner decides whom to give the returned package to. See `verifyDisclosure`.
+   */
+  createDisclosure(
+    request: { appIdA: bigint; appIdB: bigint; audience: string; nonce?: Hex; ttlSeconds?: number; labels?: DisclosurePackage["labels"] },
+    emit: Listener = () => {}
+  ): Promise<DisclosurePackage> {
+    return this.run(emit, async () => {
+      const session = this.requireSession();
+      if (request.appIdA === request.appIdB) throw new VeraKeyError("policy", "Choose two different apps.");
+      const [nullifierA, nullifierB] = [await this.nullifier(request.appIdA), await this.nullifier(request.appIdB)];
+      const statement: LinkStatement = {
+        chainId: this.config.chainId,
+        factory: this.config.factory,
+        appIdA: toFieldHex(request.appIdA),
+        nullifierA: toFieldHex(nullifierA),
+        appIdB: toFieldHex(request.appIdB),
+        nullifierB: toFieldHex(nullifierB),
+        audience: request.audience.trim(),
+        nonce: request.nonce ?? bytesToHex(randomChallenge()),
+        expiresAt: Math.floor(Date.now() / 1000) + (request.ttlSeconds ?? 86_400),
+      };
+      const linkProverReady = this.linkProver();
+      emit({ status: "authenticating" });
+      let assertion;
+      try {
+        assertion = await getAssertion({
+          rpId: this.config.rpId,
+          challenge: hexToBytes(linkDisclosureChallenge(statement)),
+          credentialIds: [credentialIdBytes(session.passkey)],
+        });
+      } catch (error) {
+        throw describeWebAuthnError(error);
+      }
+      if (assertion.authenticatorData.length !== AUTHENTICATOR_DATA_LENGTH) {
+        throw new VeraKeyError("device", `This authenticator returned ${assertion.authenticatorData.length} bytes of authenticator data; VeraKey needs ${AUTHENTICATOR_DATA_LENGTH}.`);
+      }
+      emit({ status: "proving", startedAt: Date.now() });
+      let proof;
+      try {
+        proof = await (await linkProverReady).prove({
+          publicKey: session.publicKey,
+          signature: assertion.signature,
+          authenticatorData: assertion.authenticatorData,
+          prfSecret: session.prfSecret,
+          clientDataJSON: assertion.clientDataJSON,
+          rpIdHash: hexToBytes(this.config.rpIdHash),
+          appIdA: request.appIdA,
+          nullifierA,
+          appIdB: request.appIdB,
+          nullifierB,
+        });
+      } catch (error) {
+        throw new VeraKeyError("proof", error instanceof ProofGenerationError ? error.message : "Proof generation failed.");
+      }
+      emit({ status: "idle" });
+      return {
+        kind: "verakey-link-disclosure",
+        version: 1,
+        statement,
+        labels: request.labels,
+        origin: JSON.parse(new TextDecoder().decode(assertion.clientDataJSON)).origin,
+        clientDataJSON: bytesToHex(assertion.clientDataJSON),
+        proof: proof.proof,
+        publicInputs: proof.publicInputs,
+      };
+    });
   }
 
   /** Short, stable label for UI (never used for security decisions). */

@@ -63,8 +63,9 @@ eth_at_least() { awk -v have="$(cast from-wei "$1")" -v need="$2" 'BEGIN { exit 
 echo "checks for $NETWORK:"
 [[ "$(cargo stylus --version 2>/dev/null)" == *" 0.10.9" ]] && ok "cargo-stylus 0.10.9" \
   || fail "install cargo-stylus 0.10.9: cargo install --locked cargo-stylus --version 0.10.9"
-[ -f "$ROOT/circuits/webauthn/target/vk_hash" ] && ok "circuit verification key" \
-  || fail "no circuit verification key: run scripts/build-circuit.sh"
+[ -f "$ROOT/circuits/webauthn/target/vk_hash" ] && [ -f "$ROOT/circuits/link/target/vk_hash" ] \
+  && ok "circuit verification keys (webauthn, link)" \
+  || fail "no circuit verification keys: run scripts/build-circuit.sh"
 
 CHAIN_ID=$(cast chain-id --rpc-url "$RPC" 2>/dev/null || echo none)
 if [ "$CHAIN_ID" = "$CHAIN" ]; then
@@ -163,6 +164,11 @@ VERIFIER=$(forge_deploy script/DeployVerifier.s.sol:DeployVerifier)
 [ -n "$VERIFIER" ] || { echo "verifier deployment failed" >&2; exit 1; }
 echo "    $VERIFIER"
 
+echo "==> LinkHonkVerifier (consent-to-link disclosures)"
+LINK_VERIFIER=$(forge_deploy script/DeployLinkVerifier.s.sol:DeployLinkVerifier)
+[ -n "$LINK_VERIFIER" ] || { echo "link verifier deployment failed" >&2; exit 1; }
+echo "    $LINK_VERIFIER"
+
 if [ "$NETWORK" = local ]; then
   echo "==> TestUSDG (local only)"
   USDG=$(forge_deploy script/DeployTestUSDG.s.sol:DeployTestUSDG)
@@ -215,6 +221,7 @@ cache_program "$FACTORY"
 
 CONFIG_HASH=$(cast call "$FACTORY" 'configHash()(bytes32)' --rpc-url "$RPC")
 VK_HASH=0x$(xxd -p "$ROOT/circuits/webauthn/target/vk_hash" | tr -d '\n')
+LINK_VK_HASH=0x$(xxd -p "$ROOT/circuits/link/target/vk_hash" | tr -d '\n')
 mkdir -p "$ROOT/deployments"
 cat > "$ROOT/deployments/$NETWORK.json" <<JSON
 {
@@ -226,6 +233,7 @@ cat > "$ROOT/deployments/$NETWORK.json" <<JSON
   "rpIdHash": "$RP_ID_HASH",
   "contracts": {
     "honkVerifier": "$VERIFIER",
+    "linkVerifier": "$LINK_VERIFIER",
     "accountImplementation": "$IMPLEMENTATION",
     "factory": "$FACTORY",
     "factoryAlt": "$FACTORY_ALT",
@@ -240,6 +248,7 @@ cat > "$ROOT/deployments/$NETWORK.json" <<JSON
   },
   "configHash": "$CONFIG_HASH",
   "circuitVkHash": "$VK_HASH",
+  "linkCircuitVkHash": "$LINK_VK_HASH",
   "deployer": "$DEPLOYER",
   "deployedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }

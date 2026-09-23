@@ -39,6 +39,7 @@ export const deployment = JSON.parse(
   rpIdHash: Hex;
   contracts: {
     honkVerifier: Address;
+    linkVerifier: Address;
     accountImplementation: Address;
     factory: Address;
     factoryAlt: Address;

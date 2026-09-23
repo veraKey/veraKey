@@ -1,5 +1,5 @@
 [package]
-name = "verakey_webauthn"
+name = "verakey_link"
 type = "bin"
 authors = ["VeraKey"]
 

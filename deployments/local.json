@@ -6,11 +6,12 @@
   "origin": "http://localhost:5190",
   "rpIdHash": "0x49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d9763",
   "contracts": {
-    "honkVerifier": "0x7756C5d87BBc55df427419056868a866E93729c8",
-    "accountImplementation": "0x9ae8a390121ba71545e9923b333d60e7e3ccd3bd",
-    "factory": "0x0fb6856c36c25e01190d6a8f2ebbe28aca05a341",
-    "factoryAlt": "0x9b2db8135222d7b05aea29b54ae0317e8640d6b0",
-    "usdg": "0x6823b3D4Df049D93cA12dd67Abae2E469fe10fbb"
+    "honkVerifier": "0x710d4c75e0cB03bCd229033690567a936661aECE",
+    "linkVerifier": "0x6BfEc96c9637556ADA9999cD0307C4953A817f0A",
+    "accountImplementation": "0x8a4e3997dafbd64b507bbb42b5ba21865abefadb",
+    "factory": "0x49e772bd7efd483c043402331fbf03533852850f",
+    "factoryAlt": "0x740b6a46585474eb113f81999c1117e69d4be1be",
+    "usdg": "0x5C2171EB7fA1900AF693CC79B46e06E5a4Fb3B13"
   },
   "policy": {
     "perTxCap": "50000000",
@@ -19,8 +20,9 @@
     "changeDelay": 10,
     "recoveryDelay": 15
   },
-  "configHash": "0xe7e1bca26d3095aa317b9fbf7baf1253de643db5599449f44203f12c0a0e792b",
+  "configHash": "0x94576271af4779c54133b71694db02a5f2da80dc153f66bc70efa0e881861fed",
   "circuitVkHash": "0x16378935c4dee31e952a8c42d2f20d4d5dbd00ee2e8225a1eb16e908caf37f12",
+  "linkCircuitVkHash": "0x16256f66baa7cfcdc09869a3fa825033c24bc198a2929908165b8e5280f21683",
   "deployer": "0x3f1Eae7D46d88F08fc2F8ed27FCb2AB183EB2d0E",
-  "deployedAt": "2026-09-23T23:24:12Z"
+  "deployedAt": "2026-09-23T23:31:46Z"
 }
