@@ -128,6 +128,10 @@ again.
    proxy with `RELAYER_PRIVATE_KEY` set (see `Dockerfile`). Without Docker: `pnpm build && pnpm start`,
    which reads `.env`.
 
+On your own machine behind a tunnel, serve port 3090 on loopback only, e.g. `docker run -d --restart
+unless-stopped -p 127.0.0.1:3090:3090 …` or `HOST=127.0.0.1 pnpm start`, and route a fixed hostname to
+`http://localhost:3090` (a cloudflared named tunnel, not a quick tunnel, whose URL changes on restart).
+
 On Railway, `railway.json` builds the Dockerfile. Generate the service's `*.up.railway.app` domain
 before step 1 and use it as the origin, then set `RELAYER_PRIVATE_KEY` in the service variables
 (`VERAKEY_NETWORK` defaults to `sepolia` in the image). Without a volume, the faucet forgets which

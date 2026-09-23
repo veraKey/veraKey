@@ -138,7 +138,9 @@ if (existsSync(staticDir)) {
   app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(path.join(staticDir, "index.html")));
 }
 
-createServer(app).listen(config.port, () => {
+// Behind a tunnel or proxy on the same machine, HOST=127.0.0.1 keeps the port private: a direct
+// client could otherwise forge the X-Forwarded-For address the rate limits key on.
+createServer(app).listen(config.port, process.env.HOST, () => {
   console.log(`VeraKey relayer (${config.network.network}) on http://localhost:${config.port} — relayer ${relayer.address}`);
   // Accounts only accept passkeys used on the origin the factory was deployed with.
   console.log(`Passkeys and accounts are bound to ${config.network.origin}: serve the app there.`);
