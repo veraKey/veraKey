@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Sword Shop · VeraKey demo game</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main>
+      <p class="tag">Demo game · on its own origin</p>
+      <h1>Sword Shop</h1>
+      <p class="lede">Sign in with VeraKey to get a player ID that only this game knows, then buy a sword for 1 USDG.</p>
+      <section>
+        <button id="sign-in" disabled>Sign in with VeraKey</button>
+        <p id="status" role="status"></p>
+      </section>
+      <section id="shop" hidden>
+        <h2>A sword · 1 USDG</h2>
+        <button id="buy" disabled>Buy a sword (1 USDG)</button>
+        <p id="receipt" role="status"></p>
+      </section>
+    </main>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

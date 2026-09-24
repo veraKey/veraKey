@@ -1,0 +1,9 @@
+:root { color-scheme: light; background: #f4efe4; color: #2b2118; font-family: Georgia, "Times New Roman", serif; }
+body { margin: 0; }
+main { max-width: 560px; margin: 0 auto; padding: 48px 20px; }
+.tag { display: inline-block; margin: 0 0 16px; padding: 3px 8px; border: 1px solid #b59f7b; font: 12px system-ui, sans-serif; letter-spacing: 0.04em; text-transform: uppercase; }
+h1 { margin: 0 0 8px; font-size: 44px; }
+.lede { font-size: 18px; line-height: 1.5; }
+section { margin-top: 28px; padding: 20px; border: 2px solid #2b2118; background: #fffaf0; }
+button { padding: 10px 16px; border: 2px solid #2b2118; background: #e6b84d; font: 600 15px system-ui, sans-serif; cursor: pointer; }
+[role="status"] { min-height: 1.4em; font: 14px system-ui, sans-serif; overflow-wrap: anywhere; }
