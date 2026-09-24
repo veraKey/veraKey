@@ -8,7 +8,10 @@ import {
   parseEventLogs,
   stringToHex,
   type Address,
+  type Chain,
   type Hex,
+  type HttpTransport,
+  type PublicClient,
   type TransactionReceipt,
 } from "viem";
 import { erc20Abi, veraKeyAccountAbi, veraKeyFactoryAbi } from "./abi";
@@ -196,7 +199,8 @@ function describeWebAuthnError(error: unknown): VeraKeyError {
  * actions submitted through a gasless relayer. Proving happens on this device only.
  */
 export class VeraKeyClient {
-  readonly publicClient;
+  /** Typed as a plain PublicClient: the inferred type spells out the chain and weighs 700 KB in the declarations. */
+  readonly publicClient: PublicClient<HttpTransport, Chain>;
   readonly relayer: RelayerClient;
   readonly store: PasskeyStore;
   private proverPromise?: Promise<VeraKeyProver>;

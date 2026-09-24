@@ -226,8 +226,8 @@ try {
     await markPopup();
     // A payment request for some other player's account, sent with the SDK from the game's page.
     const { verakeyUrl } = await (await fetch(`${GAME}/game-api/config`)).json();
-    const sdk = path.resolve(import.meta.dirname, "../packages/sdk/src/connect.ts");
-    await evaluate(game, `import("/@fs${sdk}").then(({ VeraKeyConnect }) => {
+    // The SDK as the game's dev server resolves it: the workspace source, or the published build when installed from npm.
+    await evaluate(game, `import("/@id/@verakey/sdk/connect").then(({ VeraKeyConnect }) => {
       window.__otherAccount = new VeraKeyConnect({ url: ${JSON.stringify(verakeyUrl)} })
         .pay({ to: "0x5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe", amount: 1000000n, account: "0x000000000000000000000000000000000000dEaD" })
         .then(() => "paid", error => error.code);
