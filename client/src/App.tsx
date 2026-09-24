@@ -16,6 +16,7 @@ import { Verify } from "./pages/app/Verify";
 import { VeraKeyProvider } from "./state/VeraKeyProvider";
 
 const DocsSite = lazy(() => import("./docs/DocsSite"));
+const ConnectPage = lazy(() => import("./pages/connect/ConnectPage"));
 
 function Router() {
   return (
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/app/recovery">{() => <AppLayout><Recovery /></AppLayout>}</Route>
       <Route path="/app/disclose">{() => <AppLayout><Disclose /></AppLayout>}</Route>
       <Route path="/app/verify">{() => <AppLayout requiresSession={false}><Verify /></AppLayout>}</Route>
+      <Route path="/connect">{() => <Suspense fallback={null}><ConnectPage /></Suspense>}</Route>
       <Route path="/docs">{() => <Suspense fallback={null}><DocsSite /></Suspense>}</Route>
       <Route path="/docs/*">{() => <Suspense fallback={null}><DocsSite /></Suspense>}</Route>
       <Route path="/404" component={NotFound} />

@@ -22,6 +22,7 @@ import { countPublicKeyOccurrences } from "./privacy";
 import { ProofGenerationError } from "./errors";
 import type { VeraKeyProver } from "./prover";
 import { RelayerClient, RelayerError, type RelayableFunction } from "./relayer";
+import { SIGN_IN_TTL_SECONDS, accountAddressOf, signInChallenge, type SignInResult, type SignInStatement } from "./signin";
 import {
   LocalPasskeyStore,
   credentialIdBytes,
@@ -52,6 +53,9 @@ export interface VeraKeyConfig {
   rpcUrl: string;
   factory: Address;
   usdg: Address;
+  /** The account implementation and the factory's configuration hash: `proveSignIn` computes account addresses with them, offline. */
+  accountImplementation?: Address;
+  configHash?: Hex;
   rpIdHash: Hex;
   /** Base URL of the gasless relayer API, e.g. "/api". */
   relayerUrl: string;
@@ -821,6 +825,71 @@ export class VeraKeyClient {
         statement,
         labels: request.labels,
         origin: JSON.parse(new TextDecoder().decode(assertion.clientDataJSON)).origin,
+        clientDataJSON: bytesToHex(assertion.clientDataJSON),
+        proof: proof.proof,
+        publicInputs: proof.publicInputs,
+      };
+    });
+  }
+
+  /**
+   * "Sign in with VeraKey": signs a sign-in statement for `origin` with the unlocked passkey and proves it. Nothing
+   * is sent anywhere, and the account address is computed offline, so no request carries the player ID.
+   */
+  proveSignIn(appId: bigint, request: { nonce: Hex; origin: string; now?: number }, emit: Listener = () => {}): Promise<SignInResult> {
+    return this.run(emit, async () => {
+      const session = this.requireSession();
+      const { accountImplementation, configHash } = this.config;
+      if (!accountImplementation || !configHash) throw new VeraKeyError("device", "This client cannot compute account addresses offline.");
+      const nullifier = await this.nullifier(appId);
+      const issuedAt = request.now ?? Math.floor(Date.now() / 1000);
+      const statement: SignInStatement = {
+        chainId: this.config.chainId,
+        factory: this.config.factory,
+        origin: request.origin,
+        appId: toFieldHex(appId),
+        nullifier: toFieldHex(nullifier),
+        nonce: request.nonce,
+        issuedAt,
+        expiresAt: issuedAt + SIGN_IN_TTL_SECONDS,
+      };
+      const proverReady = this.prover();
+      emit({ status: "authenticating" });
+      let assertion;
+      try {
+        assertion = await getAssertion({
+          rpId: this.config.rpId,
+          challenge: hexToBytes(signInChallenge(statement)),
+          credentialIds: [credentialIdBytes(session.passkey)],
+        });
+      } catch (error) {
+        throw describeWebAuthnError(error);
+      }
+      if (assertion.authenticatorData.length !== AUTHENTICATOR_DATA_LENGTH) {
+        throw new VeraKeyError("device", `This authenticator returned ${assertion.authenticatorData.length} bytes of authenticator data; VeraKey needs ${AUTHENTICATOR_DATA_LENGTH}.`);
+      }
+      emit({ status: "proving", startedAt: Date.now() });
+      let proof;
+      try {
+        proof = await (await proverReady).prove({
+          publicKey: session.publicKey,
+          signature: assertion.signature,
+          authenticatorData: assertion.authenticatorData,
+          prfSecret: session.prfSecret,
+          clientDataJSON: assertion.clientDataJSON,
+          rpIdHash: hexToBytes(this.config.rpIdHash),
+          appId,
+          nullifier,
+        });
+      } catch (error) {
+        throw new VeraKeyError("proof", error instanceof ProofGenerationError ? error.message : "Proof generation failed.");
+      }
+      emit({ status: "idle" });
+      return {
+        version: 1,
+        statement,
+        playerId: statement.nullifier,
+        account: accountAddressOf({ factory: this.config.factory, accountImplementation, configHash }, appId, nullifier),
         clientDataJSON: bytesToHex(assertion.clientDataJSON),
         proof: proof.proof,
         publicInputs: proof.publicInputs,

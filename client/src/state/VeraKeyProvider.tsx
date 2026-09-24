@@ -35,7 +35,7 @@ export function proverThreads(): number {
   return globalThis.crossOriginIsolated === true ? Math.min(navigator.hardwareConcurrency || 4, 8) : 1;
 }
 
-function createClient(config: NetworkConfig): VeraKeyClient {
+export function createClient(config: NetworkConfig, appIds = DEMO_APPS.map(app => app.appId)): VeraKeyClient {
   return new VeraKeyClient({
     rpId: config.rpId,
     rpName: "VeraKey",
@@ -43,10 +43,12 @@ function createClient(config: NetworkConfig): VeraKeyClient {
     rpcUrl: new URL(config.rpcUrl, location.origin).toString(),
     factory: config.contracts.factory,
     usdg: config.contracts.usdg,
+    accountImplementation: config.contracts.accountImplementation,
+    configHash: config.configHash,
     rpIdHash: config.rpIdHash,
     relayerUrl: "/api",
     relayerFee: BigInt(config.relayer.fee),
-    appIds: DEMO_APPS.map(app => app.appId),
+    appIds,
     paymentInstrument: { displayName: "VeraKey · USDG on Arbitrum", icon: `${location.origin}/verakey-icon.png` },
     loadProver: async () => {
       // Same-origin CRS (see patches/@aztec__bb.js*.patch): no CDN on the demo path.

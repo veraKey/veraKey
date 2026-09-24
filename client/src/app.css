@@ -316,3 +316,14 @@
 .vk-verify-row small { display: block; color: var(--vk-faint); font-size: 11px; margin-top: 2px; word-break: break-all; }
 .vk-verify-row .is-ok { color: var(--vk-lime); }
 .vk-verify-row .is-bad { color: #ff8a80; }
+
+/* Sign in with VeraKey popup */
+.vk-connect { min-height: 100vh; padding: 20px 20px 28px; display: grid; align-content: start; gap: 14px; }
+.vk-connect-head { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.vk-connect-requester { margin: 0; padding: 10px 12px; border: 1px solid var(--vk-line-strong); color: var(--vk-muted); font-size: 12px; }
+.vk-connect-requester b { display: block; margin-top: 2px; color: var(--vk-ink); font-family: var(--vk-mono); font-size: 13px; overflow-wrap: anywhere; }
+.vk-connect-actions { display: grid; gap: 10px; }
+.vk-connect-actions .vk-btn { width: 100%; }
+.vk-connect .vk-receive { margin: 0; }
+.vk-connect .vk-facts { margin: 0; }
+.vk-connect .vk-fact code { overflow-wrap: anywhere; text-align: right; }
