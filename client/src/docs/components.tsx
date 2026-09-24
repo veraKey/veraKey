@@ -138,6 +138,27 @@ export function Flow({ steps }: { steps: { title: string; detail: string }[] }) 
   );
 }
 
+/** Columns of components side by side (stacked on phones), e.g. where each part of the system runs. */
+export function Lanes({ lanes }: { lanes: { title: string; items: { name: string; detail: string }[] }[] }) {
+  return (
+    <div className="dx-lanes">
+      {lanes.map(lane => (
+        <section key={lane.title}>
+          <p className="dx-lane-title">{lane.title}</p>
+          <ul>
+            {lane.items.map(item => (
+              <li key={item.name}>
+                <strong>{item.name}</strong>
+                <span>{item.detail}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 export const Kbd = ({ children }: { children: ReactNode }) => <kbd className="dx-kbd">{children}</kbd>;
 export const Badge = ({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "lime" | "orange" }) => (
   <span className={`dx-badge is-${tone}`}>{children}</span>

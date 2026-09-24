@@ -193,6 +193,42 @@ export const PAGES: DocPage[] = [
     sections: ["Toolchain", "Build and test", "Run a local devnode", "Deploy to Arbitrum Sepolia", "Serve the app", "Environment variables"],
     load: () => import("./pages/developers/Deploy"),
   },
+  {
+    path: "/docs/architecture",
+    title: "System overview",
+    group: "Architecture",
+    description: "The components of VeraKey, how a payment flows between them, and where the trust boundaries are.",
+    keywords: ["architecture", "components", "diagram", "data flow", "trust boundaries", "overview"],
+    sections: ["Components", "A payment end to end", "Trust boundaries", "Repository layout"],
+    load: () => import("./pages/architecture/Overview"),
+  },
+  {
+    path: "/docs/architecture/circuits",
+    title: "Circuits",
+    group: "Architecture",
+    description: "The two Noir circuits behind VeraKey: what they prove, their public inputs, and how their verifiers are generated.",
+    keywords: ["noir", "ultrahonk", "circuit", "public inputs", "p-256", "ecdsa", "poseidon2", "barretenberg", "nullifier"],
+    sections: ["The authorization circuit", "Public inputs", "The nullifier", "The link circuit", "Toolchain and verifiers"],
+    load: () => import("./pages/architecture/Circuits"),
+  },
+  {
+    path: "/docs/architecture/contracts",
+    title: "Smart contracts",
+    group: "Architecture",
+    description: "How the Stylus account and factory and the Solidity verifiers work: authorization, policy checks, storage layout and address derivation.",
+    keywords: ["stylus", "rust", "account", "factory", "create2", "storage layout", "eip-1167", "solidity", "verifier"],
+    sections: ["The account", "Authorization", "Policy checks", "Storage layout", "The factory", "Verifiers and the validator"],
+    load: () => import("./pages/architecture/Contracts"),
+  },
+  {
+    path: "/docs/architecture/gas",
+    title: "Gas and performance",
+    group: "Architecture",
+    description: "What VeraKey costs on Arbitrum, where a payment spends its gas, and how fast the browser proves.",
+    keywords: ["gas", "cost", "performance", "proving time", "benchmark", "fees", "arbitrum one"],
+    sections: ["Measured costs", "Where a payment spends its gas", "Before and after", "Proving time", "What is left"],
+    load: () => import("./pages/architecture/Gas"),
+  },
 ];
 
 function normalize(path: string): string {
