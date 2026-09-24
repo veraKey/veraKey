@@ -13,7 +13,7 @@ export default function ContractsPage() {
       <p>
         An account has no generic call surface: it only moves USDG, through <code>transfer</code>, to a payee and to the fee
         recipient. Its pure logic (client data parsing, spending windows, change validation) is a separate library,
-        covered by 39 unit tests and 9 property tests.
+        covered by 44 unit tests and 9 property tests.
       </p>
 
       <H2>Authorization</H2>

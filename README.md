@@ -165,12 +165,14 @@ Nothing on-chain connects a user's accounts in different apps. When someone need
 
 **Tests:**
 - 18 circuit tests (`nargo test`: 11 for the authorization circuit, 7 for the link circuit);
-- 39 Rust unit tests and 9 property tests (`contracts/stylus/core`, 2,000 cases each);
+- 44 Rust unit tests and 9 property tests (`contracts/stylus/core`, 2,000 cases each);
 - 36 Foundry tests for the ERC-7579 validator, with real proofs;
-- 61 end-to-end tests (`packages/sdk/test/e2e`). They deploy the real contracts to a nitro devnode and use real proofs:
+- 75 end-to-end tests (`packages/sdk/test/e2e`). They deploy the real contracts to a nitro devnode and use real proofs:
   - 44 cover the account: front-running, replay, cross-account and cross-chain proofs, tampered proofs, caps, fees, the new-recipient cap, freezing, timelocks, the payment sheet, backup owners, the guardian and recovery;
+  - 7 replay the internal audit's attacks;
   - 10 cover disclosures;
-  - 7 drive the relayer over HTTP.
+  - 5 cover Sign in with VeraKey;
+  - 9 drive the relayer over HTTP.
 - A browser workflow (`scripts/browser-e2e.mjs`) drives the app in headless Chrome with a virtual passkey, on desktop, on mobile and through the payment sheet:
   - it registers, funds and pays;
   - it runs into the new-recipient cap;
