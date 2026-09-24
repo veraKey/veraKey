@@ -102,8 +102,10 @@ try {
       ids: [...document.querySelectorAll("[id]")].map(e => e.id),
       links: [...document.querySelectorAll(".dx-article a[href], .dx-toc a[href], .dx-page-foot a[href]")].map(a => a.getAttribute("href")),
       overflow: document.scrollingElement.scrollWidth - innerWidth,
+      blockIcons: [...document.querySelectorAll(".dx-article .dx-ext")].filter(e => getComputedStyle(e).display === "block").length,
     })`);
     if (info.notFound) fail(`${page}: shows the docs 404`);
+    if (info.blockIcons) fail(`${page}: ${info.blockIcons} external-link icon(s) break onto a line of their own`);
     if (!info.title.trim()) fail(`${page}: no title`);
     if (info.overflow > 1) fail(`${page}: scrolls horizontally by ${info.overflow}px at 1440px`);
     if (pageErrors.length) fail(`${page}: console errors: ${pageErrors.slice(0, 3).join(" | ")}`);

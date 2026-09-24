@@ -167,9 +167,11 @@ export const Badge = ({ children, tone = "neutral" }: { children: ReactNode; ton
 );
 
 /** A contract or account address, linked to Arbiscan (Arbitrum Sepolia). */
-export function Address({ value }: { value: string }) {
+/** An address linked to its explorer page; plain text on a network without an explorer (`explorer={null}`). */
+export function Address({ value, explorer = "https://sepolia.arbiscan.io" }: { value: string; explorer?: string | null }) {
+  if (!explorer) return <code className="dx-address">{value}</code>;
   return (
-    <A href={`https://sepolia.arbiscan.io/address/${value}`} className="dx-link dx-address">
+    <A href={`${explorer}/address/${value}`} className="dx-link dx-address">
       <code>{value}</code>
     </A>
   );

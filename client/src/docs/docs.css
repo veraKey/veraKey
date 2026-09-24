@@ -50,8 +50,9 @@
 .dx-article :not(pre) > code { padding: 1px 5px; border: 1px solid var(--vk-line); background: rgba(115, 228, 210, 0.06); color: #9ff0e2; font-family: var(--vk-mono); font-size: 0.86em; overflow-wrap: anywhere; }
 .dx-link { color: var(--vk-teal); text-decoration: underline; text-decoration-color: rgba(115, 228, 210, 0.35); text-underline-offset: 3px; }
 .dx-link:hover { text-decoration-color: var(--vk-teal); }
-.dx-ext { margin-left: 3px; vertical-align: -1px; }
+.dx-ext { display: inline-block; margin-left: 3px; vertical-align: -1px; }
 .dx-address code { overflow-wrap: anywhere; }
+.dx-article code.dx-nowrap { white-space: nowrap; overflow-wrap: normal; }
 
 .dx-code { margin: 18px 0 22px; border: 1px solid var(--vk-line); background: #0a0f14; }
 .dx-code figcaption { display: flex; justify-content: space-between; align-items: center; padding: 7px 12px; border-bottom: 1px solid var(--vk-line); color: var(--vk-faint); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -96,6 +97,10 @@
 .dx-table th { padding: 9px 12px; border-bottom: 1px solid var(--vk-line-strong); color: var(--vk-muted); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-align: left; text-transform: uppercase; white-space: nowrap; }
 .dx-table td { padding: 9px 12px; border-bottom: 1px solid var(--vk-line); color: #c3cfcb; vertical-align: top; line-height: 1.55; }
 .dx-table tr:last-child td { border-bottom: 0; }
+.dx-glossary { margin: 8px 0 0; border-top: 1px solid var(--vk-line); }
+.dx-glossary > div { padding: 13px 0; border-bottom: 1px solid var(--vk-line); scroll-margin-top: 84px; }
+.dx-glossary dt { color: var(--vk-ink); font-size: 15px; font-weight: 600; }
+.dx-glossary dd { margin: 3px 0 0; color: #c3cfcb; font-size: 15px; line-height: 1.7; }
 .dx-badge { display: inline-block; padding: 1px 7px; border: 1px solid var(--vk-line-strong); font-size: 11px; white-space: nowrap; }
 .dx-badge.is-lime { border-color: rgba(201, 255, 91, 0.45); color: var(--vk-lime); }
 .dx-badge.is-orange { border-color: rgba(255, 174, 120, 0.45); color: var(--vk-orange); }
@@ -154,6 +159,9 @@
   .dx-top-links a:not(.dx-open-app) { display: none; }
   .dx-main { padding-top: 28px; }
   .dx-pager { grid-template-columns: 1fr; }
+}
+@media (min-width: 641px) {
+  .dx-table .dx-address { white-space: nowrap; }
 }
 @media (max-width: 640px) {
   .dx-table-wrap.is-stacked table, .dx-table-wrap.is-stacked tbody, .dx-table-wrap.is-stacked tr, .dx-table-wrap.is-stacked td { display: block; }
