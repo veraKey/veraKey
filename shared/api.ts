@@ -19,7 +19,17 @@ export interface NetworkConfig {
     veraKeyValidator?: `0x${string}`;
     usdg: `0x${string}`;
   };
-  policy: { perTxCap: string; dailyCap: string; newPayeeCap: string; changeDelay: number; recoveryDelay: number };
+  policy: {
+    perTxCap: string;
+    dailyCap: string;
+    newPayeeCap: string;
+    /** Largest fee any action may carry, in USDG base units. */
+    maxFee?: string;
+    /** Where every account pays its fees (the relayer's address). */
+    feeRecipient?: `0x${string}`;
+    changeDelay: number;
+    recoveryDelay: number;
+  };
   relayer: {
     address: `0x${string}`;
     /** Fee the relayer expects, in USDG base units (6 decimals); it is signed into every action. */

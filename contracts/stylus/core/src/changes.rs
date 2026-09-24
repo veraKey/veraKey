@@ -3,8 +3,9 @@
 //! Loosening a change (more spending, a new owner, another guardian, unfreezing) is scheduled with a
 //! passkey proof and applied after the account's change delay, so a stolen-but-unlocked device cannot
 //! silently raise limits, add owners or swap the guardian. Tightening a change (freezing, lowering a
-//! limit, enabling the allowlist, removing a recipient) may apply immediately: it can only reduce what
-//! the account can spend, which is what an owner wants the moment a device goes missing.
+//! limit, enabling the allowlist, removing a recipient, requiring the payment sheet) may apply
+//! immediately: it can only reduce what the account can spend, which is what an owner wants the
+//! moment a device goes missing.
 
 use alloy_primitives::{Address, B256, U256};
 
@@ -28,6 +29,9 @@ pub const SET_NEW_PAYEE_CAP: u8 = 7;
 pub const FREEZE: u8 = 8;
 /// empty payload: allow payments again (always timelocked)
 pub const UNFREEZE: u8 = 9;
+/// `bool required`: when set, `pay` accepts only Secure Payment Confirmation client data, so every
+/// payment is confirmed in the browser's own sheet showing the payee and the total
+pub const SET_PAYMENT_SHEET: u8 = 10;
 
 /// `keccak256("VeraKeyGuardian(address account,address guardian,bytes32 salt)")`
 pub const GUARDIAN_TYPEHASH: [u8; 32] = [
@@ -98,7 +102,7 @@ pub fn is_valid(kind: u8, payload: &[u8]) -> bool {
                 && word_address(&payload[..32]).is_some_and(|a| a != Address::ZERO)
                 && word_bool(&payload[32..]).is_some()
         }
-        SET_ALLOWLIST => word_bool(payload).is_some(),
+        SET_ALLOWLIST | SET_PAYMENT_SHEET => word_bool(payload).is_some(),
         SET_GUARDIAN => payload.len() == 32,
         SET_NEW_PAYEE_CAP => word_u128(payload).is_some(),
         FREEZE | UNFREEZE => payload.is_empty(),
@@ -125,7 +129,7 @@ pub fn is_restrictive(kind: u8, payload: &[u8], current: &Limits) -> bool {
                 && U256::from_be_slice(&payload[32..]) <= current.daily_cap
         }
         SET_NEW_PAYEE_CAP => U256::from_be_slice(payload) <= current.new_payee_cap,
-        SET_ALLOWLIST => word_bool(payload) == Some(true),
+        SET_ALLOWLIST | SET_PAYMENT_SHEET => word_bool(payload) == Some(true),
         SET_RECIPIENT => word_bool(&payload[32..]) == Some(false),
         FREEZE => true,
         _ => false,
@@ -227,6 +231,10 @@ mod tests {
         assert!(is_valid(FREEZE, &[]));
         assert!(is_valid(UNFREEZE, &[]));
         assert!(!is_valid(FREEZE, &word(1)));
+        assert!(is_valid(SET_PAYMENT_SHEET, &word(1)));
+        assert!(is_valid(SET_PAYMENT_SHEET, &word(0)));
+        assert!(!is_valid(SET_PAYMENT_SHEET, &word(2)));
+        assert!(!is_valid(SET_PAYMENT_SHEET, &[]));
         assert!(!is_valid(99, &word(1)));
     }
 
@@ -247,6 +255,8 @@ mod tests {
         assert!(!is_restrictive(SET_RECIPIENT, &remove, &CURRENT));
         assert!(is_restrictive(FREEZE, &[], &CURRENT));
         assert!(!is_restrictive(UNFREEZE, &[], &CURRENT));
+        assert!(is_restrictive(SET_PAYMENT_SHEET, &word(1), &CURRENT));
+        assert!(!is_restrictive(SET_PAYMENT_SHEET, &word(0), &CURRENT));
         assert!(!is_restrictive(ADD_OWNER, &word(7), &CURRENT));
         assert!(!is_restrictive(REMOVE_OWNER, &word(7), &CURRENT));
         assert!(!is_restrictive(SET_GUARDIAN, &[0u8; 32], &CURRENT));

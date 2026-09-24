@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploys VeraKey: the UltraHonk verifier (+ linked libraries), the Stylus account implementation
+# Deploys VeraKey: the UltraHonk verifiers, the ERC-7579 validator, the Stylus account implementation
 # and the Stylus factory, then writes deployments/<network>.json.
 #
 #   scripts/deploy.sh local            # nitro devnode on 127.0.0.1:8649 (scripts/devnode.sh up), test USDG
@@ -32,6 +32,8 @@ case "$NETWORK" in
     NEW_PAYEE_CAP=5000000    # 5 USDG: largest first payment to an unknown recipient
     CHANGE_DELAY=10          # short so the end-to-end timelock tests finish quickly
     RECOVERY_DELAY=15
+    MAX_FEE=1000000          # 1 USDG: largest fee any action may carry
+    FEE_RECIPIENT=$(cast wallet address --private-key "$DEV_KEY") # the local relayer
     ;;
   sepolia)
     RPC=${ARBITRUM_SEPOLIA_RPC:-https://sepolia-rollup.arbitrum.io/rpc}
@@ -47,6 +49,8 @@ case "$NETWORK" in
     NEW_PAYEE_CAP=${VERAKEY_NEW_PAYEE_CAP:-2000000} # 2 USDG: largest first payment to an unknown recipient
     CHANGE_DELAY=${VERAKEY_CHANGE_DELAY:-120}      # demo value; production default is 86400
     RECOVERY_DELAY=${VERAKEY_RECOVERY_DELAY:-300}  # demo value; production default is 259200
+    MAX_FEE=${VERAKEY_MAX_FEE:-250000}             # 0.25 USDG: largest fee any action may carry
+    FEE_RECIPIENT=${VERAKEY_FEE_RECIPIENT:-}       # default: the relayer's address (below)
     ;;
   *) echo "unknown network: $NETWORK" >&2; exit 1 ;;
 esac
@@ -113,14 +117,25 @@ if [ "$NETWORK" != local ] && [ "$CHAIN_ID" = "$CHAIN" ]; then
     fail "set RELAYER_PRIVATE_KEY in .env (the server signs every relayed transaction with it)"
   else
     RELAYER=$(cast wallet address --private-key "$RELAYER_KEY")
+    FEE_RECIPIENT=${FEE_RECIPIENT:-$RELAYER}
+    # The relayer key sits on an internet-facing server; the deployer key should not.
+    [ "$RELAYER" != "$DEPLOYER" ] && ok "relayer and deployer use separate keys" \
+      || warn "the relayer and the deployer share a key: give the server its own RELAYER_PRIVATE_KEY"
     RELAYER_ETH=$(cast balance "$RELAYER" --rpc-url "$RPC")
     RELAYER_USDG=$(cast call "$USDG" 'balanceOf(address)(uint256)' "$RELAYER" --rpc-url "$RPC" | cut -d' ' -f1)
     eth_at_least "$RELAYER_ETH" 0.003 && ok "relayer $RELAYER holds $(cast from-wei "$RELAYER_ETH") ETH" \
-      || warn "relayer $RELAYER holds $(cast from-wei "$RELAYER_ETH") ETH; each relayed payment burns ~4.2M gas"
+      || warn "relayer $RELAYER holds $(cast from-wei "$RELAYER_ETH") ETH; each relayed payment burns ~1.1M gas"
     awk -v units="$RELAYER_USDG" 'BEGIN { exit !(units + 0 >= 5000000) }' \
       && ok "relayer holds $(awk -v u="$RELAYER_USDG" 'BEGIN { printf "%.2f", u / 1e6 }') USDG for the demo faucet" \
       || warn "relayer holds $(awk -v u="$RELAYER_USDG" 'BEGIN { printf "%.2f", u / 1e6 }') USDG; the demo faucet sends 5 USDG to each new account (https://faucet.paxos.com)"
   fi
+fi
+
+# Every account pays its fees to this address, for good: the factory binds it into each account.
+if [[ "${FEE_RECIPIENT:-}" =~ ^0x[0-9a-fA-F]{40}$ ]]; then
+  ok "fees (at most $MAX_FEE USDG units per action) go to $FEE_RECIPIENT"
+elif [ "$NETWORK" != local ]; then
+  fail "no fee recipient: set RELAYER_PRIVATE_KEY (or VERAKEY_FEE_RECIPIENT)"
 fi
 
 if [ "$PROBLEMS" -gt 0 ]; then
@@ -188,7 +203,7 @@ echo "    $IMPLEMENTATION"
 
 echo "==> VeraKeyFactory (Stylus)"
 FACTORY=$(stylus_deploy verakey-factory "$IMPLEMENTATION" "$VERIFIER" "$USDG" "$RP_ID_HASH" "$ORIGIN_HEX" \
-  "$PER_TX_CAP" "$DAILY_CAP" "$NEW_PAYEE_CAP" "$CHANGE_DELAY" "$RECOVERY_DELAY")
+  "$PER_TX_CAP" "$DAILY_CAP" "$NEW_PAYEE_CAP" "$CHANGE_DELAY" "$RECOVERY_DELAY" "$FEE_RECIPIENT" "$MAX_FEE")
 [ -n "$FACTORY" ] || { echo "factory deployment failed" >&2; exit 1; }
 echo "    $FACTORY"
 
@@ -198,7 +213,7 @@ if [ "$NETWORK" = local ]; then
   # never produce the same account address as the real factory.
   echo "==> VeraKeyFactory with a different verifier (local test fixture)"
   FACTORY_ALT=$(stylus_deploy verakey-factory "$IMPLEMENTATION" "$USDG" "$USDG" "$RP_ID_HASH" "$ORIGIN_HEX" \
-    "$PER_TX_CAP" "$DAILY_CAP" "$NEW_PAYEE_CAP" "$CHANGE_DELAY" "$RECOVERY_DELAY")
+    "$PER_TX_CAP" "$DAILY_CAP" "$NEW_PAYEE_CAP" "$CHANGE_DELAY" "$RECOVERY_DELAY" "$FEE_RECIPIENT" "$MAX_FEE")
   echo "    $FACTORY_ALT"
 fi
 
@@ -250,6 +265,8 @@ cat > "$ROOT/deployments/$NETWORK.json" <<JSON
     "perTxCap": "$PER_TX_CAP",
     "dailyCap": "$DAILY_CAP",
     "newPayeeCap": "$NEW_PAYEE_CAP",
+    "maxFee": "$MAX_FEE",
+    "feeRecipient": "$FEE_RECIPIENT",
     "changeDelay": $CHANGE_DELAY,
     "recoveryDelay": $RECOVERY_DELAY
   },
@@ -261,3 +278,23 @@ cat > "$ROOT/deployments/$NETWORK.json" <<JSON
 }
 JSON
 echo "wrote deployments/$NETWORK.json"
+
+# Publishes the Solidity sources on Sourcify (no API key needed), so anyone can check that the verifiers
+# on-chain are the ones bb generated from this repository's circuits. A failure is reported, not fatal:
+# the contracts are already deployed, and the printed command retries it.
+sourcify() { # <address> <path:Contract> [abi-encoded constructor args]
+  local extra=()
+  [ -n "${3:-}" ] && extra=(--constructor-args "$3")
+  if (cd "$ROOT/contracts/evm" && forge verify-contract "$1" "$2" --verifier sourcify --chain "$CHAIN" --watch "${extra[@]}" >/dev/null 2>&1); then
+    echo "    verified $2 at $1"
+  else
+    echo "    warn  Sourcify did not verify $2; retry: (cd contracts/evm && forge verify-contract $1 $2 --verifier sourcify --chain $CHAIN ${extra[*]})"
+  fi
+}
+if [ "$NETWORK" != local ]; then
+  echo "==> Sourcify"
+  sourcify "$VERIFIER" src/HonkVerifier.sol:HonkVerifier
+  sourcify "$LINK_VERIFIER" src/LinkHonkVerifier.sol:LinkHonkVerifier
+  sourcify "$VALIDATOR" src/modules/VeraKeyValidator.sol:VeraKeyValidator \
+    "$(cast abi-encode 'constructor(address,bytes32,string)' "$VERIFIER" "$RP_ID_HASH" "$ORIGIN")"
+fi

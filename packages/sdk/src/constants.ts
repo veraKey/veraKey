@@ -39,6 +39,8 @@ export const ChangeKind = {
   SetNewPayeeCap: 7,
   Freeze: 8,
   Unfreeze: 9,
+  /** payload: `bool required`; when set, payments must be confirmed in the browser's payment sheet */
+  SetPaymentSheet: 10,
 } as const;
 
 /** `keccak256("VeraKeyGuardian(address account,address guardian,bytes32 salt)")` */

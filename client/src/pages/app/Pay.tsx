@@ -31,6 +31,7 @@ export function Pay() {
     };
   }, [client, session]);
 
+  const sheetRequired = !!account?.deployed && account.paymentSheetRequired;
   const to = (recipient || merchant || "") as Address;
   const units = parseUsdg(amount);
   const fee = config ? BigInt(config.relayer.fee) : 0n;
@@ -41,11 +42,14 @@ export function Pay() {
     if (!isAddress(to)) return "Enter a valid recipient address.";
     if (units === null || units === 0n) return "Enter an amount.";
     if (!account) return "Loading this account's balance…";
+    if (sheetRequired && !sheetAvailable) {
+      return "This account only pays through the browser's payment sheet, which is not available here (Chrome on macOS, Windows or Android, with this passkey enrolled for it).";
+    }
     // Above the cap the contract refuses before it looks at the balance, which is the point of the
     // "try over the cap" demo; within the cap, an unaffordable payment is blocked here.
     if (units + fee > account.balance && units + fee <= perTxCap) return "Not enough USDG in this account (amount + relayer fee).";
     return null;
-  }, [to, units, fee, account, perTxCap]);
+  }, [to, units, fee, account, perTxCap, sheetRequired, sheetAvailable]);
   const overCap = units !== null && units + fee > perTxCap;
 
   const submit = async () => {
@@ -61,7 +65,7 @@ export function Pay() {
           setState(next);
           if (next.status === "verified") verified = next;
         },
-        { secureConfirmation: sheetAvailable && useSheet }
+        { secureConfirmation: sheetRequired || (sheetAvailable && useSheet) }
       );
       const final = verified as Extract<ProofState, { status: "verified" }> | null;
       if (!final) return;
@@ -109,7 +113,9 @@ export function Pay() {
     onSubmit: submit,
     onTryOverCap: () => setAmount(formatUsdg(perTxCap + 1_000_000n).replace(/,/g, "")),
     onDone: () => setState({ status: "idle" }),
-    paymentSheet: sheetAvailable ? { enabled: useSheet, onToggle: setUseSheet } : undefined,
+    paymentSheet: sheetAvailable
+      ? { enabled: sheetRequired || useSheet, onToggle: setUseSheet, required: sheetRequired }
+      : undefined,
   };
   return compact ? <PayMobile {...view} /> : <PayDesktop {...view} />;
 }

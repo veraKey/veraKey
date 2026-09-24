@@ -106,12 +106,24 @@ export interface DisclosureVerdict {
   accounts: { a: DisclosedAccount; b: DisclosedAccount } | null;
 }
 
+/** Longest remaining validity a verifier accepts by default: disclosures are made for days, not months. */
+export const MAX_DISCLOSURE_TTL_SECONDS = 7 * 86_400;
+
 export interface VerifyDisclosureOptions {
   publicClient: PublicClient;
   chainId: number;
   factory: Address;
   rpIdHash: Hex;
   origin: string;
+  /**
+   * Who is verifying, exactly as the disclosure must name them. A disclosure can be forwarded; this is
+   * what makes one made for someone else fail.
+   */
+  audience: string;
+  /** The nonce the verifier asked the owner to include, if it asked for one. */
+  nonce?: Hex;
+  /** Refuse disclosures valid for longer than this from now (default 7 days). */
+  maxTtlSeconds?: number;
   /** The on-chain `LinkHonkVerifier`; checked with `eth_call`, no transaction. */
   linkVerifier?: Address;
   /** Local verification with bb.js, for audiences that do not want to trust an RPC. */
@@ -157,8 +169,15 @@ export async function verifyDisclosure(pkg: DisclosurePackage, options: VerifyDi
   check("This deployment", s.chainId === options.chainId && s.factory.toLowerCase() === options.factory.toLowerCase(),
     `chain ${s.chainId}, factory ${s.factory}`);
   check("Two different apps", s.appIdA.toLowerCase() !== s.appIdB.toLowerCase());
+  check("Made for this audience", typeof s.audience === "string" && s.audience.trim() !== "" && s.audience === options.audience.trim(),
+    `made for "${s.audience}"`);
+  if (options.nonce !== undefined) {
+    check("Carries the nonce you asked for", s.nonce.toLowerCase() === options.nonce.toLowerCase(), `nonce ${s.nonce}`);
+  }
   const now = options.now ?? Math.floor(Date.now() / 1000);
   check("Not expired", s.expiresAt > now, new Date(s.expiresAt * 1000).toISOString());
+  const maxTtl = options.maxTtlSeconds ?? MAX_DISCLOSURE_TTL_SECONDS;
+  check("Short-lived", s.expiresAt - now <= maxTtl, `valid until ${new Date(s.expiresAt * 1000).toISOString()}`);
 
   // The signed client data must be a plain passkey assertion for the VeraKey origin, over the statement.
   const clientData = hexToBytes(pkg.clientDataJSON);

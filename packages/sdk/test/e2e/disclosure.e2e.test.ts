@@ -24,7 +24,10 @@ const pay = appIdFromName("pay");
 const shop = appIdFromName("shop");
 const nullifiers = {} as { pay: bigint; shop: bigint };
 
-const options = () => ({
+const AUDIENCE = "compliance@exchange.example";
+const NONCE = keccak256(toHex("verifier nonce 1"));
+
+const options = (overrides: { audience?: string; nonce?: Hex } = {}) => ({
   publicClient: publicClient as never,
   chainId: chain.id,
   factory: deployment.contracts.factory,
@@ -32,6 +35,9 @@ const options = () => ({
   origin: deployment.origin,
   linkVerifier: deployment.contracts.linkVerifier,
   linkProver: link,
+  audience: AUDIENCE,
+  nonce: NONCE,
+  ...overrides,
 });
 
 async function disclose(overrides: { statement?: Partial<LinkStatement>; origin?: string; signer?: VirtualPasskey } = {}): Promise<DisclosurePackage> {
@@ -43,8 +49,8 @@ async function disclose(overrides: { statement?: Partial<LinkStatement>; origin?
     nullifierA: toFieldHex(nullifiers.pay),
     appIdB: toFieldHex(shop),
     nullifierB: toFieldHex(nullifiers.shop),
-    audience: "compliance@exchange.example",
-    nonce: keccak256(toHex("verifier nonce 1")),
+    audience: AUDIENCE,
+    nonce: NONCE,
     expiresAt: Math.floor(Date.now() / 1000) + 3600,
     ...overrides.statement,
   };
@@ -107,7 +113,25 @@ describe("linkable by consent", () => {
   it("changing_the_audience_after_signing_fails", async () => {
     const pkg = await disclose();
     const edited = { ...pkg, statement: { ...pkg.statement, audience: "someone-else@example" } };
-    expect(failed(await verifyDisclosure(edited, options()))).toEqual(["Passkey signed this statement"]);
+    expect(failed(await verifyDisclosure(edited, options()))).toEqual(["Made for this audience", "Passkey signed this statement"]);
+    // Whoever edits it to name themselves still fails: the passkey signed the original audience.
+    expect(failed(await verifyDisclosure(edited, options({ audience: "someone-else@example" })))).toEqual(["Passkey signed this statement"]);
+  });
+
+  it("a_forwarded_disclosure_fails_for_another_audience", async () => {
+    const pkg = await disclose();
+    expect(failed(await verifyDisclosure(pkg, options({ audience: "someone-else@example" })))).toEqual(["Made for this audience"]);
+  });
+
+  it("a_disclosure_without_the_requested_nonce_fails", async () => {
+    const pkg = await disclose();
+    const other = keccak256(toHex("verifier nonce 2"));
+    expect(failed(await verifyDisclosure(pkg, options({ nonce: other })))).toEqual(["Carries the nonce you asked for"]);
+  });
+
+  it("a_long_lived_disclosure_fails", async () => {
+    const pkg = await disclose({ statement: { expiresAt: Math.floor(Date.now() / 1000) + 30 * 86_400 } });
+    expect(failed(await verifyDisclosure(pkg, options()))).toEqual(["Short-lived"]);
   });
 
   it("an_expired_disclosure_fails", async () => {

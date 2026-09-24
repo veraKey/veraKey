@@ -7,6 +7,7 @@ import { encodeFunctionData, keccak256, parseEventLogs, toHex, type Address, typ
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
   ActionKind,
+  ChangeKind,
   VeraKeyProver,
   ZERO_HASH,
   appIdFromName,
@@ -58,7 +59,9 @@ async function createAccount(appId: bigint, nullifier: bigint): Promise<Address>
     account: devAccount,
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash: await relayer.writeContract(request) });
-  gas.createAccount = receipt.gasUsed;
+  // An existing account returns early; only a real deployment is worth reporting.
+  const created = parseEventLogs({ abi: veraKeyFactoryAbi, eventName: "AccountCreated", logs: receipt.logs }).length > 0;
+  if (created) gas.createAccount ??= receipt.gasUsed;
   return result;
 }
 
@@ -96,7 +99,8 @@ async function pay(owner: Owner, appId: bigint, account: Address, to: Address, a
   return { receipt: await publicClient.waitForTransactionReceipt({ hash }), auth };
 }
 
-async function schedule(owner: Owner, appId: bigint, account: Address, change: { kind: number; payload: Hex }) {
+/** Signs and proves a change to schedule; returns the simulation request (throws on revert). */
+async function scheduleRequest(owner: Owner, appId: bigint, account: Address, change: { kind: number; payload: Hex }) {
   const dl = deadline();
   const auth = await authorize(prover, owner, appId, account, {
     kind: ActionKind.ScheduleChange,
@@ -106,13 +110,17 @@ async function schedule(owner: Owner, appId: bigint, account: Address, change: {
     fee: FEE,
     deadline: dl,
   });
-  const { request } = await publicClient.simulateContract({
+  return publicClient.simulateContract({
     address: account,
     abi: veraKeyAccountAbi,
     functionName: "scheduleChange",
     args: [change.kind, change.payload, FEE, dl, fieldHex(owner.nullifier), auth.clientDataJSON, auth.proof],
     account: devAccount,
   });
+}
+
+async function schedule(owner: Owner, appId: bigint, account: Address, change: { kind: number; payload: Hex }) {
+  const { request } = await scheduleRequest(owner, appId, account, change);
   const receipt = await publicClient.waitForTransactionReceipt({ hash: await relayer.writeContract(request) });
   const [event] = parseEventLogs({ abi: veraKeyAccountAbi, eventName: "ChangeScheduled", logs: receipt.logs });
   return { changeId: event.args.changeId, eta: event.args.eta, hash: receipt.transactionHash };
@@ -141,12 +149,25 @@ async function restrictRequest(owner: Owner, appId: bigint, account: Address, ch
 async function restrict(owner: Owner, appId: bigint, account: Address, change: { kind: number; payload: Hex }) {
   const { request } = await restrictRequest(owner, appId, account, change);
   const receipt = await publicClient.waitForTransactionReceipt({ hash: await relayer.writeContract(request) });
-  gas.restrict = receipt.gasUsed;
+  gas.restrict ??= receipt.gasUsed;
   return receipt;
 }
 
 const protections = (account: Address) =>
   publicClient.readContract({ address: account, abi: veraKeyAccountAbi, functionName: "protections" });
+
+const pendingIds = (account: Address) =>
+  publicClient.readContract({ address: account, abi: veraKeyAccountAbi, functionName: "pendingChangeIds" });
+
+const mint = async (to: Address, amount: bigint) =>
+  publicClient.waitForTransactionReceipt({
+    hash: await relayer.writeContract({
+      address: usdg,
+      abi: [{ type: "function", name: "mint", stateMutability: "nonpayable", inputs: [{ name: "to", type: "address" }, { name: "value", type: "uint256" }], outputs: [] }],
+      functionName: "mint",
+      args: [to, amount],
+    }),
+  });
 
 async function apply(account: Address, changeId: Hex, change: { kind: number; payload: Hex }) {
   const { request } = await publicClient.simulateContract({
@@ -217,7 +238,7 @@ describe("factory", () => {
   it("init_twice_reverts", async () => {
     const name = await revertName(publicClient.simulateContract({
       address: accounts.pay, abi: veraKeyAccountAbi, functionName: "initialize",
-      args: [fieldHex(apps.pay), fieldHex(1n), usdg, usdg, deployment.rpIdHash, toHex("x"), 1n, 1n, 0n, 0n, 0n],
+      args: [fieldHex(apps.pay), fieldHex(1n), usdg, usdg, deployment.rpIdHash, toHex("x"), 1n, 1n, 0n, 0n, 0n, devAccount.address, 0n],
       account: devAccount,
     }));
     expect(name).toBe("AlreadyInitialized");
@@ -239,14 +260,18 @@ describe("factory", () => {
     expect(factoryConfig[0].toLowerCase()).toBe(accountImplementation.toLowerCase());
     const [perTxCap, dailyCap, spent, , allowlist] = await publicClient.readContract({ address: accounts.vault, abi: veraKeyAccountAbi, functionName: "policy" });
     expect([perTxCap, dailyCap, spent, allowlist]).toEqual([BigInt(deployment.policy.perTxCap), BigInt(deployment.policy.dailyCap), 0n, false]);
-    const [newPayeeCap, frozen, guardian] = await publicClient.readContract({ address: accounts.vault, abi: veraKeyAccountAbi, functionName: "protections" });
-    expect([newPayeeCap, frozen, guardian]).toEqual([BigInt(deployment.policy.newPayeeCap), false, ZERO_HASH]);
+    const [newPayeeCap, frozen, guardian, sheet] = await publicClient.readContract({ address: accounts.vault, abi: veraKeyAccountAbi, functionName: "protections" });
+    expect([newPayeeCap, frozen, guardian, sheet]).toEqual([BigInt(deployment.policy.newPayeeCap), false, ZERO_HASH, false]);
+    const [feeRecipient, maxFee] = await publicClient.readContract({ address: accounts.vault, abi: veraKeyAccountAbi, functionName: "fees" });
+    expect([feeRecipient.toLowerCase(), maxFee]).toEqual([deployment.policy.feeRecipient!.toLowerCase(), BigInt(deployment.policy.maxFee!)]);
+    expect([factoryConfig[9].toLowerCase(), factoryConfig[10]]).toEqual([feeRecipient.toLowerCase(), maxFee]);
+    expect(await publicClient.readContract({ address: accounts.vault, abi: veraKeyAccountAbi, functionName: "pendingChangeIds" })).toEqual([]);
   });
 
   it("implementation_is_locked", async () => {
     const name = await revertName(publicClient.simulateContract({
       address: accountImplementation, abi: veraKeyAccountAbi, functionName: "initialize",
-      args: [fieldHex(apps.pay), fieldHex(1n), usdg, usdg, deployment.rpIdHash, toHex("x"), 1n, 1n, 0n, 0n, 0n],
+      args: [fieldHex(apps.pay), fieldHex(1n), usdg, usdg, deployment.rpIdHash, toHex("x"), 1n, 1n, 0n, 0n, 0n, devAccount.address, 0n],
       account: devAccount,
     }));
     expect(name).toBe("AlreadyInitialized");
@@ -254,7 +279,7 @@ describe("factory", () => {
 });
 
 describe("pay", () => {
-  it("pay_moves_usdg_and_pays_the_submitter", async () => {
+  it("pay_moves_usdg_and_pays_the_fee_recipient", async () => {
     const before = { account: await balance(accounts.pay), to: await balance(recipient), relayer: await balance(devAccount.address) };
     const { receipt, auth } = await pay(owners.pay, apps.pay, accounts.pay, recipient, USDG(2));
     gas.pay = receipt.gasUsed;
@@ -286,13 +311,27 @@ describe("pay", () => {
     expect(await revertName(publicClient.simulateContract(call))).toBe("InvalidClientData");
   });
 
-  it("any_eoa_executes_and_gets_fee", async () => {
+  it("any_eoa_executes_but_the_fee_goes_to_the_fee_recipient", async () => {
     const stranger = privateKeyToAccount(generatePrivateKey());
     await publicClient.waitForTransactionReceipt({
       hash: await relayer.sendTransaction({ to: stranger.address, value: 10n ** 16n }),
     });
+    const feeRecipient = deployment.policy.feeRecipient!;
+    const before = await balance(feeRecipient);
     await pay(owners.pay, apps.pay, accounts.pay, recipient, USDG(1), walletFor(stranger));
-    expect(await balance(stranger.address)).toBe(FEE);
+    expect(await balance(stranger.address)).toBe(0n);
+    expect(await balance(feeRecipient)).toBe(before + FEE);
+  });
+
+  it("fee_above_max_fee_reverts", async () => {
+    const fee = BigInt(deployment.policy.maxFee!) + 1n;
+    const dl = deadline();
+    const auth = await authorize(prover, owners.pay, apps.pay, accounts.pay,
+      { kind: ActionKind.Pay, target: recipient, amount: USDG(1), dataHash: ZERO_HASH, fee, deadline: dl });
+    expect(await revertName(publicClient.simulateContract({
+      address: accounts.pay, abi: veraKeyAccountAbi, functionName: "pay",
+      args: [recipient, USDG(1), fee, dl, fieldHex(owners.pay.nullifier), auth.clientDataJSON, auth.proof], account: devAccount,
+    }))).toBe("FeeTooHigh");
   });
 
   it("chrome_injected_keys_accepted", async () => {
@@ -591,9 +630,19 @@ describe("protections", () => {
     expect((await protections(accounts.tip))[0]).toBe(USDG(1));
   });
 
-  it("owner_freeze_stops_payments_until_a_timelocked_unfreeze", async () => {
+  it("owner_freeze_stops_payments_and_cancels_scheduled_changes_until_a_timelocked_unfreeze", async () => {
+    // Someone with the unlocked device schedules a loosening change; any device can see it on-chain...
+    const raise = changePayload.setLimits(USDG(50), USDG(200));
+    const raised = await schedule(owners.tip, apps.tip, accounts.tip, raise);
+    expect(await pendingIds(accounts.tip)).toContain(raised.changeId);
+    const [kind, , eta] = await publicClient.readContract({
+      address: accounts.tip, abi: veraKeyAccountAbi, functionName: "pendingChange", args: [raised.changeId],
+    });
+    expect([kind, eta]).toEqual([ChangeKind.SetLimits, raised.eta]);
+    // ...and the owner's freeze cancels it.
     await restrict(owners.tip, apps.tip, accounts.tip, changePayload.freeze());
     expect((await protections(accounts.tip))[1]).toBe(true);
+    expect(await pendingIds(accounts.tip)).toEqual([]);
     const dl = deadline();
     const auth = await payArgs(owners.tip, apps.tip, accounts.tip, stranger, USDG(1), { deadline: dl });
     expect(await revertName(publicClient.simulateContract(payCall(accounts.tip, owners.tip, stranger, USDG(1), auth, dl)))).toBe("AccountFrozen");
@@ -605,6 +654,10 @@ describe("protections", () => {
     }))).toBe("ChangeNotReady");
     await sleepUntil(scheduled.eta);
     await apply(accounts.tip, scheduled.changeId, unfreeze);
+    expect(await revertName(publicClient.simulateContract({
+      address: accounts.tip, abi: veraKeyAccountAbi, functionName: "applyChange",
+      args: [raised.changeId, raise.kind, raise.payload], account: devAccount,
+    }))).toBe("UnknownChange");
     expect((await pay(owners.tip, apps.tip, accounts.tip, stranger, USDG(1))).receipt.status).toBe("success");
   });
 
@@ -631,6 +684,81 @@ describe("protections", () => {
     const dl = deadline();
     const auth = await payArgs(owners.tip, apps.tip, accounts.tip, stranger, USDG(1), { deadline: dl });
     expect(await revertName(publicClient.simulateContract(payCall(accounts.tip, owners.tip, stranger, USDG(1), auth, dl)))).toBe("AccountFrozen");
+  });
+
+  it("a_frozen_account_pays_fees_only_to_the_fee_recipient_and_never_above_the_max_fee", async () => {
+    expect((await protections(accounts.tip))[1]).toBe(true);
+    const submitter = privateKeyToAccount(generatePrivateKey());
+    await publicClient.waitForTransactionReceipt({ hash: await relayer.sendTransaction({ to: submitter.address, value: 10n ** 16n }) });
+    const maxFee = BigInt(deployment.policy.maxFee!);
+    const feeRecipient = deployment.policy.feeRecipient!;
+    // Someone who can make the passkey sign submits a freeze with a fee, hoping to collect it.
+    const freezeWithFee = async (fee: bigint) => {
+      const change = changePayload.freeze();
+      const dl = deadline();
+      const auth = await authorize(prover, owners.tip, apps.tip, accounts.tip, {
+        kind: ActionKind.Restrict, target: "0x0000000000000000000000000000000000000000", amount: 0n,
+        dataHash: changeDataHash(change.kind as never, change.payload), fee, deadline: dl,
+      });
+      return publicClient.simulateContract({
+        address: accounts.tip, abi: veraKeyAccountAbi, functionName: "restrict",
+        args: [change.kind, change.payload, fee, dl, fieldHex(owners.tip.nullifier), auth.clientDataJSON, auth.proof],
+        account: submitter,
+      });
+    };
+    expect(await revertName(freezeWithFee(maxFee + 1n))).toBe("FeeTooHigh");
+    const before = await balance(feeRecipient);
+    const { request } = await freezeWithFee(maxFee);
+    await publicClient.waitForTransactionReceipt({ hash: await walletFor(submitter).writeContract(request) });
+    expect(await balance(submitter.address)).toBe(0n);
+    expect(await balance(feeRecipient)).toBe(before + maxFee);
+  });
+
+  it("the_guardian_cannot_veto_a_change_to_the_guardian_which_waits_longer", async () => {
+    const remove = changePayload.setGuardian(ZERO_HASH);
+    const removal = await schedule(owners.tip, apps.tip, accounts.tip, remove);
+    const { blockNumber } = await publicClient.getTransactionReceipt({ hash: removal.hash });
+    const { timestamp } = await publicClient.getBlock({ blockNumber });
+    expect(removal.eta - timestamp).toBe(BigInt(deployment.policy.changeDelay + deployment.policy.recoveryDelay));
+    const unfreeze = changePayload.unfreeze();
+    const unfreezing = await schedule(owners.tip, apps.tip, accounts.tip, unfreeze);
+
+    const asGuardian = (functionName: "guardianCancelChange" | "guardianFreeze", args: readonly unknown[]) =>
+      publicClient.simulateContract({ address: accounts.tip, abi: veraKeyAccountAbi, functionName, args, account: guardian } as never);
+    expect(await revertName(asGuardian("guardianCancelChange", [removal.changeId, salt]))).toBe("CannotVetoGuardianChange");
+    // It can still veto anything else, and freezing again keeps the owners' change to the guardian.
+    const veto = await asGuardian("guardianCancelChange", [unfreezing.changeId, salt]);
+    await publicClient.waitForTransactionReceipt({ hash: await walletFor(guardian).writeContract(veto.request as never) });
+    const refreeze = await asGuardian("guardianFreeze", [salt]);
+    await publicClient.waitForTransactionReceipt({ hash: await walletFor(guardian).writeContract(refreeze.request as never) });
+    expect(await pendingIds(accounts.tip)).toEqual([removal.changeId]);
+
+    await sleepUntil(removal.eta);
+    await apply(accounts.tip, removal.changeId, remove);
+    expect((await protections(accounts.tip))[2]).toBe(ZERO_HASH);
+    expect(await revertName(asGuardian("guardianFreeze", [salt]))).toBe("NotGuardian");
+    // Without a guardian to hold it, the owners unfreeze after the ordinary delay.
+    const again = await schedule(owners.tip, apps.tip, accounts.tip, unfreeze);
+    await sleepUntil(again.eta);
+    await apply(accounts.tip, again.changeId, unfreeze);
+    expect((await pay(owners.tip, apps.tip, accounts.tip, stranger, USDG(1))).receipt.status).toBe("success");
+  });
+
+  it("at_most_eight_changes_wait_and_a_freeze_cancels_them_all", async () => {
+    const appId = appIdFromName("safe");
+    const owner = { passkey, nullifier: await computeNullifier(prover.barretenberg, passkey.publicKey, passkey.prfSecret, appId) };
+    const account = await createAccount(appId, owner.nullifier);
+    await mint(account, USDG(20));
+    const ids: Hex[] = [];
+    for (let i = 0; i < 8; i++) {
+      ids.push((await schedule(owner, appId, account, changePayload.setNewPayeeCap(USDG(3 + i)))).changeId);
+    }
+    expect([...(await pendingIds(account))].sort()).toEqual([...ids].sort());
+    expect(await revertName(scheduleRequest(owner, appId, account, changePayload.setNewPayeeCap(USDG(20))))).toBe("TooManyPendingChanges");
+    const receipt = await restrict(owner, appId, account, changePayload.freeze());
+    gas.freezeCancellingEightChanges = receipt.gasUsed;
+    expect(await pendingIds(account)).toEqual([]);
+    expect(parseEventLogs({ abi: veraKeyAccountAbi, eventName: "ChangeCancelled", logs: receipt.logs })).toHaveLength(8);
   });
 });
 
@@ -679,6 +807,24 @@ describe("secure payment confirmation", () => {
   it("payment_sheet_rp_id_must_hash_to_the_account_rp_id_hash", async () => {
     const { call } = await spcPay({ payee: shop, total: amount + FEE, rpId: "evil.example" });
     expect(await revertName(publicClient.simulateContract(call))).toBe("InvalidClientData");
+  });
+
+  it("a_required_payment_sheet_refuses_the_plain_passkey_prompt", async () => {
+    await restrict(owners.vault, apps.vault, accounts.vault, changePayload.setPaymentSheet(true));
+    expect((await protections(accounts.vault))[3]).toBe(true);
+    const dl = deadline();
+    const plain = await payArgs(owners.vault, apps.vault, accounts.vault, shop, amount, { deadline: dl });
+    expect(await revertName(publicClient.simulateContract(payCall(accounts.vault, owners.vault, shop, amount, plain, dl)))).toBe("PaymentSheetRequired");
+    const { call } = await spcPay({ payee: shop, total: amount + FEE });
+    const { request } = await publicClient.simulateContract(call);
+    expect((await publicClient.waitForTransactionReceipt({ hash: await relayer.writeContract(request) })).status).toBe("success");
+    // Dropping the requirement loosens the account, so it waits out the change delay.
+    const drop = changePayload.setPaymentSheet(false);
+    expect(await revertName(restrictRequest(owners.vault, apps.vault, accounts.vault, drop))).toBe("NotRestrictive");
+    const scheduled = await schedule(owners.vault, apps.vault, accounts.vault, drop);
+    await sleepUntil(scheduled.eta);
+    await apply(accounts.vault, scheduled.changeId, drop);
+    expect((await pay(owners.vault, apps.vault, accounts.vault, shop, amount)).receipt.status).toBe("success");
   });
 
   it("payment_sheet_client_data_cannot_authorize_other_actions", async () => {

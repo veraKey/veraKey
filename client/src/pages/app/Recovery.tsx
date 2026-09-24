@@ -19,7 +19,8 @@ function downloadCard(card: GuardianCard, appName: string) {
     ...card,
     app: appName,
     howToAct: {
-      freeze: `guardianFreeze(bytes32 salt) on ${card.account}, sent from ${card.guardian}`,
+      freeze: `guardianFreeze(bytes32 salt) on ${card.account}, sent from ${card.guardian}; also cancels every scheduled change except changes to the guardian`,
+      veto: `guardianCancelChange(bytes32 changeId, bytes32 salt): any scheduled change except a change to the guardian (see pendingChangeIds())`,
       recover: `initiateRecovery(bytes32 newOwnerNullifier, bytes32 salt) on ${card.account}, sent from ${card.guardian}`,
       cancelRecovery: `guardianCancelRecovery(bytes32 salt)`,
     },
@@ -117,10 +118,13 @@ export function Recovery() {
               <div className="vk-panel-head"><span>Guardian</span><span>{account.guardianCommitment === ZERO_HASH ? "none" : "set · private"}</span></div>
               <div className="vk-panel-body vk-form">
                 <p style={{ margin: 0, color: "var(--vk-muted)", fontSize: 12, lineHeight: 1.6 }}>
-                  A guardian (a friend's wallet, a multisig, another account) can freeze this account at once and
-                  start replacing its owners; the replacement waits {formatDuration(Number(account.recoveryDelay))} and
-                  any owner passkey can cancel it. The account stores only a salted commitment, so the guardian stays
-                  private until it acts, and one guardian used by several apps leaves nothing on-chain that links them.
+                  A guardian (a friend's wallet, a multisig, another account) can freeze this account at once, veto
+                  scheduled changes, and start replacing its owners; the replacement waits{" "}
+                  {formatDuration(Number(account.recoveryDelay))} and any owner passkey can cancel it. It cannot veto
+                  its own replacement, which waits {formatDuration(Number(account.changeDelay + account.recoveryDelay))},
+                  so a guardian can delay you but never hold the account. The account stores only a salted
+                  commitment, so the guardian stays private until it acts, and one guardian used by several apps
+                  leaves nothing on-chain that links them.
                 </p>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 10, alignItems: "end" }}>
                   <label className="vk-field"><span>Guardian address</span><input className="vk-input is-mono" placeholder="0x…" value={guardian} onChange={e => { setGuardian(e.target.value.trim()); setCard(null); }} spellCheck={false} /></label>

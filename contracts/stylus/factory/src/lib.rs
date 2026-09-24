@@ -2,9 +2,10 @@
 //!
 //! Deploys VeraKey accounts as EIP-1167 minimal proxies of one Stylus implementation. The CREATE2
 //! salt commits to `(appId, nullifier, configHash)`, where `configHash` covers the implementation,
-//! verifier, USDG token, rpIdHash, origin and default policy (caps, new-payee cap, delays). An account address can therefore
-//! only ever hold code that was initialized with this factory's configuration: nobody can deploy
-//! the same address first with a different verifier or policy (risk register #4).
+//! verifier, USDG token, rpIdHash, origin, default policy (caps, new-payee cap, delays) and fees (fee
+//! recipient, largest fee). An account address can therefore only ever hold code that was
+//! initialized with this factory's configuration: nobody can deploy the same address first with a
+//! different verifier or policy (risk register #4).
 #![cfg_attr(not(any(test, feature = "export-abi")), no_main)]
 extern crate alloc;
 
@@ -25,7 +26,7 @@ use verakey_core::{clone, field};
 
 sol_interface! {
     interface IVeraKeyAccount {
-        function initialize(bytes32 app_id, bytes32 owner_nullifier, address verifier, address usdg, bytes32 rp_id_hash, bytes origin, uint256 per_tx_cap, uint256 daily_cap, uint256 new_payee_cap, uint64 change_delay, uint64 recovery_delay) external;
+        function initialize(bytes32 app_id, bytes32 owner_nullifier, address verifier, address usdg, bytes32 rp_id_hash, bytes origin, uint256 per_tx_cap, uint256 daily_cap, uint256 new_payee_cap, uint64 change_delay, uint64 recovery_delay, address fee_recipient, uint256 max_fee) external;
     }
 }
 
@@ -68,6 +69,8 @@ pub struct VeraKeyFactory {
     new_payee_cap: StorageU256,
     change_delay: StorageU64,
     recovery_delay: StorageU64,
+    fee_recipient: StorageAddress,
+    max_fee: StorageU256,
     config_hash: StorageB256,
 }
 
@@ -87,6 +90,8 @@ impl VeraKeyFactory {
         new_payee_cap: U256,
         change_delay: u64,
         recovery_delay: u64,
+        fee_recipient: Address,
+        max_fee: U256,
     ) -> Result<(), FactoryError> {
         if implementation == Address::ZERO
             || verifier == Address::ZERO
@@ -96,6 +101,8 @@ impl VeraKeyFactory {
             || per_tx_cap > daily_cap
             || daily_cap > U256::from(u128::MAX)
             || new_payee_cap > U256::from(u128::MAX)
+            || fee_recipient == Address::ZERO
+            || max_fee > U256::from(u64::MAX)
         {
             return Err(FactoryError::InvalidConfig(InvalidConfig {}));
         }
@@ -109,10 +116,12 @@ impl VeraKeyFactory {
         self.new_payee_cap.set(new_payee_cap);
         self.change_delay.set(U64::from(change_delay));
         self.recovery_delay.set(U64::from(recovery_delay));
+        self.fee_recipient.set(fee_recipient);
+        self.max_fee.set(max_fee);
 
         // abi.encode(implementation, verifier, usdg, rpIdHash, keccak256(origin), perTxCap,
-        //            dailyCap, newPayeeCap, changeDelay, recoveryDelay)
-        let mut encoded = Vec::with_capacity(10 * 32);
+        //            dailyCap, newPayeeCap, changeDelay, recoveryDelay, feeRecipient, maxFee)
+        let mut encoded = Vec::with_capacity(12 * 32);
         for address in [implementation, verifier, usdg] {
             encoded.extend_from_slice(&[0u8; 12]);
             encoded.extend_from_slice(address.as_slice());
@@ -124,6 +133,9 @@ impl VeraKeyFactory {
         encoded.extend_from_slice(&new_payee_cap.to_be_bytes::<32>());
         encoded.extend_from_slice(&U256::from(change_delay).to_be_bytes::<32>());
         encoded.extend_from_slice(&U256::from(recovery_delay).to_be_bytes::<32>());
+        encoded.extend_from_slice(&[0u8; 12]);
+        encoded.extend_from_slice(fee_recipient.as_slice());
+        encoded.extend_from_slice(&max_fee.to_be_bytes::<32>());
         self.config_hash.set(keccak(encoded));
         Ok(())
     }
@@ -156,6 +168,8 @@ impl VeraKeyFactory {
         let new_payee_cap = self.new_payee_cap.get();
         let change_delay = self.change_delay.get().to::<u64>();
         let recovery_delay = self.recovery_delay.get().to::<u64>();
+        let fee_recipient = self.fee_recipient.get();
+        let max_fee = self.max_fee.get();
         #[allow(deprecated)]
         IVeraKeyAccount::new(account)
             .initialize(
@@ -171,6 +185,8 @@ impl VeraKeyFactory {
                 new_payee_cap,
                 change_delay,
                 recovery_delay,
+                fee_recipient,
+                max_fee,
             )
             .map_err(|_| FactoryError::InitializationFailed(InitializationFailed {}))?;
         log(
@@ -196,9 +212,9 @@ impl VeraKeyFactory {
     }
 
     /// `(implementation, verifier, usdg, rpIdHash, perTxCap, dailyCap, newPayeeCap, changeDelay,
-    /// recoveryDelay)`; `origin` has its own view (see `VeraKeyAccount::config`).
+    /// recoveryDelay, feeRecipient, maxFee)`; `origin` has its own view (see `VeraKeyAccount::config`).
     #[allow(clippy::type_complexity)]
-    pub fn config(&self) -> (Address, Address, Address, B256, U256, U256, U256, u64, u64) {
+    pub fn config(&self) -> (Address, Address, Address, B256, U256, U256, U256, u64, u64, Address, U256) {
         (
             self.implementation.get(),
             self.verifier.get(),
@@ -209,6 +225,8 @@ impl VeraKeyFactory {
             self.new_payee_cap.get(),
             self.change_delay.get().to::<u64>(),
             self.recovery_delay.get().to::<u64>(),
+            self.fee_recipient.get(),
+            self.max_fee.get(),
         )
     }
 

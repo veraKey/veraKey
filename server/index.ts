@@ -16,6 +16,15 @@ const config = loadConfig(ROOT);
 const relayer = new Relayer(config);
 config.network.relayer.address = relayer.address;
 
+// Accounts pay every fee to the deployment's fee recipient and refuse fees above its maximum.
+const { maxFee, feeRecipient } = config.network.policy;
+if (maxFee !== undefined && BigInt(config.network.relayer.fee) > BigInt(maxFee)) {
+  throw new Error(`RELAYER_FEE_USDG_UNITS (${config.network.relayer.fee}) exceeds the accounts' maxFee (${maxFee}): every relay would revert.`);
+}
+if (feeRecipient && feeRecipient.toLowerCase() !== relayer.address.toLowerCase()) {
+  console.warn(`Fees go to ${feeRecipient}, not to this relayer (${relayer.address}).`);
+}
+
 const visitors = new VisitorKeys();
 const perIp = new RateLimiter(Number(process.env.API_REQUESTS_PER_IP_PER_MINUTE ?? 30), 60_000);
 const rpcPerIp = new RateLimiter(900, 60_000);
@@ -28,6 +37,9 @@ const RPC_METHODS = new Set([
 ]);
 const upstreamRpc = config.upstreamRpcUrl;
 const perAccount = new RateLimiter(12, 60_000);
+// Creating an account costs the relayer gas and takes no proof: cap it per visitor, not only per
+// (attacker-chosen) nullifier.
+const accountsPerIp = new RateLimiter(Number(process.env.ACCOUNTS_PER_IP_PER_DAY ?? 10), 24 * 60 * 60_000);
 // FAUCET_ACCOUNTS_PER_IP only exists so automated end-to-end runs against a local devnode can fund more
 // than three accounts a day; the public deployment keeps the default.
 const faucetPerIp = new RateLimiter(Number(process.env.FAUCET_ACCOUNTS_PER_IP ?? 3), 24 * 60 * 60_000);
@@ -106,7 +118,12 @@ app.post(
   route(async (req, res) => {
     const { appId, nullifier } = req.body ?? {};
     if (!perAccount.take(`create:${nullifier}`)) throw new RelayError(429, "Too many requests for this account.");
-    res.json(await relayer.createAccount(appId, nullifier));
+    const created = await relayer.createAccount(appId, nullifier, () => {
+      if (!accountsPerIp.take(`accounts:${visitors.key(req.ip)}`)) {
+        throw new RelayError(429, "Too many new accounts from this visitor today.");
+      }
+    });
+    res.json(created);
   })
 );
 

@@ -116,6 +116,10 @@ const POLICY_COPY: Record<string, string> = {
   NewPayeeCapExceeded: "Your proof is valid, but this is the first payment to this address and it is above the new-recipient cap. Pay a smaller amount first, or allowlist the recipient on the Policy page.",
   AccountFrozen: "Your proof is valid, but this account is frozen. Unfreeze it on the Policy page (timelocked).",
   NotRestrictive: "That change would loosen the account, so it has to be scheduled with the timelock.",
+  FeeTooHigh: "The relayer fee is above this account's fee limit, so the account would refuse it.",
+  PaymentSheetRequired: "This account only pays through the browser's payment sheet (Chrome on macOS, Windows or Android, with this passkey enrolled for it). Stopping the requirement is a timelocked change on the Policy page.",
+  TooManyPendingChanges: "Eight changes are already waiting. Apply or cancel some on the Policy page first; freezing cancels them all.",
+  CannotVetoGuardianChange: "A guardian cannot cancel a change to the guardian itself.",
 };
 
 const HEADLINE: Record<string, string> = {

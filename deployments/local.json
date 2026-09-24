@@ -6,24 +6,26 @@
   "origin": "http://localhost:5190",
   "rpIdHash": "0x49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d9763",
   "contracts": {
-    "honkVerifier": "0x1eFfE0934Bd4c77D8a9e50db317560557ed2235B",
-    "linkVerifier": "0x1b0678E3C7cE0781dAC4DD6e76e0D68Efc445554",
-    "veraKeyValidator": "0x683439C8e55Da0A7F6A93CCaB08d882ce7c0939F",
-    "accountImplementation": "0x46e21eed59ad0652b638231653e11c5f7b3e7f9b",
-    "factory": "0xe1f6ff1f3efb2fb92846f97a2e4e017b311245b9",
-    "factoryAlt": "0x141ea9d975236de4cb3720115c04440008066de1",
-    "usdg": "0x142aaaa718cf7B1B4510c01BeEE9972f1B1F675e"
+    "honkVerifier": "0x5644eb3cfe5A045F34d5F271a972cdcBF30455Ce",
+    "linkVerifier": "0xC049F3295D27088A8a3DAD66d5f53bD38C577b8A",
+    "veraKeyValidator": "0xb33D0947897C5aCaD338638CCfbD91A754B769f6",
+    "accountImplementation": "0x01143a467990d06b6481c3d7bef95ad25c36a49b",
+    "factory": "0x382ede30fc954bf36e0d23f7125ebf9d0f486602",
+    "factoryAlt": "0x9da074fea8ea079c41a757e75100668b84380a64",
+    "usdg": "0x900eCC0De96c690b17265C6f2Cc75Fd685ff04E8"
   },
   "policy": {
     "perTxCap": "50000000",
     "dailyCap": "200000000",
     "newPayeeCap": "5000000",
+    "maxFee": "1000000",
+    "feeRecipient": "0x3f1Eae7D46d88F08fc2F8ed27FCb2AB183EB2d0E",
     "changeDelay": 10,
     "recoveryDelay": 15
   },
-  "configHash": "0xfd35bbf2ed47155dea908c5fa755731fe17b290ee712f21e20db0d1ce1f23caa",
+  "configHash": "0xe82c6f8c35ff36f4eaae392af3336826135dac58899f4d9cd4ced4fb0742b0e6",
   "circuitVkHash": "0x16378935c4dee31e952a8c42d2f20d4d5dbd00ee2e8225a1eb16e908caf37f12",
   "linkCircuitVkHash": "0x16256f66baa7cfcdc09869a3fa825033c24bc198a2929908165b8e5280f21683",
   "deployer": "0x3f1Eae7D46d88F08fc2F8ed27FCb2AB183EB2d0E",
-  "deployedAt": "2026-09-24T00:14:22Z"
+  "deployedAt": "2026-09-24T00:49:11Z"
 }

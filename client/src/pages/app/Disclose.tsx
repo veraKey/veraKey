@@ -136,8 +136,9 @@ export function Disclose() {
           </div>
         ) : (
           <div className="vk-note">
-            The disclosure reveals only that these two accounts share an owner, to whoever holds it. It cannot move
-            funds, and it stops being accepted after it expires.
+            The disclosure reveals only that these two accounts share an owner. It names its audience, so anyone
+            checking it under another name sees it fail; it cannot move funds, and it stops being accepted after
+            it expires.
           </div>
         )}
       </section>

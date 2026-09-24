@@ -75,7 +75,7 @@ beforeAll(async () => {
   dataDir = mkdtempSync(path.join(tmpdir(), "verakey-relayer-"));
   server = spawn(process.execPath, ["--import", "tsx", "server/index.ts"], {
     cwd: ROOT,
-    env: { ...process.env, VERAKEY_NETWORK: "local", PORT: String(port), VERAKEY_DATA_DIR: dataDir },
+    env: { ...process.env, VERAKEY_NETWORK: "local", PORT: String(port), VERAKEY_DATA_DIR: dataDir, ACCOUNTS_PER_IP_PER_DAY: "3" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   server.stdout!.on("data", chunk => (serverLog += chunk));
@@ -139,6 +139,27 @@ describe("relayer", () => {
     const response = await api("10.0.0.3", "POST", "/relay", await payRequest(USDG(1), fee - 1n));
     expect(response.status).toBe(402);
     expect(await pendingNonce()).toBe(nonce);
+  });
+
+  it("look_alike_contract_not_relayed", async () => {
+    // A contract that is not a clone of this deployment's account implementation (here the token) is
+    // refused before any simulation, so it cannot make the relayer burn gas.
+    const request = { ...(await payRequest(USDG(1), fee)), account: deployment.contracts.usdg };
+    const nonce = await pendingNonce();
+    const response = await api("10.0.0.8", "POST", "/relay", request);
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("Not a VeraKey account.");
+    expect(await pendingNonce()).toBe(nonce);
+  });
+
+  it("new_accounts_are_rate_limited_per_visitor", async () => {
+    const create = () =>
+      api("10.0.0.7", "POST", "/accounts", { appId: fieldHex(appId), nullifier: fieldHex(BigInt(generatePrivateKey()) % 2n ** 250n) });
+    const statuses: number[] = [];
+    for (let i = 0; i < 4; i++) statuses.push((await create()).status);
+    expect(statuses).toEqual([200, 200, 200, 429]);
+    // The limit follows the visitor, not the nullifier they choose.
+    expect((await api("10.0.0.9", "POST", "/accounts", { appId: fieldHex(appId), nullifier: fieldHex(12345n) })).status).toBe(200);
   });
 
   it("faucet_funds_each_account_once", async () => {

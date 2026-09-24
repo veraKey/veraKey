@@ -83,12 +83,16 @@ proptest! {
         for kind in [changes::ADD_OWNER, changes::REMOVE_OWNER, changes::SET_GUARDIAN, changes::UNFREEZE] {
             prop_assert!(!changes::is_restrictive(kind, &payload, &current));
         }
-        // Enabling (never disabling) the allowlist, and removing (never adding) a recipient.
+        // Enabling (never disabling) the allowlist, removing (never adding) a recipient.
         if changes::is_restrictive(changes::SET_ALLOWLIST, &payload, &current) {
             prop_assert_eq!(changes::word_bool(&payload), Some(true));
         }
         if changes::is_restrictive(changes::SET_RECIPIENT, &payload, &current) {
             prop_assert_eq!(changes::word_bool(&payload[32..]), Some(false));
+        }
+        // Requiring (never dropping) the payment sheet.
+        if changes::is_restrictive(changes::SET_PAYMENT_SHEET, &payload, &current) {
+            prop_assert_eq!(changes::word_bool(&payload), Some(true));
         }
     }
 

@@ -198,6 +198,24 @@ export const veraKeyAccountAbi = [
   },
   {
     "type": "function",
+    "name": "fees",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "guardianCancelChange",
     "inputs": [
       {
@@ -298,6 +316,16 @@ export const veraKeyAccountAbi = [
         "name": "recovery_delay",
         "type": "uint64",
         "internalType": "uint64"
+      },
+      {
+        "name": "fee_recipient",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "max_fee",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -522,6 +550,19 @@ export const veraKeyAccountAbi = [
   },
   {
     "type": "function",
+    "name": "pendingChangeIds",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "policy",
     "inputs": [],
     "outputs": [
@@ -572,6 +613,11 @@ export const veraKeyAccountAbi = [
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
+      },
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
@@ -709,6 +755,11 @@ export const veraKeyAccountAbi = [
   },
   {
     "type": "error",
+    "name": "CannotVetoGuardianChange",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "ChangeNotReady",
     "inputs": [
       {
@@ -732,6 +783,17 @@ export const veraKeyAccountAbi = [
     "type": "error",
     "name": "DeadlineTooFar",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FeeTooHigh",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",
@@ -812,6 +874,11 @@ export const veraKeyAccountAbi = [
   },
   {
     "type": "error",
+    "name": "PaymentSheetRequired",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "PerTxCapExceeded",
     "inputs": []
   },
@@ -834,6 +901,11 @@ export const veraKeyAccountAbi = [
   {
     "type": "error",
     "name": "TokenTransferFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TooManyPendingChanges",
     "inputs": []
   },
   {
@@ -1101,6 +1173,16 @@ export const veraKeyFactoryAbi = [
         "name": "",
         "type": "uint64",
         "internalType": "uint64"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"

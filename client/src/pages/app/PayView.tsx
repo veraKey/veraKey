@@ -42,15 +42,18 @@ export interface PayViewProps {
    * Secure Payment Confirmation: when available, the browser's own payment sheet shows the payee and
    * total, and the account checks that the signed ones match. Omitted where the browser cannot do it.
    */
-  paymentSheet?: { enabled: boolean; onToggle: (enabled: boolean) => void };
+  paymentSheet?: { enabled: boolean; onToggle: (enabled: boolean) => void; required?: boolean };
 }
 
 function PaymentSheetOption({ sheet, busy }: { sheet: PayViewProps["paymentSheet"]; busy: boolean }) {
   if (!sheet) return null;
   return (
-    <label className="vk-optin" title="The browser shows payee and total in its own sheet; the account refuses anything else">
-      <input type="checkbox" checked={sheet.enabled} disabled={busy} onChange={e => sheet.onToggle(e.target.checked)} />
-      <span>Confirm in the browser's payment sheet <small>payee and total are signed and checked on-chain</small></span>
+    <label className="vk-optin" title="The browser shows the payee and the total in its own sheet; the account checks that they are what was signed">
+      <input type="checkbox" checked={sheet.enabled} disabled={busy || sheet.required} onChange={e => sheet.onToggle(e.target.checked)} />
+      <span>
+        Confirm in the browser's payment sheet{" "}
+        <small>{sheet.required ? "required by this account's policy" : "payee and total are signed and checked on-chain"}</small>
+      </span>
     </label>
   );
 }

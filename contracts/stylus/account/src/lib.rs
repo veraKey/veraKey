@@ -8,17 +8,24 @@
 //! Security rules (each has a negative test in `packages/sdk/test/e2e`):
 //! - the account only moves USDG, through `transfer`, and every movement (payment plus fee) is
 //!   capped per transaction and per UTC day;
+//! - fees go only to the factory's `feeRecipient` and never exceed `maxFee`, so whoever submits a
+//!   transaction cannot turn a fee into a payment to themselves (not even from a frozen account);
 //! - the first payment to a recipient that is neither known (paid before) nor allowlisted is capped
 //!   by `newPayeeCap`, which bounds what a look-alike address or a tampered page can take at once;
 //! - a frozen account makes no payments; owners (with a proof) and the guardian freeze at once,
-//!   unfreezing is a timelocked change;
+//!   unfreezing is a timelocked change. Freezing also cancels every scheduled change (a guardian's
+//!   freeze keeps changes to the guardian itself);
+//! - with the payment sheet required, `pay` accepts only Secure Payment Confirmation client data;
 //! - the nonce is consumed before any token transfer and every action carries a deadline of at most
 //!   ten minutes;
 //! - loosening configuration changes are scheduled with a proof and applied only after a timelock;
-//!   owners and the guardian can cancel them. Tightening changes (freeze, lower limits, enable the
-//!   allowlist, remove a recipient) apply immediately through `restrict`;
+//!   owners and the guardian can cancel them, and at most `MAX_PENDING` wait at once, listed on-chain
+//!   so an owner on any device can see them. Tightening changes (freeze, lower limits, enable the
+//!   allowlist, remove a recipient, require the payment sheet) apply immediately through `restrict`;
 //! - the guardian is stored as a salted commitment, so it stays private until it acts; it can
-//!   freeze the account and replace all owners after a recovery delay, which any owner can cancel;
+//!   freeze the account and replace all owners after a recovery delay, which any owner can cancel.
+//!   It cannot veto a change to the guardian, which waits the change delay plus the recovery delay,
+//!   so a guardian can delay the owners but never hold the account hostage;
 //! - `pay` and the other proof-authorized entry points are permissionless: anyone may submit.
 #![cfg_attr(not(any(test, feature = "export-abi")), no_main)]
 extern crate alloc;
@@ -34,8 +41,8 @@ use stylus_sdk::{
     crypto::keccak,
     prelude::*,
     storage::{
-        StorageAddress, StorageB256, StorageBool, StorageBytes, StorageMap, StorageU128, StorageU256,
-        StorageU64, StorageU8,
+        StorageAddress, StorageArray, StorageB256, StorageBool, StorageBytes, StorageMap, StorageU128,
+        StorageU256, StorageU64, StorageU8,
     },
 };
 use verakey_core::{
@@ -48,6 +55,8 @@ pub const MAX_DEADLINE_WINDOW: u64 = 600;
 /// Bounds on the configurable delays (seconds).
 pub const MAX_DELAY: u64 = 30 * 86_400;
 pub const MAX_ORIGIN_LEN: usize = 128;
+/// Most scheduled changes that may wait at once.
+pub const MAX_PENDING: usize = 8;
 
 const SHA256_PRECOMPILE: Address = address!("0000000000000000000000000000000000000002");
 
@@ -85,12 +94,16 @@ sol! {
     error PerTxCapExceeded();
     error DailyCapExceeded();
     error NewPayeeCapExceeded(uint256 cap);
+    error FeeTooHigh(uint256 maxFee);
+    error PaymentSheetRequired();
     error AccountFrozen();
     error InvalidChange();
     error NotRestrictive();
     error UnknownChange();
     error ChangeNotReady(uint64 eta);
+    error TooManyPendingChanges();
     error NotGuardian();
+    error CannotVetoGuardianChange();
     error NoRecovery();
     error RecoveryNotReady(uint64 eta);
     error LastOwner();
@@ -114,12 +127,16 @@ pub enum AccountError {
     PerTxCapExceeded(PerTxCapExceeded),
     DailyCapExceeded(DailyCapExceeded),
     NewPayeeCapExceeded(NewPayeeCapExceeded),
+    FeeTooHigh(FeeTooHigh),
+    PaymentSheetRequired(PaymentSheetRequired),
     AccountFrozen(AccountFrozen),
     InvalidChange(InvalidChange),
     NotRestrictive(NotRestrictive),
     UnknownChange(UnknownChange),
     ChangeNotReady(ChangeNotReady),
+    TooManyPendingChanges(TooManyPendingChanges),
     NotGuardian(NotGuardian),
+    CannotVetoGuardianChange(CannotVetoGuardianChange),
     NoRecovery(NoRecovery),
     RecoveryNotReady(RecoveryNotReady),
     LastOwner(LastOwner),
@@ -144,7 +161,7 @@ pub struct PendingChange {
     owner_epoch: StorageU256,
 }
 
-/// Field order is the storage layout. Small fields are packed so that `initialize` writes nine
+/// Field order is the storage layout. Small fields are packed so that `initialize` writes ten
 /// slots and a payment updates its nonce and spending window in a single slot.
 #[storage]
 #[entrypoint]
@@ -155,6 +172,7 @@ pub struct VeraKeyAccount {
     change_delay: StorageU64,
     frozen: StorageBool,
     allowlist_enabled: StorageBool,
+    payment_sheet_required: StorageBool,
     // slot 1
     verifier: StorageAddress,
     recovery_delay: StorageU64,
@@ -167,10 +185,13 @@ pub struct VeraKeyAccount {
     // slot 4
     new_payee_cap: StorageU128,
     recovery_eta: StorageU64,
+    max_fee: StorageU64,
     // slot 5: everything a payment writes to this account
     nonce: StorageU64,
     spend_day: StorageU64,
     spent_today: StorageU128,
+    // slot 6
+    fee_recipient: StorageAddress,
     // one slot each
     app_id: StorageB256,
     rp_id_hash: StorageB256,
@@ -180,6 +201,8 @@ pub struct VeraKeyAccount {
     owner_epoch: StorageU256,
     guardian_commitment: StorageB256,
     recovery_nullifier: StorageB256,
+    // Ids of the scheduled changes still waiting (zero = free), readable from any device.
+    pending_ids: StorageArray<StorageB256, MAX_PENDING>,
     owners: StorageMap<B256, StorageBool>,
     allowed_recipients: StorageMap<Address, StorageBool>,
     known_recipients: StorageMap<Address, StorageBool>,
@@ -293,6 +316,10 @@ impl VeraKeyAccount {
         payment: Option<client_data::Payment>,
     ) -> Result<B256, AccountError> {
         self.require_initialized()?;
+        let max_fee = U256::from(self.max_fee.get().to::<u64>());
+        if fee > max_fee {
+            return Err(AccountError::FeeTooHigh(FeeTooHigh { maxFee: max_fee }));
+        }
         let now = self.now();
         if deadline < now {
             return Err(AccountError::DeadlineExpired(DeadlineExpired {}));
@@ -365,12 +392,62 @@ impl VeraKeyAccount {
             .map_err(|_| AccountError::TokenTransferFailed(TokenTransferFailed {}))
     }
 
+    /// Fees go to the factory's fee recipient, never to the caller: a submitter chosen by an attacker
+    /// gains nothing from the fee an owner signed.
+    fn pay_fee(&mut self, fee: U256) -> Result<(), AccountError> {
+        let recipient = self.fee_recipient.get();
+        self.transfer_usdg(recipient, fee)
+    }
+
+    fn pending_id(&self, index: usize) -> B256 {
+        self.pending_ids.getter(index).map(|id| id.get()).unwrap_or_default()
+    }
+
+    fn set_pending_id(&mut self, index: usize, id: B256) {
+        if let Some(mut slot) = self.pending_ids.setter(index) {
+            slot.set(id);
+        }
+    }
+
+    fn track_pending(&mut self, change_id: B256) -> Result<(), AccountError> {
+        for index in 0..MAX_PENDING {
+            if self.pending_id(index) == B256::ZERO {
+                self.set_pending_id(index, change_id);
+                return Ok(());
+            }
+        }
+        Err(AccountError::TooManyPendingChanges(TooManyPendingChanges {}))
+    }
+
     fn clear_pending(&mut self, change_id: B256) {
         let mut pending = self.pending.setter(change_id);
         pending.change_kind.set(U8::ZERO);
         pending.payload_hash.set(B256::ZERO);
         pending.eta.set(U64::ZERO);
         pending.owner_epoch.set(U256::ZERO);
+        for index in 0..MAX_PENDING {
+            if self.pending_id(index) == change_id {
+                self.set_pending_id(index, B256::ZERO);
+                break;
+            }
+        }
+    }
+
+    /// Cancels every scheduled change; with `keep_guardian_changes`, changes to the guardian stay,
+    /// so a guardian's freeze cannot undo the owners' attempt to replace it.
+    fn cancel_pending_changes(&mut self, keep_guardian_changes: bool) {
+        for index in 0..MAX_PENDING {
+            let change_id = self.pending_id(index);
+            if change_id == B256::ZERO {
+                continue;
+            }
+            let kind = self.pending.getter(change_id).change_kind.get().to::<u8>();
+            if keep_guardian_changes && kind == change::SET_GUARDIAN {
+                continue;
+            }
+            self.clear_pending(change_id);
+            log(self.vm(), ChangeCancelled { changeId: change_id });
+        }
     }
 
     fn pending_eta(&self, change_id: B256) -> u64 {
@@ -446,6 +523,9 @@ impl VeraKeyAccount {
             change::SET_NEW_PAYEE_CAP => {
                 self.new_payee_cap.set(U128::from(change::word_u128(payload).unwrap_or_default()));
             }
+            change::SET_PAYMENT_SHEET => {
+                self.payment_sheet_required.set(change::word_bool(payload).unwrap_or(false));
+            }
             change::FREEZE => self.frozen.set(true),
             change::UNFREEZE => self.frozen.set(false),
             _ => return Err(AccountError::InvalidChange(InvalidChange {})),
@@ -477,6 +557,8 @@ impl VeraKeyAccount {
         new_payee_cap: U256,
         change_delay: u64,
         recovery_delay: u64,
+        fee_recipient: Address,
+        max_fee: U256,
     ) -> Result<(), AccountError> {
         if self.initialized.get() {
             return Err(AccountError::AlreadyInitialized(AlreadyInitialized {}));
@@ -494,7 +576,9 @@ impl VeraKeyAccount {
             && daily_cap <= max
             && new_payee_cap <= max
             && change_delay <= MAX_DELAY
-            && recovery_delay <= MAX_DELAY;
+            && recovery_delay <= MAX_DELAY
+            && fee_recipient != Address::ZERO
+            && max_fee <= U256::from(u64::MAX);
         if !valid {
             return Err(AccountError::InvalidConfig(InvalidConfig {}));
         }
@@ -508,6 +592,8 @@ impl VeraKeyAccount {
         self.per_tx_cap.set(u256_to_u128(per_tx_cap));
         self.daily_cap.set(u256_to_u128(daily_cap));
         self.new_payee_cap.set(u256_to_u128(new_payee_cap));
+        self.max_fee.set(U64::from(max_fee.to::<u64>()));
+        self.fee_recipient.set(fee_recipient);
         self.app_id.set(app_id);
         self.rp_id_hash.set(rp_id_hash);
         self.origin.set_bytes(&origin);
@@ -520,7 +606,7 @@ impl VeraKeyAccount {
         Ok(())
     }
 
-    /// Pays `amount` USDG to `to`, plus `fee` USDG to whoever submits the transaction.
+    /// Pays `amount` USDG to `to`, plus `fee` USDG (at most `maxFee`) to the fee recipient.
     #[allow(clippy::too_many_arguments)]
     pub fn pay(
         &mut self,
@@ -544,6 +630,9 @@ impl VeraKeyAccount {
         let allowlisted = self.allowed_recipients.get(to);
         if self.allowlist_enabled.get() && !allowlisted {
             return Err(AccountError::RecipientNotAllowed(RecipientNotAllowed {}));
+        }
+        if self.payment_sheet_required.get() && !client_data_json.starts_with(client_data::SPC_PREFIX) {
+            return Err(AccountError::PaymentSheetRequired(PaymentSheetRequired {}));
         }
         let total = amount
             .checked_add(fee)
@@ -580,7 +669,7 @@ impl VeraKeyAccount {
 
         let submitter = self.vm().msg_sender();
         self.transfer_usdg(to, amount)?;
-        self.transfer_usdg(submitter, fee)?;
+        self.pay_fee(fee)?;
         log(self.vm(), Paid {
             nonce,
             to,
@@ -591,7 +680,9 @@ impl VeraKeyAccount {
         Ok(())
     }
 
-    /// Schedules a configuration change; it can be applied after the change delay.
+    /// Schedules a configuration change; it can be applied after the change delay. Replacing or
+    /// removing a guardian waits the recovery delay on top, so the guardian can still recover an
+    /// account whose passkey was stolen before a thief could remove it.
     #[allow(clippy::too_many_arguments)]
     pub fn schedule_change(
         &mut self,
@@ -621,8 +712,13 @@ impl VeraKeyAccount {
             None,
         )?;
         self.record_spend(window);
+        self.track_pending(change_id)?;
 
-        let eta = self.now() + self.change_delay.get().to::<u64>();
+        let mut delay = self.change_delay.get().to::<u64>();
+        if change_kind == change::SET_GUARDIAN && self.guardian_commitment.get() != B256::ZERO {
+            delay += self.recovery_delay.get().to::<u64>();
+        }
+        let eta = self.now() + delay;
         let epoch = self.owner_epoch.get();
         let mut pending = self.pending.setter(change_id);
         pending.change_kind.set(U8::from(change_kind));
@@ -630,8 +726,7 @@ impl VeraKeyAccount {
         pending.eta.set(U64::from(eta));
         pending.owner_epoch.set(epoch);
 
-        let submitter = self.vm().msg_sender();
-        self.transfer_usdg(submitter, fee)?;
+        self.pay_fee(fee)?;
         log(self.vm(), ChangeScheduled {
             changeId: change_id,
             changeKind: change_kind,
@@ -642,7 +737,9 @@ impl VeraKeyAccount {
     }
 
     /// Applies a tightening change immediately (freeze, lower limits, enable the allowlist, remove
-    /// a recipient). Anything that loosens the account must go through `schedule_change`.
+    /// a recipient, require the payment sheet). Anything that loosens the account must go through
+    /// `schedule_change`. Freezing also cancels every scheduled change, so nothing a thief scheduled
+    /// survives the owner's emergency stop.
     #[allow(clippy::too_many_arguments)]
     pub fn restrict(
         &mut self,
@@ -673,9 +770,11 @@ impl VeraKeyAccount {
         )?;
         self.record_spend(window);
         self.apply(change_kind, &payload)?;
+        if change_kind == change::FREEZE {
+            self.cancel_pending_changes(false);
+        }
 
-        let submitter = self.vm().msg_sender();
-        self.transfer_usdg(submitter, fee)?;
+        self.pay_fee(fee)?;
         log(self.vm(), Restricted {
             restrictionId: restriction_id,
             changeKind: change_kind,
@@ -748,28 +847,33 @@ impl VeraKeyAccount {
         )?;
         self.record_spend(window);
         self.clear_pending(change_id);
-        let submitter = self.vm().msg_sender();
-        self.transfer_usdg(submitter, fee)?;
+        self.pay_fee(fee)?;
         log(self.vm(), ChangeCancelled { changeId: change_id });
         Ok(())
     }
 
-    /// Lets the guardian veto a scheduled change (for example after a device theft).
+    /// Lets the guardian veto a scheduled change (for example after a device theft), except a
+    /// change to the guardian itself.
     pub fn guardian_cancel_change(&mut self, change_id: B256, salt: B256) -> Result<(), AccountError> {
         self.require_guardian(salt)?;
         if self.pending_eta(change_id) == 0 {
             return Err(AccountError::UnknownChange(UnknownChange {}));
+        }
+        if self.pending.getter(change_id).change_kind.get().to::<u8>() == change::SET_GUARDIAN {
+            return Err(AccountError::CannotVetoGuardianChange(CannotVetoGuardianChange {}));
         }
         self.clear_pending(change_id);
         log(self.vm(), ChangeCancelled { changeId: change_id });
         Ok(())
     }
 
-    /// Lets the guardian stop all payments at once. Unfreezing is a timelocked owner change.
+    /// Lets the guardian stop all payments at once and cancel every scheduled change except changes
+    /// to the guardian. Unfreezing is a timelocked owner change.
     pub fn guardian_freeze(&mut self, salt: B256) -> Result<(), AccountError> {
         self.require_initialized()?;
         self.require_guardian(salt)?;
         self.frozen.set(true);
+        self.cancel_pending_changes(true);
         log(self.vm(), GuardianFroze {});
         Ok(())
     }
@@ -801,6 +905,8 @@ impl VeraKeyAccount {
             return Err(AccountError::RecoveryNotReady(RecoveryNotReady { eta }));
         }
         let nullifier = self.clear_recovery();
+        // Changes scheduled by the old owners die with them.
+        self.cancel_pending_changes(false);
         let epoch = self.owner_epoch.get() + U256::from(1);
         self.owner_epoch.set(epoch);
         self.set_owner(nullifier, true);
@@ -840,8 +946,7 @@ impl VeraKeyAccount {
         )?;
         self.record_spend(window);
         self.clear_recovery();
-        let submitter = self.vm().msg_sender();
-        self.transfer_usdg(submitter, fee)?;
+        self.pay_fee(fee)?;
         log(self.vm(), RecoveryCancelled {
             newNullifier: pending,
         });
@@ -920,13 +1025,27 @@ impl VeraKeyAccount {
         )
     }
 
-    /// `(newPayeeCap, frozen, guardianCommitment)`.
-    pub fn protections(&self) -> (U256, bool, B256) {
+    /// `(newPayeeCap, frozen, guardianCommitment, paymentSheetRequired)`.
+    pub fn protections(&self) -> (U256, bool, B256, bool) {
         (
             u128_to_u256(self.new_payee_cap.get()),
             self.frozen.get(),
             self.guardian_commitment.get(),
+            self.payment_sheet_required.get(),
         )
+    }
+
+    /// `(feeRecipient, maxFee)`: where every fee goes, and the largest fee any action may carry.
+    pub fn fees(&self) -> (Address, U256) {
+        (self.fee_recipient.get(), U256::from(self.max_fee.get().to::<u64>()))
+    }
+
+    /// Ids of the scheduled changes that are still waiting; details via `pendingChange`.
+    pub fn pending_change_ids(&self) -> Vec<B256> {
+        (0..MAX_PENDING)
+            .map(|index| self.pending_id(index))
+            .filter(|id| *id != B256::ZERO)
+            .collect()
     }
 
     pub fn is_recipient_allowed(&self, recipient: Address) -> bool {

@@ -7,7 +7,7 @@
 pragma solidity ^0.8.23;
 
 interface IVeraKeyAccount  {
-    function initialize(bytes32 app_id, bytes32 owner_nullifier, address verifier, address usdg, bytes32 rp_id_hash, bytes calldata origin, uint256 per_tx_cap, uint256 daily_cap, uint256 new_payee_cap, uint64 change_delay, uint64 recovery_delay) external;
+    function initialize(bytes32 app_id, bytes32 owner_nullifier, address verifier, address usdg, bytes32 rp_id_hash, bytes calldata origin, uint256 per_tx_cap, uint256 daily_cap, uint256 new_payee_cap, uint64 change_delay, uint64 recovery_delay, address fee_recipient, uint256 max_fee) external;
 
     function pay(address to, uint256 amount, uint256 fee, uint64 deadline, bytes32 nullifier, bytes calldata client_data_json, bytes calldata proof) external;
 
@@ -47,7 +47,11 @@ interface IVeraKeyAccount  {
 
     function policy() external view returns (uint256, uint256, uint256, uint64, bool);
 
-    function protections() external view returns (uint256, bool, bytes32);
+    function protections() external view returns (uint256, bool, bytes32, bool);
+
+    function fees() external view returns (address, uint256);
+
+    function pendingChangeIds() external view returns (bytes32[] memory);
 
     function isRecipientAllowed(address recipient) external view returns (bool);
 
@@ -89,6 +93,10 @@ interface IVeraKeyAccount  {
 
     error NewPayeeCapExceeded(uint256);
 
+    error FeeTooHigh(uint256);
+
+    error PaymentSheetRequired();
+
     error AccountFrozen();
 
     error InvalidChange();
@@ -99,7 +107,11 @@ interface IVeraKeyAccount  {
 
     error ChangeNotReady(uint64);
 
+    error TooManyPendingChanges();
+
     error NotGuardian();
+
+    error CannotVetoGuardianChange();
 
     error NoRecovery();
 

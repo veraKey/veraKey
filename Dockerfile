@@ -1,8 +1,10 @@
 # VeraKey web app + gasless relayer: one Node process serves the built app and /api.
 #
 #   docker build -t verakey .
-#   docker run -p 3090:3090 -e VERAKEY_NETWORK=sepolia -e RELAYER_PRIVATE_KEY=0x… -v verakey-data:/data verakey
+#   docker run -p 127.0.0.1:3090:3090 -e VERAKEY_NETWORK=sepolia -e RELAYER_PRIVATE_KEY=0x… -v verakey-data:/data verakey
 #
+# Publish the port on loopback only and let the proxy reach it: the server trusts one proxy hop for the
+# client address (X-Forwarded-For), so a port open to the internet would let clients choose their own.
 # The image serves the deployment in deployments/$VERAKEY_NETWORK.json, so build it after
 # `scripts/deploy.sh sepolia` has written deployments/sepolia.json. WebAuthn needs https: put the
 # container behind exactly one TLS-terminating proxy (a hosting provider's router, Caddy, nginx),

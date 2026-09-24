@@ -113,6 +113,10 @@ export const POLICY_REVERTS = new Set([
   "NewPayeeCapExceeded",
   "AccountFrozen",
   "NotRestrictive",
+  "FeeTooHigh",
+  "PaymentSheetRequired",
+  "TooManyPendingChanges",
+  "CannotVetoGuardianChange",
 ]);
 
 export interface AccountState {
@@ -132,9 +136,24 @@ export interface AccountState {
   ownerCount: bigint;
   /** The zero hash when no guardian is set; the guardian's address is never stored. */
   guardianCommitment: Hex;
+  /** When set, payments must be confirmed in the browser's payment sheet (Secure Payment Confirmation). */
+  paymentSheetRequired: boolean;
+  /** Where every fee goes, and the largest fee an action may carry. */
+  feeRecipient: Address;
+  maxFee: bigint;
+  /** Scheduled changes still waiting, read from the chain (so they show on every device). */
+  pendingChanges: PendingChangeInfo[];
   recovery: { nullifier: Hex; eta: bigint } | null;
   changeDelay: bigint;
   recoveryDelay: bigint;
+}
+
+/** A scheduled change as the account stores it: the payload itself is only in the scheduling event. */
+export interface PendingChangeInfo {
+  changeId: Hex;
+  kind: ChangeKind;
+  payloadHash: Hex;
+  eta: number;
 }
 
 /** What a guardian needs to act for one account; share it with the guardian, not with anyone else. */
@@ -365,14 +384,19 @@ export class VeraKeyClient {
     if (!code || code === "0x") {
       return {
         ...base, deployed: false, nonce: 0n, perTxCap: 0n, dailyCap: 0n, spentToday: 0n, allowlistEnabled: false,
-        newPayeeCap: 0n, frozen: false, ownerCount: 1n, guardianCommitment: ZERO_HASH, recovery: null, changeDelay: 0n, recoveryDelay: 0n,
+        newPayeeCap: 0n, frozen: false, ownerCount: 1n, guardianCommitment: ZERO_HASH, paymentSheetRequired: false,
+        feeRecipient: ZERO_ADDRESS, maxFee: 0n, pendingChanges: [], recovery: null, changeDelay: 0n, recoveryDelay: 0n,
       };
     }
-    const read = <F extends "nonce" | "policy" | "ownerCount" | "protections" | "recovery" | "config">(functionName: F) =>
+    const read = <F extends "nonce" | "policy" | "ownerCount" | "protections" | "fees" | "recovery" | "config">(functionName: F) =>
       this.publicClient.readContract({ address, abi: veraKeyAccountAbi, functionName } as never) as Promise<unknown>;
-    const [nonce, policy, ownerCount, protections, recovery, config] = (await Promise.all([
-      read("nonce"), read("policy"), read("ownerCount"), read("protections"), read("recovery"), read("config"),
-    ])) as [bigint, readonly [bigint, bigint, bigint, bigint, boolean], bigint, readonly [bigint, boolean, Hex], readonly [Hex, bigint], readonly unknown[]];
+    const [nonce, policy, ownerCount, protections, fees, recovery, config, pendingChanges] = (await Promise.all([
+      read("nonce"), read("policy"), read("ownerCount"), read("protections"), read("fees"), read("recovery"), read("config"),
+      this.pendingChanges(address),
+    ])) as [
+      bigint, readonly [bigint, bigint, bigint, bigint, boolean], bigint, readonly [bigint, boolean, Hex, boolean],
+      readonly [Address, bigint], readonly [Hex, bigint], readonly unknown[], PendingChangeInfo[],
+    ];
     return {
       ...base,
       deployed: true,
@@ -385,10 +409,45 @@ export class VeraKeyClient {
       frozen: protections[1],
       ownerCount,
       guardianCommitment: protections[2],
+      paymentSheetRequired: protections[3],
+      feeRecipient: fees[0],
+      maxFee: fees[1],
+      pendingChanges,
       recovery: recovery[1] === 0n ? null : { nullifier: recovery[0], eta: recovery[1] },
       changeDelay: config[4] as bigint,
       recoveryDelay: config[5] as bigint,
     };
+  }
+
+  /** The account's scheduled changes that are still waiting, oldest first. */
+  async pendingChanges(account: Address): Promise<PendingChangeInfo[]> {
+    const ids = await this.publicClient.readContract({ address: account, abi: veraKeyAccountAbi, functionName: "pendingChangeIds" });
+    const changes = await Promise.all(
+      ids.map(async changeId => {
+        const [kind, payloadHash, eta] = await this.publicClient.readContract({
+          address: account, abi: veraKeyAccountAbi, functionName: "pendingChange", args: [changeId],
+        });
+        return { changeId, kind: kind as ChangeKind, payloadHash, eta: Number(eta) };
+      })
+    );
+    return changes.filter(change => change.eta !== 0).sort((a, b) => a.eta - b.eta);
+  }
+
+  /**
+   * Best effort: a scheduled change's payload, from its `ChangeScheduled` event in the last
+   * `lookbackBlocks` blocks. The account stores only the payload's hash; `null` when not found.
+   */
+  async scheduledPayload(account: Address, changeId: Hex, lookbackBlocks = 100_000n): Promise<Hex | null> {
+    try {
+      const latest = await this.publicClient.getBlockNumber();
+      const logs = await this.publicClient.getContractEvents({
+        address: account, abi: veraKeyAccountAbi, eventName: "ChangeScheduled", args: { changeId },
+        fromBlock: latest > lookbackBlocks ? latest - lookbackBlocks : 0n, toBlock: latest,
+      });
+      return (logs[0]?.args.payload as Hex | undefined) ?? null;
+    } catch {
+      return null;
+    }
   }
 
   /** Deploys the account for `appId` through the relayer (idempotent). */
@@ -427,11 +486,19 @@ export class VeraKeyClient {
     const nullifier = await this.nullifier(appId);
     const account = await this.predictAddress(appId, nullifier);
     const code = await this.publicClient.getCode({ address: account });
-    const nonce =
-      code && code !== "0x"
-        ? await this.publicClient.readContract({ address: account, abi: veraKeyAccountAbi, functionName: "nonce" })
-        : 0n;
+    const deployed = !!code && code !== "0x";
+    const [nonce, protections, fees] = deployed
+      ? await Promise.all([
+          this.publicClient.readContract({ address: account, abi: veraKeyAccountAbi, functionName: "nonce" }),
+          this.publicClient.readContract({ address: account, abi: veraKeyAccountAbi, functionName: "protections" }),
+          this.publicClient.readContract({ address: account, abi: veraKeyAccountAbi, functionName: "fees" }),
+        ])
+      : [0n, null, null];
     const fee = this.config.relayerFee;
+    if (fees && fee > fees[1]) {
+      throw new VeraKeyError("policy", `The relayer asks ${formatUnits(fee, 6)} USDG, above this account's ${formatUnits(fees[1], 6)} USDG fee limit.`, "FeeTooHigh");
+    }
+    const sheetRequired = action.kind === ActionKind.Pay && !!protections?.[3];
     // Every proof-authorized call pays the relayer fee in USDG: do not ask for the passkey when the
     // account cannot cover it. A payment's amount is left to the contract, which must still see a
     // payment above the account's caps in order to refuse it.
@@ -450,7 +517,17 @@ export class VeraKeyClient {
     const request = { rpId: this.config.rpId, challenge: hexToBytes(actionHash), credentialIds: [credentialIdBytes(session.passkey)] };
     let assertion: PasskeyAssertion | undefined;
     let confirmedBy: "payment-sheet" | "passkey" = "passkey";
-    if (secureConfirmation && action.kind === ActionKind.Pay && (await this.canConfirmPayments(session))) {
+    const sheetAvailable = (secureConfirmation || sheetRequired) && action.kind === ActionKind.Pay && (await this.canConfirmPayments(session));
+    if (sheetRequired && !sheetAvailable) {
+      throw new VeraKeyError(
+        "policy",
+        "This account only pays through the browser's payment sheet, which this browser cannot show for this passkey.",
+        "PaymentSheetRequired"
+      );
+    }
+    if (sheetAvailable) {
+      // Once the sheet was offered, there is no second chance through the plain prompt: a user who
+      // closed the sheet because the payee or the total looked wrong must not be asked again.
       try {
         assertion = await getSpcAssertion({
           ...request,
@@ -460,9 +537,10 @@ export class VeraKeyClient {
         });
         confirmedBy = "payment-sheet";
       } catch (error) {
-        // The user closed the sheet: stop. Anything else (the passkey is not enrolled in this browser
-        // profile, the sheet is unavailable): fall back to the ordinary passkey prompt.
-        if (error instanceof DOMException && error.name === "AbortError") throw describeWebAuthnError(error);
+        if (error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "AbortError")) {
+          throw new VeraKeyError("authentication", "The payment sheet was closed or timed out. Nothing was paid.");
+        }
+        throw describeWebAuthnError(error);
       }
     }
     if (!assertion) {
@@ -554,7 +632,8 @@ export class VeraKeyClient {
 
   /**
    * Pays `amount` USDG from the `appId` account to `to`. With `secureConfirmation`, a passkey enrolled
-   * for Secure Payment Confirmation confirms in the browser's own payment sheet (payee and total signed).
+   * for Secure Payment Confirmation confirms in the browser's own payment sheet (payee and total
+   * signed); an account that requires the sheet always uses it.
    */
   pay(appId: bigint, to: Address, amount: bigint, emit: Listener = () => {}, options: { secureConfirmation?: boolean } = {}): Promise<TransactionReceipt> {
     return this.run(emit, async () => {

@@ -1,7 +1,7 @@
 import { ZERO_HASH, changePayload } from "@verakey/sdk/action";
 import { ChangeKind } from "@verakey/sdk/constants";
 import type { TrackedChange } from "@verakey/sdk/client";
-import { CalendarClock, Lock, ShieldCheck, Snowflake, X } from "lucide-react";
+import { CalendarClock, Lock, ReceiptText, ShieldAlert, ShieldCheck, Snowflake, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { decodeAbiParameters, isAddress, type Address } from "viem";
@@ -12,7 +12,21 @@ import { useVeraKey } from "@/state/VeraKeyProvider";
 import { Kicker, ProofTimeline, RejectionNote, useNow } from "./components";
 import { useAuthorizedAction } from "./useAuthorizedAction";
 
-export function describeChange(change: Pick<TrackedChange, "kind" | "payload">): string {
+const KIND_NAMES: Record<number, string> = {
+  [ChangeKind.AddOwner]: "Add an owner",
+  [ChangeKind.RemoveOwner]: "Remove an owner",
+  [ChangeKind.SetLimits]: "Change the caps",
+  [ChangeKind.SetRecipient]: "Change an allowed recipient",
+  [ChangeKind.SetAllowlist]: "Change the allowlist setting",
+  [ChangeKind.SetGuardian]: "Change the guardian",
+  [ChangeKind.SetNewPayeeCap]: "Change the new-recipient cap",
+  [ChangeKind.Freeze]: "Freeze all payments",
+  [ChangeKind.Unfreeze]: "Unfreeze payments",
+  [ChangeKind.SetPaymentSheet]: "Change the payment sheet setting",
+};
+
+export function describeChange(change: { kind: number; payload: `0x${string}` | null }): string {
+  if (change.payload === null) return `${KIND_NAMES[change.kind] ?? "Unknown change"} (details not found)`;
   switch (change.kind) {
     case ChangeKind.SetLimits: {
       const [perTx, daily] = decodeAbiParameters([{ type: "uint256" }, { type: "uint256" }], change.payload);
@@ -36,6 +50,10 @@ export function describeChange(change: Pick<TrackedChange, "kind" | "payload">):
       return "Freeze all payments";
     case ChangeKind.Unfreeze:
       return "Unfreeze payments";
+    case ChangeKind.SetPaymentSheet: {
+      const [required] = decodeAbiParameters([{ type: "bool" }], change.payload);
+      return required ? "Require the payment sheet for payments" : "Stop requiring the payment sheet";
+    }
     case ChangeKind.AddOwner:
       return `Add owner ${shortHex(change.payload, 8, 6)}`;
     case ChangeKind.RemoveOwner:
@@ -45,20 +63,34 @@ export function describeChange(change: Pick<TrackedChange, "kind" | "payload">):
   }
 }
 
-/** Scheduled changes for one account, with countdowns, apply and cancel. */
+type PendingItem = Omit<TrackedChange, "payload"> & { payload: `0x${string}` | null; fromThisBrowser: boolean };
+
+/**
+ * Scheduled changes for one account, read from the chain so that a change scheduled on another
+ * device (or by someone holding an unlocked device) shows up here too, with countdowns, apply and cancel.
+ */
 export function PendingChanges({ appKey, action }: { appKey: string; action: ReturnType<typeof useAuthorizedAction> }) {
   const { client, accounts, refreshAccounts } = useVeraKey();
   const app = appByKey(appKey);
   const account = accounts[app.key];
-  const [items, setItems] = useState<TrackedChange[]>([]);
+  const [items, setItems] = useState<PendingItem[]>([]);
   const now = useNow(items.length > 0, 1000);
 
   const reload = useCallback(async () => {
     if (!client || !account?.deployed) return setItems([]);
-    const tracked = trackedChanges.list(account.address);
-    const live = await Promise.all(tracked.map(async c => ((await client.isPending(account.address, c.changeId)) ? c : null)));
-    tracked.filter((_, i) => !live[i]).forEach(c => trackedChanges.remove(c.changeId));
-    setItems(live.filter((c): c is TrackedChange => c !== null));
+    const onChain = await client.pendingChanges(account.address);
+    const local = new Map(trackedChanges.list(account.address).map(c => [c.changeId, c]));
+    for (const id of local.keys()) if (!onChain.some(c => c.changeId === id)) trackedChanges.remove(id);
+    setItems(
+      await Promise.all(
+        onChain.map(async (c): Promise<PendingItem> => {
+          const known = local.get(c.changeId);
+          if (known) return { ...known, fromThisBrowser: true };
+          const payload = await client.scheduledPayload(account.address, c.changeId);
+          return { account: account.address, changeId: c.changeId, kind: c.kind, payload, eta: c.eta, fromThisBrowser: false };
+        })
+      )
+    );
   }, [client, account?.address, account?.deployed]);
 
   useEffect(() => {
@@ -80,18 +112,23 @@ export function PendingChanges({ appKey, action }: { appKey: string; action: Ret
                 <span>
                   {describeChange(change)}
                   <small>{shortHex(change.changeId, 10, 6)}</small>
+                  {!change.fromThisBrowser && (
+                    <small style={{ color: "var(--vk-orange)" }}>
+                      <ShieldAlert size={11} style={{ verticalAlign: "-2px" }} /> Not scheduled from this browser. Cancel it if it was not you.
+                    </small>
+                  )}
                 </span>
                 <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   {left > 0 ? (
                     <span className="vk-countdown"><CalendarClock size={12} /> {formatDuration(left)}</span>
-                  ) : (
+                  ) : change.payload === null ? null : (
                     <button
                       className="vk-btn vk-btn-primary"
                       style={{ minHeight: 32 }}
                       disabled={action.busy}
                       onClick={async () => {
                         try {
-                          await client!.applyChange(account.address, change);
+                          await client!.applyChange(account.address, { ...change, payload: change.payload! });
                           trackedChanges.remove(change.changeId);
                           toast.success("Change applied");
                           await refreshAccounts();
@@ -152,6 +189,15 @@ export function Policy() {
   const [daily, setDaily] = useState("");
   const [recipient, setRecipient] = useState("");
   const [newPayee, setNewPayee] = useState("");
+  const [canUseSheet, setCanUseSheet] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    client?.canConfirmPayments().then(ok => live && setCanUseSheet(ok), () => {});
+    return () => {
+      live = false;
+    };
+  }, [client, client?.session]);
 
   const schedule = (name: string, change: { kind: ChangeKind; payload: `0x${string}` }) =>
     action.run(name, async emit => {
@@ -206,6 +252,7 @@ export function Policy() {
                 </div>
                 <div><span>Recipients</span><span className="vk-mono">{account.allowlistEnabled ? "allowlist only" : "anyone"}</span></div>
                 <div><span>First payment to a new recipient</span><span className="vk-mono">at most {formatUsdg(account.newPayeeCap)} USDG</span></div>
+                <div><span>Payment sheet</span><span className="vk-mono">{account.paymentSheetRequired ? "required" : "optional"}</span></div>
                 <div><span>Payments</span><span className="vk-mono" style={{ color: account.frozen ? "var(--vk-orange)" : undefined }}>{account.frozen ? "frozen" : "active"}</span></div>
               </div>
             </div>
@@ -214,8 +261,9 @@ export function Policy() {
               <div className="vk-panel-head"><span>Emergency</span><span>{account.frozen ? "frozen" : "applies at once"}</span></div>
               <div className="vk-panel-body vk-form">
                 <p style={{ margin: 0, color: "var(--vk-muted)", fontSize: 12, lineHeight: 1.6 }}>
-                  Lost a device, or saw a payment you did not make? Freezing stops every payment immediately; your
-                  guardian can freeze too. Unfreezing is a timelocked change that you or the guardian can cancel.
+                  Lost a device, or saw a payment you did not make? Freezing stops every payment immediately and
+                  cancels every scheduled change; your guardian can freeze too. Unfreezing is a timelocked change
+                  that you or the guardian can cancel.
                 </p>
                 {account.frozen ? (
                   <button className="vk-btn vk-btn-ghost" disabled={action.busy} onClick={() => schedule("Unfreeze", changePayload.unfreeze())}>
@@ -224,6 +272,27 @@ export function Policy() {
                 ) : (
                   <button className="vk-btn vk-btn-primary" disabled={action.busy} onClick={() => restrict("Freeze payments", changePayload.freeze())}>
                     <Snowflake size={14} /> Freeze payments now
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="vk-panel">
+              <div className="vk-panel-head"><span>Payment sheet</span><span>{account.paymentSheetRequired ? "required" : "optional"}</span></div>
+              <div className="vk-panel-body vk-form">
+                <p style={{ margin: 0, color: "var(--vk-muted)", fontSize: 12, lineHeight: 1.6 }}>
+                  Require every payment to be confirmed in the browser's own payment sheet, which shows the payee and
+                  the total. The account then refuses payments approved through the ordinary passkey prompt, so a
+                  tampered page cannot pay without the browser showing you what you pay. Only in Chrome on macOS,
+                  Windows and Android, with a passkey enrolled for it in this browser.
+                </p>
+                {account.paymentSheetRequired ? (
+                  <button className="vk-btn vk-btn-ghost" disabled={action.busy} onClick={() => schedule("Stop requiring the payment sheet", changePayload.setPaymentSheet(false))}>
+                    <ReceiptText size={14} /> Stop requiring it ({formatDuration(Number(account.changeDelay))})
+                  </button>
+                ) : (
+                  <button className="vk-btn vk-btn-ghost" disabled={action.busy || !canUseSheet} onClick={() => restrict("Require the payment sheet", changePayload.setPaymentSheet(true))}>
+                    <ReceiptText size={14} /> {canUseSheet ? "Require the payment sheet now" : "Not available in this browser"}
                   </button>
                 )}
               </div>

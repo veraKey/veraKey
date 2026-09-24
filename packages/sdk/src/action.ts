@@ -82,6 +82,11 @@ export const changePayload = {
   }),
   freeze: () => ({ kind: Change.Freeze, payload: "0x" as Hex }),
   unfreeze: () => ({ kind: Change.Unfreeze, payload: "0x" as Hex }),
+  /** Requiring the payment sheet is instant (`restrict`); dropping the requirement is timelocked. */
+  setPaymentSheet: (required: boolean) => ({
+    kind: Change.SetPaymentSheet,
+    payload: encodeAbiParameters([{ type: "bool" }], [required]),
+  }),
 } as const;
 
 /**

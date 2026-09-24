@@ -22,8 +22,8 @@ import type { ServerConfig } from "./config";
 import { Mutex } from "./rate-limit";
 
 const BN254_R = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001n;
-/** Refuse anything that would need more gas than a proof-authorized account call. */
-const MAX_GAS = 12_000_000n;
+/** Refuse anything that would need more gas than a proof-authorized account call (~1.1M). */
+const MAX_GAS = 2_500_000n;
 
 export class RelayError extends Error {
   constructor(
@@ -78,10 +78,18 @@ export class Relayer {
     this.funded = new Set(funded.map(a => a.toLowerCase()));
   }
 
-  /** Throws unless `account` is a VeraKey account created by this deployment's factory. */
+  /**
+   * Throws unless `account` is a VeraKey account created by this deployment's factory: its code must
+   * be the EIP-1167 clone of this deployment's implementation (so it cannot be a look-alike contract
+   * that burns the relayer's gas), and the clone must have been initialized by this factory.
+   */
   private async assertOurAccount(account: Address) {
     const code = await this.publicClient.getCode({ address: account });
     if (!code || code === "0x") throw new RelayError(404, "Account is not deployed.");
+    const implementation = this.config.network.contracts.accountImplementation.slice(2).toLowerCase();
+    if (code.toLowerCase() !== `0x363d3d373d3d3d363d73${implementation}5af43d82803e903d91602b57fd5bf3`) {
+      throw new RelayError(400, "Not a VeraKey account.");
+    }
     let factory: Address;
     try {
       [factory] = await this.publicClient.readContract({ address: account, abi: veraKeyAccountAbi, functionName: "config" });
@@ -110,7 +118,8 @@ export class Relayer {
     });
   }
 
-  async createAccount(appId: unknown, nullifier: unknown): Promise<{ hash: Hex | null; account: Address }> {
+  /** `beforeDeploy` runs only when a new account would be deployed (e.g. to rate-limit that). */
+  async createAccount(appId: unknown, nullifier: unknown, beforeDeploy: () => void = () => {}): Promise<{ hash: Hex | null; account: Address }> {
     if (!isFieldHex(appId) || !isFieldHex(nullifier) || BigInt(nullifier) === 0n) {
       throw new RelayError(400, "appId and nullifier must be 32-byte BN254 field elements.");
     }
@@ -120,6 +129,7 @@ export class Relayer {
     });
     const code = await this.publicClient.getCode({ address: account });
     if (code && code !== "0x") return { hash: null, account };
+    beforeDeploy();
     const hash = await this.submit({
       address: factory, abi: veraKeyFactoryAbi, functionName: "createAccount", args: [appId, nullifier],
     } as never);
@@ -147,7 +157,8 @@ export class Relayer {
       if (input.type === "bytes" && value.length > 2 * 16_384 + 2) throw new RelayError(413, `${input.name} is too large.`);
       return value;
     });
-    // Proof-authorized calls sign the USDG fee the account pays the submitter: never pay gas for less.
+    // Proof-authorized calls sign the USDG fee the account pays the fee recipient (this relayer): never
+    // pay gas for less.
     const fee = item.inputs.findIndex(input => input.name === "fee");
     if (fee >= 0 && (args[fee] as bigint) < BigInt(this.config.network.relayer.fee)) {
       throw new RelayError(402, "The signed relayer fee is too low.");
