@@ -26,7 +26,14 @@ In the page, from a click, so the browser allows the popup:
 import { VeraKeyConnect } from "@verakey/sdk/connect";
 
 const verakey = new VeraKeyConnect({ url: "https://verakey.mdloglabs.org" });
-const newNonce = async () => (await (await fetch("/api/nonce", { method: "POST" })).json()).nonce;
+
+// A fresh nonce from your server. Throw its refusal: the popup closes, and your page gets it as error.cause.
+async function newNonce() {
+  const response = await fetch("/api/nonce", { method: "POST" });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error);
+  return body.nonce;
+}
 
 button.onclick = async () => {
   const result = await verakey.signIn({ nonce: newNonce }); // the player approves in the popup
@@ -57,9 +64,12 @@ if (verdict.valid) startSession(verdict.playerId, verdict.account);
 
 Take the deployment's values from [Deployments](https://verakey.mdloglabs.org/docs/reference/deployments) and keep
 them in your configuration. `verakey.pay({ to, amount, account })` takes USDG payments in the same popup, and
-`verifyPayment` checks them on your server. The
-[Sign in with VeraKey guide](https://verakey.mdloglabs.org/docs/build/sign-in) covers payments, errors and a
-security checklist.
+`verifyPayment` checks them on your server.
+
+While you develop, the popup also answers `http://localhost` and `http://127.0.0.1`. These are different sites, with
+different player IDs: verify as the exact origin in the browser's address bar. The
+[Sign in with VeraKey guide](https://verakey.mdloglabs.org/docs/build/sign-in) covers payments, errors, local
+development, end-to-end tests with a virtual passkey, and a security checklist.
 
 ## Passkey accounts in your own app
 
@@ -85,8 +95,10 @@ for your domain, which opens with developer access after the testnet preview. Th
 
 ## Proving
 
-- The prover runs in the browser. With cross-origin isolation (`Cross-Origin-Opener-Policy: same-origin` and
+- `VeraKeyClient` proves in your page. With cross-origin isolation (`Cross-Origin-Opener-Policy: same-origin` and
   `Cross-Origin-Embedder-Policy: require-corp`) it proves on every core; without it, on one thread.
+- With Sign in with VeraKey, the popup proves on VeraKey's side. A page that opens it must not send
+  `Cross-Origin-Opener-Policy: same-origin`, which cuts the popup off from the page.
 - The first proof in a browser downloads the prover's common reference string, a few megabytes, from Aztec's
   CDN. The browser keeps it for later proofs.
 

@@ -17,9 +17,14 @@ const PLAYER = "0x00000000000000000000000000000000000000aa";
 
 class FakePopup {
   closed = false;
+  closeCalls = 0;
   sent: { message: any; target: string }[] = [];
   postMessage(message: unknown, target: string) {
     this.sent.push({ message, target });
+  }
+  close() {
+    this.closeCalls++;
+    this.closed = true;
   }
 }
 
@@ -79,6 +84,53 @@ describe("VeraKeyConnect", () => {
     expect(window.request.params.nonce).toBe(NONCE);
     window.emit(envelope({ type: "result", id: window.request.id, result: { ok: true } }));
     await signingIn;
+  });
+
+  it("closes VeraKey's window when the site's nonce callback fails, and keeps what it threw as the cause", async () => {
+    const window = new FakeWindow();
+    const cause = new Error("Open this site at http://localhost:5273");
+    const signingIn = new VeraKeyConnect({ url: VERAKEY, host: window }).signIn({ nonce: () => Promise.reject(cause) });
+    const error = await signingIn.catch(e => e);
+    expect(error).toBeInstanceOf(VeraKeyConnectError);
+    expect(error).toMatchObject({ code: "request", message: cause.message });
+    expect(error.cause).toBe(cause);
+    expect(window.popup!.closeCalls).toBe(1);
+    // A later "ready" from the closed window changes nothing.
+    window.emit(envelope({ type: "ready" }));
+    await tick();
+    expect(window.popup!.sent).toEqual([]);
+  });
+
+  it("refuses a nonce that is not 32 bytes of hex at once, closes VeraKey's window, and says why", async () => {
+    // A site whose server refused the nonce may pass on what came back instead of one.
+    for (const nonce of [() => Promise.resolve(undefined as unknown as Hex), "0x12" as Hex]) {
+      const window = new FakeWindow();
+      const error = await new VeraKeyConnect({ url: VERAKEY, host: window }).signIn({ nonce }).catch(e => e);
+      expect(error).toMatchObject({ code: "request", message: expect.stringContaining("32 bytes") });
+      expect(error.cause).toBeInstanceOf(Error);
+      expect(window.popup!.closeCalls).toBe(1);
+    }
+  });
+
+  it("leaves the window alone when the nonce fails after the request ended: a retry may be using it", async () => {
+    vi.useFakeTimers();
+    const window = new FakeWindow();
+    let refuse!: (error: Error) => void;
+    const nonce = () => new Promise<Hex>((_, reject) => { refuse = reject; });
+    const signingIn = new VeraKeyConnect({ url: VERAKEY, host: window }).signIn({ nonce });
+    const outcome = expect(signingIn).rejects.toMatchObject({ code: "unavailable" });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await outcome;
+    refuse(new Error("too late"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(window.popup!.closeCalls).toBe(0);
+  });
+
+  it("fails the request, not the page, when the host's windows cannot be closed from the page", async () => {
+    const window = new FakeWindow();
+    window.popup = Object.assign(new FakePopup(), { close: undefined }) as unknown as FakePopup;
+    const signingIn = new VeraKeyConnect({ url: VERAKEY, host: window }).signIn({ nonce: () => Promise.reject(new Error("down")) });
+    await expect(signingIn).rejects.toMatchObject({ code: "request", message: "down" });
   });
 
   it("sends a payment's amount as a decimal string", async () => {

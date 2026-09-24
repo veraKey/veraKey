@@ -32,7 +32,14 @@ your server: verifySignIn(result) ── eth_call ──▶ HonkVerifier on Arbi
 import { VeraKeyConnect, VeraKeyConnectError } from "@verakey/sdk/connect";
 
 const verakey = new VeraKeyConnect({ url: "https://verakey.mdloglabs.org" });
-const newNonce = async () => (await (await fetch("/api/nonce", { method: "POST" })).json()).nonce;
+
+// A fresh nonce from your server. Throw its refusal: the popup closes, and your page gets it as error.cause.
+async function newNonce() {
+  const response = await fetch("/api/nonce", { method: "POST" });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error);
+  return body.nonce;
+}
 
 button.onclick = async () => {
   try {
@@ -44,7 +51,8 @@ button.onclick = async () => {
       body: JSON.stringify(result),
     });
   } catch (error) {
-    if (error instanceof VeraKeyConnectError) console.log(error.code); // "cancelled", "closed", …
+    // error.cause: what your own nonce callback threw. error.code: why VeraKey stopped, e.g. "cancelled".
+    if (error instanceof VeraKeyConnectError) console.log(error.cause ?? error.code);
   }
 };
 `}</Code>
@@ -71,8 +79,8 @@ if (verdict.valid) startSession(verdict.playerId, verdict.account);
 `}</Code>
       <p>
         Take the deployment's values from <A href="/docs/reference/deployments">Deployments</A> and keep them in your
-        server's configuration; never read them from a result. <code>verifySignIn</code> returns every check, and a
-        malformed result is a refusal, never an exception:
+        server's configuration; never read them from a result. <code>verifySignIn</code> returns every check, and the{" "}
+        <code>detail</code> of a failed one says why. A malformed result is a refusal, never an exception:
       </p>
       <Table
         stack
@@ -85,7 +93,7 @@ if (verdict.valid) startSession(verdict.playerId, verdict.account);
           ["Not expired, Short-lived", "It is valid for at most five minutes, with a minute of tolerance for the player's device clock."],
           ["Passkey signed this sign-in, Signed on VeraKey", "The passkey signed exactly this statement, on VeraKey's origin."],
           ["Proof commits to this sign-in, Proof verifies", "The proof's public inputs are this sign-in's, and the verifier accepts it."],
-          ["Account of this player, Player still owns the account", "The account is the player's for your site, and still theirs."],
+          ["Account of this player, Player still owns the account", "The account is the player's for your site, and still theirs. An account that is not deployed yet passes: it is created for this player on first use."],
         ]}
       />
       <p>
@@ -131,6 +139,93 @@ const paid = hash && (await verifyPayment(hash, {
         <li>Accept each transaction hash once, so one payment never buys twice.</li>
       </ul>
 
+      <H2>Develop locally</H2>
+      <p>
+        The popup answers https sites, and plain http on <code>localhost</code> and <code>127.0.0.1</code> while you
+        develop. A site is its exact origin: scheme, host and port together.
+      </p>
+      <ul>
+        <li>
+          <code>http://localhost:5173</code> and <code>http://127.0.0.1:5173</code> are different sites. Each gets its own
+          player IDs and accounts, and <code>verifySignIn</code> refuses a sign-in made on one when your server verifies
+          as the other: the "Made for this site" check fails, and its detail names both origins.
+        </li>
+        <li>
+          Behind a development proxy, such as Vite's <code>server.proxy</code>, verify as the page's origin, the one in the
+          address bar, not as your API server's.
+        </li>
+        <li>
+          Keep the origin in your server's configuration, and check the <code>Origin</code> header when you issue a nonce.
+          If they differ, refuse with the address to open: the popup closes, and your page gets your message as{" "}
+          <code>error.cause</code>.
+        </li>
+      </ul>
+
+      <H2>Test your integration</H2>
+      <p>
+        Your end-to-end tests can sign players in for real, in headless Chromium: give VeraKey's popup a virtual passkey
+        authenticator with PRF through the Chrome DevTools Protocol, and drive the popup by its test ids. A sign-in takes
+        about ten seconds. With Playwright:
+      </p>
+      <Code lang="ts" title="sign-in.spec.ts">{`
+import { expect, test, type Page } from "@playwright/test";
+
+/** A passkey authenticator with PRF for VeraKey's popup, like a phone's or a password manager's. */
+async function addPasskeyAuthenticator(popup: Page) {
+  const cdp = await popup.context().newCDPSession(popup);
+  await cdp.send("WebAuthn.enable", { enableUI: false });
+  await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: {
+      protocol: "ctap2", transport: "internal",
+      hasResidentKey: true, hasUserVerification: true, isUserVerified: true,
+      automaticPresenceSimulation: true,
+      hasPrf: true, // VeraKey needs the PRF extension
+    },
+  });
+}
+
+test("a player signs in with a new VeraKey passkey", async ({ page }) => {
+  await page.goto("http://localhost:5173/");
+  const popupOpens = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Sign in with VeraKey" }).click(); // your page's button
+  const popup = await popupOpens;
+  await addPasskeyAuthenticator(popup);
+
+  await expect(popup.getByTestId("connect-requester")).toHaveText("http://localhost:5173");
+  await popup.getByTestId("connect-create-passkey").click();
+  await popup.getByTestId("connect-sign-in").click();
+  // The popup proves the sign-in and closes itself; then your server verifies it.
+  await expect(page.getByText("Signed in")).toBeVisible({ timeout: 120_000 });
+});
+`}</Code>
+      <ul>
+        <li>
+          The authenticator lives in the popup's window, so add one to every popup your test opens. A new one holds no
+          passkey: create one in each popup, and each is a new player.
+        </li>
+        <li>Every control a test drives has a <code>data-testid</code>. The labels may change; the test ids stay.</li>
+      </ul>
+      <Table
+        stack
+        head={["Test id", "What it is"]}
+        rows={[
+          [<code key="1">connect-waiting</code>, "Shown until your page's request arrives."],
+          [<code key="2">connect-requester</code>, "The origin the popup names as the requester: your page's."],
+          [<code key="3">connect-create-passkey</code>, "Creates a VeraKey passkey."],
+          [<code key="4">connect-unlock</code>, "Unlocks a passkey the player already has."],
+          [<code key="5">connect-sign-in</code>, "Approves the sign-in."],
+          [<code key="6">connect-top-up</code>, "Asks for demo USDG, on the testnet."],
+          [<code key="7">connect-check-balance</code>, "Reads the account's balance again."],
+          [<code key="8">connect-pay</code>, "Approves the payment."],
+          [<code key="9">connect-other-player</code>, "The passkey unlocked is not the player whose account your page named."],
+          [<code key="10">connect-cancel</code>, "Cancels the request; the popup closes."],
+          [<code key="11">connect-done</code>, "The request succeeded. The popup closes itself right after, so wait for it to close rather than for this."],
+          [<code key="12">connect-error</code>, "Why a step failed, such as the request or a top-up; the popup stays open."],
+          [<code key="13">connect-close</code>, "Closes the popup: after a failure or a refused request, or when your page's request never arrives."],
+          [<code key="14">connect-rejected</code>, "The popup refused your page's request, for example from a site on plain http."],
+        ]}
+      />
+
       <H2>Security checklist</H2>
       <ul>
         <li>Verify every sign-in on your server with <code>verifySignIn</code>, never in the page.</li>
@@ -140,7 +235,7 @@ const paid = hash && (await verifyPayment(hash, {
           themselves.
         </li>
         <li>Pin the deployment (chain, factory, verifier and VeraKey's origin) in your server's configuration.</li>
-        <li>Serve your site over https. The popup answers only https sites, and localhost while you develop.</li>
+        <li>Serve your site over https. The popup answers only https sites, and localhost or 127.0.0.1 while you develop.</li>
         <li>Send <code>Referrer-Policy: no-referrer</code>, so VeraKey's server does not learn your domain when the popup loads.</li>
         <li>
           Keep the popup's link to your page: do not send <code>Cross-Origin-Opener-Policy: same-origin</code> from the
@@ -162,8 +257,8 @@ const paid = hash && (await verifyPayment(hash, {
           [<code key="2">unavailable</code>, "The popup never answered: the page sends Cross-Origin-Opener-Policy: same-origin, the VeraKey URL is wrong, or VeraKey cannot be reached."],
           [<code key="3">closed</code>, "The player closed the popup. With error.hash, the payment was sent: verify it. With error.pending, it may have been sent: find it with findPayment first."],
           [<code key="4">busy</code>, "Another request from this page is still open."],
-          [<code key="5">origin</code>, "The page is not on https, or localhost."],
-          [<code key="6">request</code>, "A malformed request, such as a nonce that is not 32 bytes."],
+          [<code key="5">origin</code>, "The page is not on https, localhost or 127.0.0.1."],
+          [<code key="6">request</code>, "A malformed request, such as a nonce that is not 32 bytes, or your own nonce callback threw. The popup then closes at once, and error.cause says why: what your callback threw, so your page can show your server's message."],
           [<code key="7">cancelled</code>, "The player cancelled before approving."],
           [<code key="8">funds, policy, device, proof, relay</code>, <>The same stages as the SDK: see <A href="/docs/reference/errors">Errors</A>. A relay error can carry error.pending too.</>],
         ]}

@@ -95,15 +95,19 @@ const deployment = {
 };
 
 /** A chain that answers the verifier, the factory and the account the way a test needs. */
-function chain({ verify = true, account = ACCOUNT, deployed = false, owner = true } = {}): PublicClient {
+function chain({ verify = true, account = ACCOUNT, deployed = false, owner = true, failing = "" } = {}): PublicClient {
   return {
     readContract: async ({ functionName }: { functionName: string }) => {
+      if (functionName === failing) throw new Error("the RPC failed");
       if (functionName === "verify") return verify;
       if (functionName === "accountAddress") return account;
       if (functionName === "isOwner") return owner;
       throw new Error(`unexpected call ${functionName}`);
     },
-    getCode: async () => (deployed ? "0x6080" : undefined),
+    getCode: async () => {
+      if (failing === "getCode") throw new Error("the RPC failed");
+      return deployed ? "0x6080" : undefined;
+    },
   } as unknown as PublicClient;
 }
 
@@ -154,11 +158,58 @@ describe("verifySignIn", () => {
   it("accepts the site's origin written with a trailing slash or capitals", async () => {
     expect((await verify(await signedIn(), { origin: "https://Game.Example/" })).valid).toBe(true);
   });
-  it("refuses a sign-in made for another site", async () => {
+  it("refuses a sign-in made for another site, and names both origins", async () => {
     const other = "https://other.example";
     const verdict = await verify(await signedIn({ origin: other, appId: toFieldHex(appIdFromOrigin(other)) }));
     expect(failed(verdict)).toEqual(["Made for this site", "App id of this site"]);
+    const detail = verdict.checks.find(c => c.name === "Made for this site")?.detail ?? "";
+    expect(detail).toContain(other);
+    expect(detail).toContain(GAME);
   });
+  it("words each detail for its check's outcome: a valid sign-in carries no failure wording", async () => {
+    for (const client of [chain(), chain({ deployed: true })]) {
+      const verdict = await verify(await signedIn(), { client });
+      expect(verdict.valid).toBe(true);
+      const worded = verdict.checks.filter(c => c.detail && !/^0x[0-9a-fA-F]{40}$|not deployed yet/.test(c.detail));
+      expect(worded.map(c => `${c.name}: ${c.detail}`)).toEqual([]);
+    }
+  });
+  it("always reports whether the player owns the account, and says when it is not deployed yet", async () => {
+    const first = await verify(await signedIn());
+    expect(first.checks.at(-1)).toMatchObject({ name: "Player still owns the account", ok: true });
+    expect(first.checks.at(-1)?.detail).toMatch(/not deployed yet/);
+    const later = await verify(await signedIn(), { client: chain({ deployed: true }) });
+    expect(later.checks.at(-1)).toMatchObject({ name: "Player still owns the account", ok: true });
+  });
+  it("refuses a sign-in when the chain cannot say whether the player still owns the account", async () => {
+    for (const failing of ["getCode", "isOwner"]) {
+      const verdict = await verify(await signedIn(), { client: chain({ deployed: true, failing }) });
+      expect(failed(verdict), failing).toEqual(["Player still owns the account"]);
+      expect(verdict.checks.at(-1)?.detail, failing).toMatch(/could not be read/);
+    }
+    const removed = await verify(await signedIn(), { client: chain({ deployed: true, owner: false }) });
+    expect(removed.checks.at(-1)?.detail).toMatch(/no longer owns/);
+  });
+
+  it("gives the localhost hint only when both origins are on this computer", async () => {
+    const detail = (verdict: { checks: { name: string; detail?: string }[] }) => verdict.checks.find(c => c.name === "Made for this site")?.detail ?? "";
+    const other = "https://other.example";
+    expect(detail(await verify(await signedIn({ origin: other, appId: toFieldHex(appIdFromOrigin(other)) })))).not.toMatch(/localhost/);
+    const loopback = "http://127.0.0.1:5173";
+    const local = await verify(await signedIn({ origin: loopback, appId: toFieldHex(appIdFromOrigin(loopback)) }), { origin: "http://localhost:5173" });
+    expect(detail(local)).toMatch(/localhost and 127\.0\.0\.1 are different sites/);
+  });
+
+  it("says why each check fails, without blaming what is not wrong", async () => {
+    const detail = (verdict: { checks: { name: string; detail?: string }[] }, name: string) => verdict.checks.find(c => c.name === name)?.detail ?? "";
+    const badOrigin = await verify(await signedIn(), { origin: "not a web origin" });
+    expect(detail(badOrigin, "App id of this site")).not.toMatch(/another origin/);
+    const framed = await verify(await signedIn({}, { crossOrigin: true }));
+    expect(failed(framed)).toEqual(["Signed on VeraKey"]);
+    expect(detail(framed, "Signed on VeraKey")).toMatch(/cross-origin frame/);
+    expect(detail(framed, "Signed on VeraKey")).not.toMatch(/, not on/);
+  });
+
   it("refuses another site's app id, even under this site's origin", async () => {
     const verdict = await verify(await signedIn({ appId: toFieldHex(appIdFromOrigin("https://other.example")) }));
     expect(failed(verdict)).toEqual(["App id of this site"]);

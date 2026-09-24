@@ -114,8 +114,13 @@ export class VeraKeyConnectError extends Error {
   /** Set when the request ended while the payment was being sent: find it with `findPayment` before asking again. */
   readonly pending?: PendingPayment;
 
-  constructor(readonly code: ConnectErrorCode, message: string, details: { revert?: string; hash?: Hex; pending?: PendingPayment } = {}) {
-    super(message);
+  constructor(
+    readonly code: ConnectErrorCode,
+    message: string,
+    details: { revert?: string; hash?: Hex; pending?: PendingPayment; cause?: unknown } = {}
+  ) {
+    // `cause` keeps what the site's own `nonce` callback threw, so a page can tell its errors from VeraKey's.
+    super(message, details.cause === undefined ? undefined : { cause: details.cause });
     this.name = "VeraKeyConnectError";
     this.revert = details.revert;
     this.hash = details.hash;
@@ -126,6 +131,7 @@ export class VeraKeyConnectError extends Error {
 export interface ConnectPopup {
   closed: boolean;
   postMessage(message: unknown, targetOrigin: string): void;
+  close?(): void;
 }
 
 /** The browser pieces VeraKeyConnect uses: `window`, or a stand-in in tests. */
@@ -152,7 +158,15 @@ export class VeraKeyConnect {
    */
   signIn(params: { nonce: Hex | (() => Promise<Hex>) }): Promise<SignInResult> {
     const { nonce } = params;
-    return this.request("signIn", async () => ({ nonce: typeof nonce === "function" ? await nonce() : nonce })) as Promise<SignInResult>;
+    return this.request("signIn", async () => {
+      const value: unknown = typeof nonce === "function" ? await nonce() : nonce;
+      // VeraKey's window would refuse it too, but only once it loads: refusing it here closes the window at once.
+      if (typeof value !== "string" || !isHex(value) || value.length !== 66) {
+        const shown = typeof value === "string" ? JSON.stringify(value.slice(0, 80)) : String(value);
+        throw new Error(`The nonce must be 32 bytes of hex (0x and 64 hex digits), not ${shown}.`);
+      }
+      return { nonce: value };
+    }) as Promise<SignInResult>;
   }
 
   /**
@@ -176,14 +190,17 @@ export class VeraKeyConnect {
     this.pending = true;
     const id = crypto.randomUUID();
     const values = params();
-    values.catch(() => {}); // handled once the popup is ready
+    values.catch(() => {}); // handled below, as soon as it fails
     return new Promise((resolve, reject) => {
       let ready = false;
+      let settled = false;
       let sent: Hex | undefined;
       let sending: PendingPayment | undefined;
       let readyTimer: ReturnType<typeof setTimeout> | undefined;
       let closedPoll: ReturnType<typeof setInterval> | undefined;
       const settle = (done: () => void) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(readyTimer);
         clearInterval(closedPoll);
         this.host.removeEventListener("message", onMessage);
@@ -191,10 +208,25 @@ export class VeraKeyConnect {
         done();
       };
       // Without a hash, a payment the popup was sending may still land: the site gets what it needs to find it.
-      const fail = (code: ConnectErrorCode, message: string, revert?: string) =>
+      const fail = (code: ConnectErrorCode, message: string, extra: { revert?: string; cause?: unknown } = {}) =>
         settle(() =>
-          reject(new VeraKeyConnectError(code, message, { revert, hash: sent, pending: sent || !["closed", "relay"].includes(code) ? undefined : sending }))
+          reject(new VeraKeyConnectError(code, message, {
+            ...extra,
+            hash: sent,
+            pending: sent || !["closed", "relay"].includes(code) ? undefined : sending,
+          }))
         );
+      // The site's own `nonce` callback failed: close VeraKey's window rather than leave it waiting for a request.
+      // Not once the request has ended, though: a retry may already be using the same window.
+      values.catch(error => {
+        if (settled) return;
+        fail("request", error instanceof Error ? error.message : String(error), { cause: error });
+        try {
+          popup.close?.();
+        } catch {
+          // the window stays; the site has its answer
+        }
+      });
       const onMessage = (event: MessageEvent) => {
         if (event.origin !== this.origin || event.source !== popup || !isEnvelope(event.data)) return;
         const message = event.data as PopupMessage;
@@ -202,8 +234,10 @@ export class VeraKeyConnect {
           if (ready) return;
           ready = true;
           values.then(
-            value => popup.postMessage(envelope({ type: "request", id, method, params: value }), this.origin),
-            error => fail("request", error instanceof Error ? error.message : String(error))
+            value => {
+              if (!settled) popup.postMessage(envelope({ type: "request", id, method, params: value }), this.origin);
+            },
+            () => {} // already failed above
           );
           return;
         }
@@ -215,7 +249,7 @@ export class VeraKeyConnect {
           }
         }
         else if (message.type === "result") settle(() => resolve(message.result));
-        else if (message.type === "error") fail(message.code, message.message, message.revert);
+        else if (message.type === "error") fail(message.code, message.message, { revert: message.revert });
       };
       this.host.addEventListener("message", onMessage);
       readyTimer = setTimeout(() => {

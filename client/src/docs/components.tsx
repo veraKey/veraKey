@@ -48,7 +48,7 @@ export function Code({ lang = "text", title, children }: { lang?: Lang; title?: 
       setTimeout(() => setCopied(false), 1500);
     }, () => {});
   return (
-    <figure className="dx-code">
+    <figure className="dx-code" data-lang={lang} data-title={title}>
       <figcaption>
         <span>{title ?? LANG_LABEL[lang]}</span>
         <button type="button" onClick={copy} aria-label="Copy code">

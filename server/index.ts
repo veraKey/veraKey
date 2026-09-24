@@ -160,7 +160,19 @@ app.use("/api", (error: unknown, _req: Request, res: Response, _next: NextFuncti
 // Static app (production build). Express static serves HTTP Range requests, which bb.js uses for the CRS.
 const staticDir = path.resolve(ROOT, "dist", "public");
 if (existsSync(staticDir)) {
-  app.use(express.static(staticDir, { index: false, maxAge: "1h" }));
+  // The build prerenders every docs page (scripts/prerender-docs.mjs), so readers without JavaScript get its content;
+  // the path allows only lowercase letters, digits and hyphens, so it stays inside docs/.
+  app.get(/^\/docs(?:\/[a-z0-9-]+)*\/?$/, (req, res, next) => {
+    const page = path.join(staticDir, `${req.path.replace(/\/$/, "")}.html`);
+    if (!existsSync(page)) return next();
+    // no-transform: a proxy that rewrites HTML, such as Cloudflare's email obfuscation, would break hydration.
+    res.setHeader("Cache-Control", "public, max-age=0, no-transform");
+    res.sendFile(page);
+  });
+  // The router knows each page by its clean path, so the prerendered files are not pages of their own.
+  app.get(/^\/docs(?:\/[a-z0-9-]+)*\.html$/, (req, res) => res.redirect(301, req.path.slice(0, -".html".length)));
+  // No redirect from /docs/build to /docs/build/: directories are not pages.
+  app.use(express.static(staticDir, { index: false, maxAge: "1h", redirect: false }));
   app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(path.join(staticDir, "index.html")));
 }
 

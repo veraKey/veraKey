@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
@@ -37,6 +38,28 @@ function sections(html: string): Map<string, string> {
     map.set(title, plain(part));
   }
   return map;
+}
+
+/** The plain text of the h2 section with this title, including its h3 subsections. */
+function section(html: string, title: string): string {
+  const part = html.split(/(?=<h2\b)/).find(part => decode(/\bdata-title="([^"]*)"/.exec(part)?.[1] ?? "") === title);
+  if (!part) throw new Error(`no section ${title}`);
+  return part;
+}
+
+/** The text of a reference table's Signature cell, in the row of this export. */
+function signatureOf(html: string, name: string): string {
+  const row = html.split("<tr>").find(row => plain(row.split("</td>")[0] ?? "") === name);
+  if (!row) throw new Error(`no reference row for ${name}`);
+  return displayed(row.split("</td>")[1] ?? "");
+}
+
+/** The property names of an options type in the SDK's source; `pattern` captures the type's body. */
+function optionsIn(source: string, pattern: RegExp): string[] {
+  const body = pattern.exec(source)?.[1];
+  if (!body) throw new Error(`no options type matches ${pattern}`);
+  const code = body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  return [...code.matchAll(/(\w+)\??\s*:/g)].map(([, name]) => name);
 }
 
 describe("the registry matches the pages", () => {
@@ -209,6 +232,63 @@ describe("what the docs tell people", () => {
     expect(intro).toMatch(/One passkey, unlinkable on-chain identities/);
     expect(intro).toMatch(/sign-in/);
     expect(intro).toMatch(/unlinkable, not anonymous/i);
+  });
+
+  it("starts developers without a deployment of their own at Sign in with VeraKey, and scopes the isolation advice", async () => {
+    const html = await render("/docs/build/quickstart");
+    const intro = html.slice(0, html.indexOf("<h2"));
+    expect(intro).toContain('href="/docs/build/sign-in"');
+    expect(plain(intro)).toMatch(/deployment for your domain/);
+    // The prover's headers are for apps that prove in their own pages: the same header cuts VeraKey's popup off.
+    expect(sections(html).get("Before you begin")).toMatch(/must not send Cross-Origin-Opener-Policy: same-origin/);
+  });
+
+  it("tells sites that their origin is exact while they develop too", async () => {
+    const local = plain(section(await render("/docs/build/sign-in"), "Develop locally"));
+    for (const origin of ["http://localhost:5173", "http://127.0.0.1:5173"]) expect(local).toContain(origin);
+    expect(local).toMatch(/different sites/);
+    expect(local).toMatch(/proxy/);
+  });
+
+  it("says a failing nonce callback closes the popup, and keeps the site's own error as the cause", async () => {
+    const errors = plain(section(await render("/docs/build/sign-in"), "Errors and limits"));
+    expect(errors).toMatch(/nonce callback/);
+    expect(errors).toContain("error.cause");
+  });
+
+  it("shows a nonce callback that throws its server's refusal, which closes the popup and reaches the page", async () => {
+    expect(displayed(section(await render("/docs/build/sign-in"), "Add the button"))).toContain("if (!response.ok) throw new Error(");
+  });
+
+  it("shows how to test an integration, and lists exactly the popup's test ids", async () => {
+    const html = section(await render("/docs/build/sign-in"), "Test your integration");
+    for (const phrase of ["addVirtualAuthenticator", "hasPrf: true", "getByTestId"]) expect(displayed(html)).toContain(phrase);
+    // The test ids are the popup's interface for tests, so the guide lists every one, and only those.
+    const popup = readFileSync(new URL("../pages/connect/ConnectPage.tsx", import.meta.url), "utf8");
+    const ids = new Set([...popup.matchAll(/"(connect-[a-z-]+)"/g)].map(([, id]) => id));
+    const documented = new Set([...plain(html).matchAll(/\bconnect-[a-z]+(?:-[a-z]+)*/g)].map(([id]) => id));
+    expect(ids.size).toBeGreaterThan(10);
+    expect([...documented].sort()).toEqual([...ids].sort());
+  });
+
+  it("says where Deployments' live values come from before they load, as a reader without JavaScript sees it", async () => {
+    expect(plain(section(await render("/docs/reference/deployments"), "This app's network"))).toContain("/api/config");
+  });
+
+  it("lists every option of the sign-in helpers in the SDK reference", async () => {
+    const source = readFileSync(new URL("../../../packages/sdk/src/signin.ts", import.meta.url), "utf8");
+    const html = await render("/docs/reference/sdk");
+    const helpers: [string, RegExp][] = [
+      ["verifySignIn", /export interface VerifySignInOptions \{([^}]*)\}/],
+      ["verifyPayment", /export async function verifyPayment\([^)]*?options: \{([^}]*)\}/],
+      ["findPayment", /export async function findPayment\(options: \{([^}]*)\}/],
+    ];
+    for (const [name, pattern] of helpers) {
+      const signature = signatureOf(html, name);
+      const options = optionsIn(source, pattern);
+      expect(options.length, name).toBeGreaterThan(3);
+      for (const option of options) expect(signature, `${name}: ${option}`).toMatch(new RegExp(`\\b${option}\\b`));
+    }
   });
 
   it("says what an app is", async () => {

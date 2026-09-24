@@ -144,13 +144,13 @@ const HEADLINE: Record<string, string> = {
 };
 
 /** `site`: the account a site keeps for the player, shown in the Sign in with VeraKey popup. */
-export function RejectionNote({ state, site = false }: { state: Extract<ProofState, { status: "rejected" }>; site?: boolean }) {
+export function RejectionNote({ state, site = false, testId }: { state: Extract<ProofState, { status: "rejected" }>; site?: boolean; testId?: string }) {
   // A valid proof whose payment or fee the account cannot cover.
   const unfunded = state.revert === "TokenTransferFailed";
   const soft = unfunded || state.stage === "policy" || state.stage === "funds";
   const message = (state.revert && ((site && SITE_COPY[state.revert]) || POLICY_COPY[state.revert])) ?? state.message;
   return (
-    <div className={`vk-note ${soft ? "is-policy" : "is-error"}`} role="alert">
+    <div className={`vk-note ${soft ? "is-policy" : "is-error"}`} role="alert" data-testid={testId}>
       <AlertTriangle size={15} />
       <span>
         <b>{unfunded ? "Authenticated, not funded." : (HEADLINE[state.stage] ?? "Not completed.")}</b>{" "}

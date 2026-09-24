@@ -48,6 +48,8 @@ export default defineConfig({
     outDir: path.resolve(ROOT, "dist/public"),
     emptyOutDir: true,
     target: "esnext",
+    // scripts/prerender-docs.mjs reads which chunks and styles each docs page needs.
+    manifest: true,
   },
   optimizeDeps: {
     exclude: ["@aztec/bb.js", "@noir-lang/noir_js", "@noir-lang/acvm_js", "@noir-lang/noirc_abi"],

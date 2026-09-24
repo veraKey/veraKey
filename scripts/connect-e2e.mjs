@@ -73,11 +73,13 @@ try {
     if (result?.data) writeFileSync(path.join(OUT, `connect-${name}.png`), Buffer.from(result.data, "base64"));
   };
 
-  // Every new page stops before its scripts run. The popup gets a virtual passkey, request recording, and a
-  // window.close() that only marks the request done: the next request reuses the same window, and its passkey.
+  // Every new page stops before its scripts run. The popup gets a virtual passkey, request recording, and, while
+  // keepPopupsOpen, a window.close() that only marks the request done: the next request reuses the same window, and
+  // its passkey.
   let game = null;
   let popup = null;
   let popupTarget = null;
+  let keepPopupsOpen = true;
   const popupRequests = [];
   listeners.push(async msg => {
     if (msg.method === "Target.attachedToTarget" && !msg.sessionId) {
@@ -91,7 +93,7 @@ try {
         await send("WebAuthn.addVirtualAuthenticator", {
           options: { protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true, hasPrf: true },
         }, sessionId);
-        await send("Page.addScriptToEvaluateOnNewDocument", { source: "window.close = () => { window.__closeRequested = true; };" }, sessionId);
+        if (keepPopupsOpen) await send("Page.addScriptToEvaluateOnNewDocument", { source: "window.close = () => { window.__closeRequested = true; };" }, sessionId);
         popup = sessionId;
         popupTarget = targetInfo.targetId;
       } else if (targetInfo.type === "page" && !game) {
@@ -260,6 +262,31 @@ try {
     popup = null;
     await waitFor(game, hasText("closed"));
     return "closed";
+  });
+
+  await step("a failing nonce callback closes the popup, and the game gets its own error", async () => {
+    // The game's server cannot be reached: its nonce callback throws, and VeraKey's window must not stay behind.
+    await send("Network.enable", {}, game);
+    await send("Network.setBlockedURLs", { urls: ["*/game-api/nonce"] }, game);
+    // The game closes VeraKey's window before it leaves its first, blank page, which shares the game's origin: keep
+    // this window's own close(), which the other steps replace to reuse the window.
+    keepPopupsOpen = false;
+    try {
+      await click(game, "Sign in with VeraKey");
+      await waitFor(game, hasText("request: Failed to fetch"), 30_000);
+      let pages = 0;
+      for (let i = 0; i < 50; i++) {
+        pages = ((await send("Target.getTargets")).result?.targetInfos ?? []).filter(t => t.type === "page").length;
+        if (pages === 1) break;
+        await sleep(200);
+      }
+      if (pages !== 1) throw new Error(`VeraKey's window is still open (${pages} pages)`);
+    } finally {
+      await send("Network.setBlockedURLs", { urls: [] }, game);
+      keepPopupsOpen = true;
+    }
+    popup = null;
+    return "closed; the game shows its own error";
   });
 
   await step("a page that sends Cross-Origin-Opener-Policy: same-origin is told 'unavailable', not 'closed'", async () => {

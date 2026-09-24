@@ -163,8 +163,10 @@ export async function verifySignIn(
   options: VerifySignInOptions
 ): Promise<{ valid: boolean; checks: SignInCheck[]; playerId: Hex | null; account: Address | null }> {
   const checks: SignInCheck[] = [];
-  const check = (name: string, ok: boolean, detail?: string) => {
-    checks.push({ name, ok, detail });
+  // Each check explains a failure in `onFail`; `onPass` adds a neutral fact, so a passing check never reads like a failure.
+  const check = (name: string, ok: boolean, onFail?: string, onPass?: string) => {
+    const detail = ok ? onPass : onFail;
+    checks.push(detail === undefined ? { name, ok } : { name, ok, detail });
     return ok;
   };
   try {
@@ -180,7 +182,7 @@ async function checkSignIn(
   result: SignInResult,
   options: VerifySignInOptions,
   checks: SignInCheck[],
-  check: (name: string, ok: boolean, detail?: string) => boolean
+  check: (name: string, ok: boolean, onFail?: string, onPass?: string) => boolean
 ): Promise<{ valid: boolean; checks: SignInCheck[]; playerId: Hex | null; account: Address | null }> {
   const refuse = () => ({ valid: false, checks, playerId: null, account: null });
   const s = result?.statement;
@@ -201,16 +203,23 @@ async function checkSignIn(
     // reported by the checks below
   }
   check("This deployment", s.chainId === deployment.chainId && s.factory.toLowerCase() === deployment.factory.toLowerCase(),
-    `chain ${s.chainId}, factory ${s.factory}`);
-  check("Made for this site", origin !== null && s.origin === origin, `made for ${s.origin}`);
-  check("App id of this site", origin !== null && BigInt(s.appId) === appIdFromOrigin(origin));
-  check("Carries the nonce you issued", s.nonce.toLowerCase() === options.nonce.toLowerCase());
+    `made for chain ${s.chainId} and factory ${s.factory}; you pinned chain ${deployment.chainId} and factory ${deployment.factory}`);
+  // localhost and 127.0.0.1 look alike while developing, but are different sites.
+  const local = (url: string) => /^https?:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(url);
+  check("Made for this site", origin !== null && s.origin === origin,
+    origin === null
+      ? `the origin you verify as (${String(options.origin)}) is not a web origin`
+      : `made for ${s.origin}, but this site verifies as ${origin}: the page's origin must match exactly` +
+          (local(s.origin) && local(origin) ? " (localhost and 127.0.0.1 are different sites)" : ""));
+  check("App id of this site", origin !== null && BigInt(s.appId) === appIdFromOrigin(origin),
+    origin === null ? "the origin you verify as has no app id" : "the app id belongs to another origin");
+  check("Carries the nonce you issued", s.nonce.toLowerCase() === options.nonce.toLowerCase(), "not the nonce passed to verifySignIn");
   const now = options.now ?? Math.floor(Date.now() / 1000);
   const skew = options.clockSkewSeconds ?? 60;
   const until = new Date(s.expiresAt * 1000).toISOString();
   check("Not expired", s.expiresAt + skew > now, `expired at ${until}; check the device clock`);
-  check("Short-lived", s.expiresAt - now <= (options.maxTtlSeconds ?? SIGN_IN_TTL_SECONDS) + skew,
-    `valid until ${until}; check the device clock`);
+  const maxTtl = options.maxTtlSeconds ?? SIGN_IN_TTL_SECONDS;
+  check("Short-lived", s.expiresAt - now <= maxTtl + skew, `valid until ${until}, longer than the ${maxTtl} s allowed; check the device clock`);
 
   const clientData = hexToBytes(result.clientDataJSON);
   let parsed: { type?: unknown; challenge?: unknown; origin?: unknown; crossOrigin?: unknown } = {};
@@ -221,38 +230,52 @@ async function checkSignIn(
     // reported below
   }
   check("Passkey signed this sign-in",
-    parsed.type === "webauthn.get" && parsed.challenge === base64UrlEncode(hexToBytes(signInChallenge(s))));
-  check("Signed on VeraKey", parsed.origin === deployment.origin && parsed.crossOrigin !== true, String(parsed.origin));
+    parsed.type === "webauthn.get" && parsed.challenge === base64UrlEncode(hexToBytes(signInChallenge(s))),
+    "the passkey did not sign this statement");
+  check("Signed on VeraKey", parsed.origin === deployment.origin && parsed.crossOrigin !== true,
+    parsed.origin === deployment.origin
+      ? `signed on ${deployment.origin}, but inside a cross-origin frame`
+      : `signed on ${String(parsed.origin)}, not on ${deployment.origin}`);
 
   const [cdhHi, cdhLo] = limbs(await sha256(clientData));
   const [rpHi, rpLo] = limbs(hexToBytes(deployment.rpIdHash));
   const expected = [cdhHi, cdhLo, rpHi, rpLo, BigInt(s.appId), BigInt(s.nullifier)].map(toFieldHex);
   check("Proof commits to this sign-in",
-    result.publicInputs.every((value, i) => isHex(value) && BigInt(value) === BigInt(expected[i])));
+    result.publicInputs.every((value, i) => isHex(value) && BigInt(value) === BigInt(expected[i])),
+    "the proof's public inputs are not this sign-in's");
 
   if (!options.skipOnChainProof) {
     const onChain = await options.publicClient
       .readContract({ address: deployment.honkVerifier, abi: honkVerifierAbi, functionName: "verify", args: [result.proof, expected] })
       .catch(() => false);
-    check("Proof verifies on-chain (HonkVerifier, eth_call)", onChain === true);
+    check("Proof verifies on-chain (HonkVerifier, eth_call)", onChain === true, "the verifier rejected the proof, or the call failed");
   }
   if (options.prover) {
     const local = await options.prover.verify({ proof: result.proof, publicInputs: expected, provingMs: 0 }).catch(() => false);
-    check("Proof verifies locally (bb.js)", local);
+    check("Proof verifies locally (bb.js)", local, "bb.js rejected the proof");
   }
   if (options.skipOnChainProof && !options.prover) check("Proof verified", false, "no verifier configured");
 
   const account = await options.publicClient
     .readContract({ address: deployment.factory, abi: veraKeyFactoryAbi, functionName: "accountAddress", args: [s.appId, s.nullifier] })
     .catch(() => null);
-  check("Account of this player", account !== null && account.toLowerCase() === result.account.toLowerCase(), account ?? "unreadable");
-  if (account) {
-    const code = await options.publicClient.getCode({ address: account }).catch(() => undefined);
-    if (code && code !== "0x") {
+  check("Account of this player", account !== null && account.toLowerCase() === result.account.toLowerCase(),
+    account ? `the factory derives ${account} for this player` : "the factory could not be read", account ?? undefined);
+  if (!account) {
+    check("Player still owns the account", false, "the account address could not be read");
+  } else {
+    // A failed call is not an account without code: this check fails closed, so a removed passkey cannot pass.
+    const code = await options.publicClient.getCode({ address: account }).catch(() => null);
+    if (code === null) {
+      check("Player still owns the account", false, "the account's code could not be read");
+    } else if (code && code !== "0x") {
       const owner = await options.publicClient
         .readContract({ address: account, abi: veraKeyAccountAbi, functionName: "isOwner", args: [s.nullifier] })
-        .catch(() => false);
-      check("Player still owns the account", owner === true);
+        .catch(() => null);
+      check("Player still owns the account", owner === true,
+        owner === null ? "the account's owners could not be read" : "this passkey no longer owns the account");
+    } else {
+      check("Player still owns the account", true, undefined, "not deployed yet: it is created for this player on first use");
     }
   }
   const valid = checks.every(c => c.ok);

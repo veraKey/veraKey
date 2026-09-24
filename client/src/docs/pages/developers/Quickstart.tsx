@@ -5,6 +5,12 @@ import { SDK_NPM_URL } from "../../site";
 export default function QuickstartPage() {
   return (
     <>
+      <Callout kind="tip" title="No VeraKey deployment for your domain?">
+        This Quickstart builds passkey accounts into your own app, which needs a VeraKey deployment for your domain. To
+        sign players in and take USDG payments on any https site today, start with{" "}
+        <A href="/docs/build/sign-in">Sign in with VeraKey</A>.
+      </Callout>
+
       <H2>Before you begin</H2>
       <ul>
         <li>An app served over https, or from <code>http://localhost</code> while you develop: passkeys need a secure context.</li>
@@ -15,6 +21,9 @@ export default function QuickstartPage() {
         <li>
           For fast proving, serve your pages with cross-origin isolation, so the prover can use every CPU core:
           <code>Cross-Origin-Opener-Policy: same-origin</code> and <code>Cross-Origin-Embedder-Policy: require-corp</code>.
+          This is for apps that prove in their own pages, as this Quickstart does. A page that opens the Sign in with
+          VeraKey popup must not send <code>Cross-Origin-Opener-Policy: same-origin</code>: it cuts the popup off from
+          the page.
         </li>
       </ul>
 

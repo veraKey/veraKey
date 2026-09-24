@@ -6,7 +6,9 @@
 //   - deep links land on their section;
 //   - unknown pages show the docs 404, and developer pages show the developer-preview notice;
 //   - Deployments works without /api/config.
-//   - the docs never load the prover (bb.js, Noir, the CRS or WebAssembly).
+//   - the docs never load the prover (bb.js, Noir, the CRS or WebAssembly);
+//   - on a production build, readers without JavaScript get every page's content, its Markdown, and llms.txt.
+//     The browser hydrates those prerendered pages, so a hydration mismatch shows up as a console error.
 //
 //   node scripts/check-docs.mjs <baseUrl> [outDir]
 import { spawn } from "node:child_process";
@@ -62,7 +64,8 @@ try {
     pageErrors = [];
     await send("Page.navigate", { url });
     await waitFor(`document.readyState === "complete"`);
-    return waitFor(`!!document.querySelector(".dx-article h2, .dx-notfound")`);
+    // The outline fills in once React runs, so a prerendered page is hydrated by then, not only parsed.
+    return waitFor(`!!document.querySelector(".dx-toc li, .dx-notfound")`);
   };
   const viewport = (width, height, mobile) => send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile });
   const shot = async name => {
@@ -106,6 +109,7 @@ try {
   })()`);
   for (const [selector, ratio] of contrast ?? []) if (ratio !== null && ratio < 4.5) fail(`${selector}: contrast ${ratio}:1 is below 4.5:1`);
   const ids = new Map();
+  const titles = new Map();
   const links = [];
   for (const page of pages) {
     // One retry: a dev server compiles a page's chunk on its first request.
@@ -124,6 +128,7 @@ try {
     if (info.overflow > 1) fail(`${page}: scrolls horizontally by ${info.overflow}px at 1440px`);
     if (pageErrors.length) fail(`${page}: console errors: ${pageErrors.slice(0, 3).join(" | ")}`);
     ids.set(page, new Set(info.ids));
+    titles.set(page, info.title);
     for (const href of info.links) links.push({ from: page, href });
   }
 
@@ -224,6 +229,32 @@ try {
     const loaded = ((await evaluate(`performance.getEntriesByType("resource").map(r => r.name)`)) ?? []).filter(name => PROVER.test(name));
     if (loaded.length) fail(`${page}: loads the prover (${loaded.slice(0, 2).join(", ")})`);
   }
+  // 9. Readers without JavaScript: a production build prerenders every page, writes its Markdown, and lists the
+  //    pages in llms.txt. A development server serves the app's shell instead, and says so here.
+  const llms = await fetch(`${BASE}/llms.txt`);
+  if (!llms.headers.get("content-type")?.startsWith("text/plain")) {
+    console.log("  no llms.txt: a development server, whose docs are not prerendered");
+  } else {
+    const index = await llms.text();
+    const escape = text => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    for (const page of pages) {
+      const title = titles.get(page) ?? "";
+      const html = await (await fetch(`${BASE}${page}`)).text();
+      if (!html.includes(`<h1>${escape(title)}</h1>`) || !/<article class="dx-article">[\s\S]*<h2 /.test(html)) {
+        fail(`${page}: the HTML has no content without JavaScript`);
+      }
+      const markdown = await fetch(`${BASE}${page}.md`);
+      const text = markdown.ok ? await markdown.text() : "";
+      if (!markdown.headers.get("content-type")?.startsWith("text/markdown") || !text.startsWith(`# ${title}\n`)) {
+        fail(`${page}.md: not the page's Markdown (${markdown.status})`);
+      }
+      if (!index.includes(`${page}.md)`)) fail(`llms.txt does not list ${page}`);
+    }
+    const full = await (await fetch(`${BASE}/llms-full.txt`)).text();
+    const sources = (full.match(/^Source: /gm) ?? []).length;
+    if (sources !== pages.length) fail(`llms-full.txt has ${sources} pages, not ${pages.length}`);
+  }
+
   console.log(`${pages.length} pages, ${links.length} links checked: ${failures.length ? `${failures.length} problem(s)` : "no problems"} (screenshots in ${OUT})`);
 } catch (error) {
   fail(`harness: ${error.message ?? error}`);

@@ -9,6 +9,17 @@ export default function ChangelogPage() {
       <H2>2026-09-24</H2>
       <ul>
         <li>
+          <strong>SDK 0.1.1 and the popup:</strong> when a site's own nonce callback fails, the popup closes and{" "}
+          <code>error.cause</code> keeps what the callback threw. <code>verifySignIn</code> words each check for its
+          outcome, names both origins when a sign-in was made for another site, and always says whether the player still
+          owns the account. The popup has stable test ids, and says so when a site's request never arrives. See{" "}
+          <A href="/docs/build/sign-in">Sign in with VeraKey</A>, which now covers local development and testing.
+        </li>
+        <li>
+          <strong>The docs read without JavaScript:</strong> every page is served as HTML, and as Markdown at its address
+          plus <code>.md</code>. <code>/llms.txt</code> lists the pages, and <code>/llms-full.txt</code> holds all of them.
+        </li>
+        <li>
           <strong>The SDK is public</strong> on <A href={SDK_NPM_URL}>npm</A>: <code>npm install @verakey/sdk</code>.
           Sign in with VeraKey works on any https site today; accounts and payments on your own domain still need a
           deployment for it. See{" "}

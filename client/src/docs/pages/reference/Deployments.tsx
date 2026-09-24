@@ -27,7 +27,7 @@ function LiveNetwork() {
         The live configuration could not be loaded; the addresses above are the canonical Arbitrum Sepolia deployment.
       </Callout>
     ) : (
-      <p>Loading the live configuration…</p>
+      <p>Loading the live configuration from <A href="/api/config">/api/config</A>…</p>
     );
   }
   const canonical = config.contracts.factory.toLowerCase() === sepolia.contracts.factory.toLowerCase();
