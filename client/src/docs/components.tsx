@@ -173,13 +173,15 @@ export function Contact() {
   return CONTACT ? <A href={contactHref(CONTACT)}>the VeraKey team</A> : <>the VeraKey team</>;
 }
 
-/** Shown on developer pages while the SDK and developer access are not open yet. */
+/** Shown on developer pages during the developer preview: what works today, and what waits for developer access. */
 export function PreviewNotice() {
   return (
     <div className="dx-preview">
       <Callout kind="note" title="Developer preview">
-        The VeraKey SDK and developer access open after the testnet preview. These pages show how an integration works;
-        details may still change before then.{CONTACT && <> To hear when access opens, contact <Contact />.</>}
+        The SDK is public: <code>npm install @verakey/sdk</code>. Sign in with VeraKey works today on any https site. The
+        other developer pages need a VeraKey deployment for your domain, which opens with developer access after the
+        testnet preview; details may still change before then.
+        {CONTACT && <> To hear when access opens, contact <Contact />.</>}
       </Callout>
     </div>
   );

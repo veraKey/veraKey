@@ -23,7 +23,10 @@ your server: verifySignIn(result) ── eth_call ──▶ HonkVerifier on Arbi
 `}</Code>
 
       <H2>Add the button</H2>
-      <p>Create one client with VeraKey's address, and call <code>signIn</code> from a click, so the browser allows the popup:</p>
+      <p>
+        Install the SDK with <code>npm install @verakey/sdk</code>. Create one client with VeraKey's address, and call{" "}
+        <code>signIn</code> from a click, so the browser allows the popup:
+      </p>
       <Code lang="ts" title="game.ts">{`
 import { VeraKeyConnect, VeraKeyConnectError } from "@verakey/sdk/connect";
 

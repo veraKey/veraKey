@@ -8,6 +8,11 @@ export default function ChangelogPage() {
       <H2>2026-09-24</H2>
       <ul>
         <li>
+          <strong>The SDK is public:</strong> <code>npm install @verakey/sdk</code>. Sign in with VeraKey works on any
+          https site today; accounts and payments on your own domain still need a deployment for it. See{" "}
+          <A href="/docs/build/quickstart">Quickstart</A>.
+        </li>
+        <li>
           <strong>Fixed the internal audit's findings:</strong> the caps can no longer stop owners from freezing or vetoing,
           a change to the guardian cancels the old guardian's recovery and always waits the recovery delay, a freeze is
           always instant, and owner changes that could never apply are refused. Redeployed to Arbitrum Sepolia, so account

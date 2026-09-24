@@ -21,7 +21,7 @@ export interface DocPage {
   subsections?: string[];
   /** Search terms that live under one heading, such as error or function names, keyed by that h2 or h3. */
   headingKeywords?: Record<string, string[]>;
-  /** A developer page: shown with a notice that developer access opens after the testnet preview. */
+  /** A developer page: shown with a notice of what works today and what waits for developer access. */
   preview?: boolean;
   load: () => Promise<{ default: ComponentType }>;
 }
@@ -137,7 +137,7 @@ export const PAGES: DocPage[] = [
     group: "Build",
     preview: true,
     description: "Add passkey accounts with private, gasless USDG payments to a web app in six steps.",
-    keywords: ["getting started", "install", "sdk", "tutorial", "integration", "first payment"],
+    keywords: ["getting started", "install", "npm", "sdk", "tutorial", "integration", "first payment"],
     sections: ["Before you begin", "1. Get the SDK", "2. Configure the client", "3. Register a passkey", "4. Fund the account", "5. Make a payment", "6. Handle the result", "Next steps"],
     load: () => import("./pages/developers/Quickstart"),
   },
@@ -147,7 +147,7 @@ export const PAGES: DocPage[] = [
     group: "Build",
     preview: true,
     description: "Let players sign in to your game or app with their VeraKey passkey, get a player ID for your site alone, and take USDG payments through the VeraKey popup.",
-    keywords: ["sign in", "login", "auth", "popup", "game", "dapp", "player id", "connect", "web3 game"],
+    keywords: ["sign in", "login", "auth", "popup", "game", "dapp", "player id", "connect", "web3 game", "npm"],
     sections: ["How sign-in works", "Add the button", "Verify on your server", "Take a payment", "Security checklist", "Errors and limits"],
     headingKeywords: {
       "Add the button": ["VeraKeyConnect", "signIn"],

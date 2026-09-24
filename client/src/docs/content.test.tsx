@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
+import { PreviewNotice } from "./components";
 import { PAGES } from "./registry";
 import { slugify } from "./slug";
 
@@ -130,9 +131,24 @@ describe("what the docs tell people", () => {
     expect(plain(await render("/docs/build/disclosures"))).toMatch(/permanent/i);
   });
 
+  it("tells developers to install the public SDK, and what works without a deployment of their own", async () => {
+    const quickstart = displayed(await render("/docs/build/quickstart"));
+    expect(quickstart).toContain("npm install @verakey/sdk");
+    expect(quickstart).not.toContain("__BB_CRS_HOST__"); // only VeraKey's own build of bb.js reads it
+    expect(quickstart).toMatch(/Aztec's CDN/);
+    expect(displayed(await render("/docs/build/sign-in"))).toContain("npm install @verakey/sdk");
+    for (const page of PAGES) expect(plain(await render(page.path)), page.path).not.toMatch(/SDK becomes available|SDK and developer access open/);
+    const notice = plain(renderToStaticMarkup(<PreviewNotice />));
+    expect(notice).toContain("npm install @verakey/sdk");
+    expect(notice).toMatch(/Sign in with VeraKey works/);
+    expect(notice).toMatch(/deployment for your domain/);
+    const modules = plain(await render("/docs/build/sdk"));
+    for (const module of ["@verakey/sdk/connect", "@verakey/sdk/signin"]) expect(modules).toContain(module);
+  });
+
   it("presents VeraKey as a hosted product: no repository, open source, self-hosting or build tooling", async () => {
     const SELF_HOSTED = [
-      /repositor/i, /open[- ]source/i, /github/i, /git clone/i, /\bp?npm\b/i, /workspace/i, /docker/i, /railway/i,
+      /repositor/i, /open[- ]source/i, /github/i, /git clone/i, /\bpnpm\b/i, /workspace/i, /docker/i, /railway/i,
       /cloudflared|tunnel/i, /self-host/i, /\.env\b/, /environment variable/i, /\bREADME\b/, /\bCI\b/,
       /\b(nargo|cargo|forge)\b/, /\b(packages|scripts|server|circuits|deployments)\//, /contracts\/(stylus|evm)/,
       /devnode/i, /public issue/i,

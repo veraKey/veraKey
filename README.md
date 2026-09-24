@@ -183,7 +183,7 @@ circuits/link            Noir consent-to-link circuit (one passkey owns two null
 circuits/verakey_lib     shared WebAuthn assertion check and nullifier
 contracts/stylus         Rust: core (pure logic + property tests), account, factory
 contracts/evm            Foundry: bb-generated verifiers, ERC-7579 validator + tests, deploy scripts, test token
-packages/sdk             @verakey/sdk: WebAuthn/PRF/SPC, action hashing, provers, VeraKeyClient, disclosures, validator
+packages/sdk             @verakey/sdk (npm): WebAuthn/PRF/SPC, action hashing, provers, VeraKeyClient, sign-in, disclosures, validator
 server                   Express relayer: /api/config, /api/accounts, /api/relay, /api/faucet, /api/rpc
 client                   Vite + React app: landing page, /app (accounts, pay, policy, recovery, disclose, verify), /docs
 scripts                  build-circuit.sh, gen-abi.sh, devnode.sh (local chain), deploy.sh, browser-e2e.mjs, build-server.mjs
@@ -206,7 +206,8 @@ pnpm contracts:evm:test             # ERC-7579 validator (Foundry, real proofs)
 
 scripts/devnode.sh up               # nitro devnode on :8649, upgraded to ArbOS 61 (multi-fragment Stylus)
 scripts/deploy.sh local             # verifiers, validator, test USDG, account implementation, factories
-pnpm test:e2e                       # 61 end-to-end tests with real proofs
+pnpm test:e2e                       # 75 end-to-end tests with real proofs
+pnpm sdk:pack                       # build and pack @verakey/sdk, check the tarball from a fresh project
 pnpm dev                            # relayer on :3090, app on http://localhost:5190
 node scripts/browser-e2e.mjs http://localhost:5190 /tmp/verakey-browser desktop  # also: mobile; add "spc" for the payment sheet
 ```
@@ -241,6 +242,16 @@ again.
 - Without a volume, the faucet forgets which accounts it funded on every redeploy. To keep that record, mount a volume at `/data` and set `RAILWAY_RUN_UID=0`: the image runs as a non-root user and Railway volumes are owned by root.
 
 ## Using the SDK
+
+The SDK is on npm, with TypeScript types:
+
+```bash
+npm install @verakey/sdk
+```
+
+Any https site can use Sign in with VeraKey today: `@verakey/sdk/connect` in its pages, `@verakey/sdk/signin` on
+its server (see [packages/sdk/README.md](packages/sdk/README.md)). The full client below needs a deployment bound
+to the app's origin.
 
 ```ts
 import { VeraKeyClient } from "@verakey/sdk/client";

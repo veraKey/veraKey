@@ -12,6 +12,8 @@ export default function SdkGuidePage() {
         head={["Import", "What it gives you"]}
         rows={[
           [<code key="1">@verakey/sdk/client</code>, "VeraKeyClient, VeraKeyError, POLICY_REVERTS and the AccountState, ProofState, PendingChangeInfo, GuardianCard and TrackedChange types"],
+          [<code key="14">@verakey/sdk/connect</code>, "VeraKeyConnect, VeraKeyConnectError: Sign in with VeraKey in a site's pages"],
+          [<code key="15">@verakey/sdk/signin</code>, "verifySignIn, verifyPayment, findPayment, appIdFromOrigin, accountAddressOf: for a site's server"],
           [<code key="2">@verakey/sdk/action</code>, "hashAction, encodeAction, changePayload, changeDataHash, guardianCommitment, ZERO_HASH"],
           [<code key="3">@verakey/sdk/constants</code>, "ActionKind, ChangeKind, ACTION_TYPEHASH, GUARDIAN_TYPEHASH, MAX_DEADLINE_WINDOW, USDG_DECIMALS"],
           [<code key="4">@verakey/sdk/nullifier</code>, "appIdFromName, computeNullifier"],

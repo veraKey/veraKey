@@ -19,12 +19,15 @@ export default function QuickstartPage() {
 
       <H2>1. Get the SDK</H2>
       <p>
-        The SDK is the <code>@verakey/sdk</code> package for the browser. It becomes available with developer access,
-        after the testnet preview. Its modules load separately, so an app downloads the prover only when it proves.
+        The SDK is the <code>@verakey/sdk</code> package for the browser, with TypeScript types. Its modules load
+        separately, so an app downloads the prover only when it proves.
       </p>
+      <Code lang="bash">{`
+npm install @verakey/sdk
+`}</Code>
       <p>
-        The prover needs a common reference string (CRS). Serve it from your app's own origin, so no third party sees
-        when your users prove; the client below points the prover at it.
+        The prover needs a common reference string (CRS). The first proof in a browser downloads it from Aztec's CDN, a
+        few megabytes, and the browser keeps it for later proofs.
       </p>
 
       <H2>2. Configure the client</H2>
@@ -50,7 +53,6 @@ export const vera = new VeraKeyClient({
   relayerFee: BigInt(config.relayer.fee), // USDG base units, signed into every action
   appIds: [APP_ID],
   loadProver: async () => {
-    (globalThis as { __BB_CRS_HOST__?: string }).__BB_CRS_HOST__ = \`\${location.origin}/crs\`;
     const { VeraKeyProver } = await import("@verakey/sdk/prover");
     return VeraKeyProver.create({
       threads: crossOriginIsolated ? Math.min(navigator.hardwareConcurrency || 4, 8) : 1,
