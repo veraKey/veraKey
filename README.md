@@ -243,7 +243,7 @@ again.
 
 ## Using the SDK
 
-The SDK is on npm, with TypeScript types:
+The SDK is [on npm](https://www.npmjs.com/package/@verakey/sdk), with TypeScript types:
 
 ```bash
 npm install @verakey/sdk

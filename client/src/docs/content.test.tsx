@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
 import { PreviewNotice } from "./components";
 import { PAGES } from "./registry";
+import { SDK_NPM_URL } from "./site";
 import { slugify } from "./slug";
 
 // Deployments reads the live configuration; these tests render it without one.
@@ -144,6 +145,20 @@ describe("what the docs tell people", () => {
     expect(notice).toMatch(/deployment for your domain/);
     const modules = plain(await render("/docs/build/sdk"));
     for (const module of ["@verakey/sdk/connect", "@verakey/sdk/signin"]) expect(modules).toContain(module);
+  });
+
+  it("links the SDK's public npm page wherever the docs name the package", async () => {
+    const link = `href="${SDK_NPM_URL}"`;
+    // Developer pages show the preview notice, so it carries the link for them; other pages link it themselves.
+    expect(renderToStaticMarkup(<PreviewNotice />)).toContain(link);
+    for (const page of PAGES) {
+      const html = await render(page.path);
+      if (html.includes("@verakey/sdk") && !page.preview) expect(html, page.path).toContain(link);
+    }
+    // Where the docs say how to get the SDK, the page links it directly.
+    for (const path of ["/docs/build/quickstart", "/docs/build/sign-in", "/docs/build/sdk", "/docs/reference/sdk", "/docs/reference/changelog"]) {
+      expect(await render(path), path).toContain(link);
+    }
   });
 
   it("presents VeraKey as a hosted product: no repository, open source, self-hosting or build tooling", async () => {

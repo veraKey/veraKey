@@ -1,4 +1,5 @@
 import { A, Code, H2, Table } from "../../components";
+import { SDK_NPM_URL } from "../../site";
 
 export default function SignInPage() {
   return (
@@ -24,8 +25,8 @@ your server: verifySignIn(result) ── eth_call ──▶ HonkVerifier on Arbi
 
       <H2>Add the button</H2>
       <p>
-        Install the SDK with <code>npm install @verakey/sdk</code>. Create one client with VeraKey's address, and call{" "}
-        <code>signIn</code> from a click, so the browser allows the popup:
+        Install <A href={SDK_NPM_URL}>the SDK</A> with <code>npm install @verakey/sdk</code>. Create one client with
+        VeraKey's address, and call <code>signIn</code> from a click, so the browser allows the popup:
       </p>
       <Code lang="ts" title="game.ts">{`
 import { VeraKeyConnect, VeraKeyConnectError } from "@verakey/sdk/connect";

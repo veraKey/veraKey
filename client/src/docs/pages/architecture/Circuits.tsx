@@ -1,4 +1,5 @@
 import { A, Callout, Code, H2, Table } from "../../components";
+import { SDK_NPM_URL } from "../../site";
 
 export default function CircuitsPage() {
   return (
@@ -41,9 +42,9 @@ nullifier = Poseidon2([NULLIFIER_DOMAIN, pk.x_hi, pk.x_lo, pk.y_hi, pk.y_lo, prf
 NULLIFIER_DOMAIN = "VERAKEY_NULLIFIER_V1" (as a field element)
 `}</Code>
       <p>
-        The public key's coordinates and the PRF secret enter as 128-bit limbs. The SDK computes the same function in{" "}
-        <code>@verakey/sdk/nullifier</code> (<code>computeNullifier</code>), so the app knows each account's owner and
-        address before proving anything.
+        The public key's coordinates and the PRF secret enter as 128-bit limbs. <A href={SDK_NPM_URL}>The SDK</A> computes
+        the same function in <code>@verakey/sdk/nullifier</code> (<code>computeNullifier</code>), so the app knows each
+        account's owner and address before proving anything.
       </p>
 
       <H2>The link circuit</H2>

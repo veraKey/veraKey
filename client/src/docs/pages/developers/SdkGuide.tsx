@@ -1,12 +1,14 @@
 import { A, Callout, Code, H2, Table } from "../../components";
+import { SDK_NPM_URL } from "../../site";
 
 export default function SdkGuidePage() {
   return (
     <>
       <H2>Modules</H2>
       <p>
-        Import from subpaths, so bundlers load only what you use. The prover and link prover pull in bb.js and its WASM:
-        load them lazily.
+        Install <A href={SDK_NPM_URL}><code>@verakey/sdk</code></A> from npm with <code>npm install @verakey/sdk</code>,
+        then import from subpaths, so bundlers load only what you use. The prover and link prover pull in bb.js and its
+        WASM: load them lazily.
       </p>
       <Table
         head={["Import", "What it gives you"]}

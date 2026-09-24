@@ -1,4 +1,5 @@
 import { A, H2 } from "../../components";
+import { SDK_NPM_URL } from "../../site";
 
 export default function ChangelogPage() {
   return (
@@ -8,8 +9,9 @@ export default function ChangelogPage() {
       <H2>2026-09-24</H2>
       <ul>
         <li>
-          <strong>The SDK is public:</strong> <code>npm install @verakey/sdk</code>. Sign in with VeraKey works on any
-          https site today; accounts and payments on your own domain still need a deployment for it. See{" "}
+          <strong>The SDK is public</strong> on <A href={SDK_NPM_URL}>npm</A>: <code>npm install @verakey/sdk</code>.
+          Sign in with VeraKey works on any https site today; accounts and payments on your own domain still need a
+          deployment for it. See{" "}
           <A href="/docs/build/quickstart">Quickstart</A>.
         </li>
         <li>

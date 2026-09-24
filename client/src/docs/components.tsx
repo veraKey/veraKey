@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Link } from "wouter";
 import { tokenize, type Lang } from "./highlight";
 import { slugify } from "./slug";
-import { CONTACT, contactHref } from "./site";
+import { CONTACT, SDK_NPM_URL, contactHref } from "./site";
 import { textOf } from "./text";
 
 function Heading({ level, id, children }: { level: 2 | 3; id?: string; children: ReactNode }) {
@@ -178,9 +178,9 @@ export function PreviewNotice() {
   return (
     <div className="dx-preview">
       <Callout kind="note" title="Developer preview">
-        The SDK is public: <code>npm install @verakey/sdk</code>. Sign in with VeraKey works today on any https site. The
-        other developer pages need a VeraKey deployment for your domain, which opens with developer access after the
-        testnet preview; details may still change before then.
+        The SDK is <A href={SDK_NPM_URL}>public on npm</A>: <code>npm install @verakey/sdk</code>. Sign in with VeraKey
+        works today on any https site. The other developer pages need a VeraKey deployment for your domain, which opens
+        with developer access after the testnet preview; details may still change before then.
         {CONTACT && <> To hear when access opens, contact <Contact />.</>}
       </Callout>
     </div>

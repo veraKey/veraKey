@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { A, Code, H2, H3, Table } from "../../components";
+import { SDK_NPM_URL } from "../../site";
 
 const c = (text: string) => <code>{text}</code>;
 /** A name that must not break mid-word. */
@@ -10,8 +11,9 @@ export default function SdkReferencePage() {
   return (
     <>
       <p>
-        Everything below is exported from <code>@verakey/sdk</code>; each module is also importable on its own, for example{" "}
-        <code>@verakey/sdk/validator</code>. The <A href="/docs/build/sdk">SDK guide</A> shows how the pieces fit together.
+        Everything below is exported from <A href={SDK_NPM_URL}><code>@verakey/sdk</code></A>; each module is also
+        importable on its own, for example <code>@verakey/sdk/validator</code>. The{" "}
+        <A href="/docs/build/sdk">SDK guide</A> shows how the pieces fit together.
       </p>
 
       <H2>VeraKeyClient</H2>

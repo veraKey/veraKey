@@ -1,5 +1,6 @@
 import { BookOpen, CreditCard, Server, ShieldCheck } from "lucide-react";
 import { A, Callout, Card, Cards, Code, H2 } from "../../components";
+import { SDK_NPM_URL } from "../../site";
 
 export default function QuickstartPage() {
   return (
@@ -19,8 +20,8 @@ export default function QuickstartPage() {
 
       <H2>1. Get the SDK</H2>
       <p>
-        The SDK is the <code>@verakey/sdk</code> package for the browser, with TypeScript types. Its modules load
-        separately, so an app downloads the prover only when it proves.
+        The SDK is the <A href={SDK_NPM_URL}><code>@verakey/sdk</code></A> package for the browser, with TypeScript
+        types. Its modules load separately, so an app downloads the prover only when it proves.
       </p>
       <Code lang="bash">{`
 npm install @verakey/sdk
