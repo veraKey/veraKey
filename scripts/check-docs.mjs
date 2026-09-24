@@ -1,5 +1,6 @@
 // Checks the docs site in headless Chrome:
 //   - every page renders at desktop and phone widths without console errors or horizontal scrolling;
+//   - tables of prose stack on phones instead of scrolling sideways;
 //   - every internal link and #anchor resolves, including search's section deep links;
 //   - search opens with Ctrl+K, finds a section and opens it with Enter;
 //   - deep links land on their section;
@@ -167,6 +168,9 @@ try {
     await open(`${BASE}${page}`);
     const overflow = await evaluate(`document.scrollingElement.scrollWidth - innerWidth`);
     if (overflow > 1) fail(`${page}: scrolls horizontally by ${overflow}px at 390px`);
+    // Tables of prose must read without sideways scrolling; tables of numbers may scroll.
+    const prose = await evaluate(`[...document.querySelectorAll(".dx-table-wrap")].filter(w => w.scrollWidth - w.clientWidth > 1 && [...w.querySelectorAll("td")].some(td => td.textContent.length > 80)).length`);
+    if (prose) fail(`${page}: ${prose} table(s) of prose scroll sideways at 390px`);
     if (pageErrors.length) fail(`${page} (phone): console errors: ${pageErrors.slice(0, 3).join(" | ")}`);
   }
   await open(`${BASE}/docs`);

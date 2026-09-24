@@ -155,6 +155,15 @@
   .dx-main { padding-top: 28px; }
   .dx-pager { grid-template-columns: 1fr; }
 }
+@media (max-width: 640px) {
+  .dx-table-wrap.is-stacked table, .dx-table-wrap.is-stacked tbody, .dx-table-wrap.is-stacked tr, .dx-table-wrap.is-stacked td { display: block; }
+  .dx-table-wrap.is-stacked thead { display: none; }
+  .dx-table-wrap.is-stacked tr { padding: 10px 12px; border-bottom: 1px solid var(--vk-line); }
+  .dx-table-wrap.is-stacked tr:last-child { border-bottom: 0; }
+  .dx-table-wrap.is-stacked td { padding: 3px 0; border: 0; }
+  .dx-table-wrap.is-stacked td[data-label]::before { content: attr(data-label); display: block; color: var(--vk-muted); font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  .dx-table-wrap.is-stacked td[data-label="#"]::before { display: inline; margin-right: 4px; }
+}
 @media (max-width: 480px) {
   .dx-brand .brand-wordmark { display: none; }
 }

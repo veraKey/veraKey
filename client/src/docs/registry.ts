@@ -229,6 +229,24 @@ export const PAGES: DocPage[] = [
     sections: ["Measured costs", "Where a payment spends its gas", "Before and after", "Proving time", "What is left"],
     load: () => import("./pages/architecture/Gas"),
   },
+  {
+    path: "/docs/security",
+    title: "Security model",
+    group: "Security",
+    description: "What VeraKey guarantees, what it assumes, and what it does not hide.",
+    keywords: ["security", "threat model", "invariants", "trust assumptions", "privacy", "guarantees"],
+    sections: ["What VeraKey protects", "Invariants", "Trust assumptions", "What still leaks", "Threat model"],
+    load: () => import("./pages/security/SecurityModel"),
+  },
+  {
+    path: "/docs/security/review",
+    title: "Review and accepted risks",
+    group: "Security",
+    description: "The audit status, the internal review and its fixes, the risks VeraKey accepts, and how to report a vulnerability.",
+    keywords: ["audit", "review", "vulnerabilities", "risks", "dependencies", "report", "disclosure policy"],
+    sections: ["Audit status", "Internal review", "Accepted risks", "Dependencies", "Report a vulnerability"],
+    load: () => import("./pages/security/Review"),
+  },
 ];
 
 function normalize(path: string): string {

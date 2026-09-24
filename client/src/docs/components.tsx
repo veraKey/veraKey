@@ -106,16 +106,18 @@ export function Card({ href, title, icon: Icon, children }: { href: string; titl
   );
 }
 
-export function Table({ head, rows }: { head: ReactNode[]; rows: ReactNode[][] }) {
+/** `stack` turns each row into a labelled block on phones: use it for tables of prose. */
+export function Table({ head, rows, stack = false }: { head: ReactNode[]; rows: ReactNode[][]; stack?: boolean }) {
+  const labels = head.map(cell => textOf(cell));
   return (
-    <div className="dx-table-wrap">
+    <div className={stack ? "dx-table-wrap is-stacked" : "dx-table-wrap"}>
       <table className="dx-table">
         <thead>
           <tr>{head.map((cell, i) => <th key={i}>{cell}</th>)}</tr>
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i}>{row.map((cell, j) => <td key={j}>{cell}</td>)}</tr>
+            <tr key={i}>{row.map((cell, j) => <td key={j} data-label={stack ? labels[j] : undefined}>{cell}</td>)}</tr>
           ))}
         </tbody>
       </table>

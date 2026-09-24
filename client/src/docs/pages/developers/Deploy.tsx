@@ -92,6 +92,7 @@ docker run -d --restart unless-stopped -p 127.0.0.1:3090:3090 \\
 
       <H2>Environment variables</H2>
       <Table
+        stack
         head={["Variable", "Used by", "Meaning (default)"]}
         rows={[
           [<code key="1">DEPLOYER_PRIVATE_KEY</code>, "deploy.sh", "Deploys the contracts. Keep it off the server."],
