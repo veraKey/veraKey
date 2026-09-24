@@ -1,5 +1,5 @@
 import type { ProofState } from "@verakey/sdk/client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { isAddress, type Address } from "viem";
 import { useSearch } from "wouter";
 import { COMPACT_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
@@ -11,7 +11,7 @@ import type { ReceiptData } from "./components";
 import { PROOF_BYTES, PayDesktop, PayMobile, type PayViewProps } from "./PayView";
 
 export function Pay() {
-  const { client, config, accounts, refreshAccounts } = useVeraKey();
+  const { client, config, accounts, refreshAccounts, session } = useVeraKey();
   const search = useSearch();
   const app = appByKey(new URLSearchParams(search).get("from") ?? undefined);
   const account = accounts[app.key];
@@ -21,6 +21,15 @@ export function Pay() {
   const [state, setState] = useState<ProofState>({ status: "idle" });
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const compact = useMediaQuery(COMPACT_QUERY);
+  const [sheetAvailable, setSheetAvailable] = useState(false);
+  const [useSheet, setUseSheet] = useState(true);
+  useEffect(() => {
+    let live = true;
+    client?.canConfirmPayments().then(ok => live && setSheetAvailable(ok));
+    return () => {
+      live = false;
+    };
+  }, [client, session]);
 
   const to = (recipient || merchant || "") as Address;
   const units = parseUsdg(amount);
@@ -44,10 +53,16 @@ export function Pay() {
     setReceipt(null);
     try {
       let verified: Extract<ProofState, { status: "verified" }> | null = null;
-      const tx = await client.pay(app.appId, to, units, next => {
-        setState(next);
-        if (next.status === "verified") verified = next;
-      });
+      const tx = await client.pay(
+        app.appId,
+        to,
+        units,
+        next => {
+          setState(next);
+          if (next.status === "verified") verified = next;
+        },
+        { secureConfirmation: sheetAvailable && useSheet }
+      );
       const final = verified as Extract<ProofState, { status: "verified" }> | null;
       if (!final) return;
       setReceipt({
@@ -94,6 +109,7 @@ export function Pay() {
     onSubmit: submit,
     onTryOverCap: () => setAmount(formatUsdg(perTxCap + 1_000_000n).replace(/,/g, "")),
     onDone: () => setState({ status: "idle" }),
+    paymentSheet: sheetAvailable ? { enabled: useSheet, onToggle: setUseSheet } : undefined,
   };
   return compact ? <PayMobile {...view} /> : <PayDesktop {...view} />;
 }

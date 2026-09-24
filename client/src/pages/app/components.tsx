@@ -44,7 +44,8 @@ const REJECTION_STEP: Record<string, StepKey> = {
 };
 
 /** The authorization pipeline, step by step: passkey, proof, relay, chain. */
-export function ProofTimeline({ state, lastProvingMs }: { state: ProofState; lastProvingMs?: number }) {
+/** `offChain`: a proof made to hand to someone (a disclosure), so there is no relay or transaction. */
+export function ProofTimeline({ state, lastProvingMs, offChain = false }: { state: ProofState; lastProvingMs?: number; offChain?: boolean }) {
   const failedAt = state.status === "rejected" ? ORDER.indexOf(REJECTION_STEP[state.stage]) : -1;
   // A rejection at step k means every earlier step succeeded (e.g. a valid proof blocked by policy).
   const current = state.status === "rejected" ? failedAt : stepIndex(state);
@@ -74,9 +75,15 @@ export function ProofTimeline({ state, lastProvingMs }: { state: ProofState; las
     },
   ];
 
+  const shown = offChain
+    ? [
+        { ...steps[0], detail: "Face ID, Touch ID or PIN approves this exact disclosure statement." },
+        { ...steps[1], detail: "Proves one passkey owns both accounts. The key, signature and PRF secret stay here." },
+      ]
+    : steps;
   return (
     <div className="vk-timeline" aria-live="polite">
-      {steps.map((step, i) => {
+      {shown.map((step, i) => {
         const failed = failedAt === i;
         const done = current > i || (state.status === "verified" && i <= 3);
         const active = current === i && !done;
@@ -106,6 +113,9 @@ const POLICY_COPY: Record<string, string> = {
   UnknownChange: "That change is no longer pending.",
   LastOwner: "An account must keep at least one owner passkey.",
   TokenTransferFailed: "Your proof is valid, but this account holds less USDG than the amount plus the relayer fee. Get demo USDG on the Accounts page.",
+  NewPayeeCapExceeded: "Your proof is valid, but this is the first payment to this address and it is above the new-recipient cap. Pay a smaller amount first, or allowlist the recipient on the Policy page.",
+  AccountFrozen: "Your proof is valid, but this account is frozen. Unfreeze it on the Policy page (timelocked).",
+  NotRestrictive: "That change would loosen the account, so it has to be scheduled with the timelock.",
 };
 
 const HEADLINE: Record<string, string> = {

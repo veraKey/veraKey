@@ -8,9 +8,11 @@ import NotFound from "./pages/NotFound";
 import { Docs } from "./pages/Docs";
 import { Accounts } from "./pages/app/Accounts";
 import { AppLayout } from "./pages/app/AppLayout";
+import { Disclose } from "./pages/app/Disclose";
 import { Pay } from "./pages/app/Pay";
 import { Policy } from "./pages/app/Policy";
 import { Recovery } from "./pages/app/Recovery";
+import { Verify } from "./pages/app/Verify";
 import { VeraKeyProvider } from "./state/VeraKeyProvider";
 
 function Router() {
@@ -21,6 +23,8 @@ function Router() {
       <Route path="/app/pay">{() => <AppLayout><Pay /></AppLayout>}</Route>
       <Route path="/app/policy">{() => <AppLayout><Policy /></AppLayout>}</Route>
       <Route path="/app/recovery">{() => <AppLayout><Recovery /></AppLayout>}</Route>
+      <Route path="/app/disclose">{() => <AppLayout><Disclose /></AppLayout>}</Route>
+      <Route path="/app/verify">{() => <AppLayout requiresSession={false}><Verify /></AppLayout>}</Route>
       <Route path="/docs" component={Docs} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

@@ -1,6 +1,7 @@
 import type { NetworkConfig } from "@shared/api";
 import { VeraKeyClient, type AccountState, type Session } from "@verakey/sdk/client";
 import type { StoredPasskey } from "@verakey/sdk/store";
+import { spcAvailability } from "@verakey/sdk/webauthn";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { DEMO_APPS, type DemoApp } from "@/lib/apps";
 import { loadNetworkConfig } from "@/lib/config";
@@ -46,6 +47,7 @@ function createClient(config: NetworkConfig): VeraKeyClient {
     relayerUrl: "/api",
     relayerFee: BigInt(config.relayer.fee),
     appIds: DEMO_APPS.map(app => app.appId),
+    paymentInstrument: { displayName: "VeraKey · USDG on Arbitrum", icon: `${location.origin}/verakey-icon.png` },
     loadProver: async () => {
       // Same-origin CRS (see patches/@aztec__bb.js*.patch): no CDN on the demo path.
       (globalThis as { __BB_CRS_HOST__?: string }).__BB_CRS_HOST__ = `${location.origin}/crs`;
@@ -119,7 +121,19 @@ export function VeraKeyProvider({ children }: { children: ReactNode }) {
   const register = useCallback(
     async (label: string) => {
       if (!client) return;
-      const { session: created } = await client.register(label);
+      // Where the browser can show Secure Payment Confirmation, enroll the passkey for it too. Only on
+      // macOS and Android, whose platform passkeys (iCloud Keychain, Google Password Manager) support
+      // PRF; if enrollment fails, fall back to an ordinary passkey.
+      const platformWithPrf = /Mac OS X|Android/.test(navigator.userAgent) && !/iPhone|iPad/.test(navigator.userAgent);
+      const payment = platformWithPrf && (await spcAvailability()) === "available";
+      let created;
+      try {
+        ({ session: created } = await client.register(label, { payment }));
+      } catch (error) {
+        const cancelled = error instanceof Error && /cancelled|timed out/i.test(error.message);
+        if (!payment || cancelled) throw error;
+        ({ session: created } = await client.register(label));
+      }
       await afterSession(created ?? (await client.unlock()));
     },
     [client, afterSession]

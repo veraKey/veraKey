@@ -16,7 +16,7 @@ const config = loadConfig(ROOT);
 const relayer = new Relayer(config);
 config.network.relayer.address = relayer.address;
 
-const perIp = new RateLimiter(30, 60_000);
+const perIp = new RateLimiter(Number(process.env.API_REQUESTS_PER_IP_PER_MINUTE ?? 30), 60_000);
 const rpcPerIp = new RateLimiter(900, 60_000);
 
 /** Read-only JSON-RPC methods the browser may use through /api/rpc. */
@@ -27,7 +27,9 @@ const RPC_METHODS = new Set([
 ]);
 const upstreamRpc = config.upstreamRpcUrl;
 const perAccount = new RateLimiter(12, 60_000);
-const faucetPerIp = new RateLimiter(3, 24 * 60 * 60_000);
+// FAUCET_ACCOUNTS_PER_IP only exists so automated end-to-end runs against a local devnode can fund more
+// than three accounts a day; the public deployment keeps the default.
+const faucetPerIp = new RateLimiter(Number(process.env.FAUCET_ACCOUNTS_PER_IP ?? 3), 24 * 60 * 60_000);
 
 const app = express();
 app.disable("x-powered-by");
@@ -118,7 +120,7 @@ app.post(
 app.post(
   "/api/faucet",
   route(async (req, res) => {
-    if (!faucetPerIp.take(`faucet:${req.ip}`)) throw new RelayError(429, "The faucet allows 3 accounts per day per visitor.");
+    if (!faucetPerIp.take(`faucet:${req.ip}`)) throw new RelayError(429, `The faucet allows ${process.env.FAUCET_ACCOUNTS_PER_IP ?? 3} accounts per day per visitor.`);
     res.json({ hash: await relayer.faucet(req.body?.account) });
   })
 );

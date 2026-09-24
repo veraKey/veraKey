@@ -38,6 +38,21 @@ export interface PayViewProps {
   onTryOverCap?: () => void;
   /** Phone layout: closes the paid screen. */
   onDone?: () => void;
+  /**
+   * Secure Payment Confirmation: when available, the browser's own payment sheet shows the payee and
+   * total, and the account checks that the signed ones match. Omitted where the browser cannot do it.
+   */
+  paymentSheet?: { enabled: boolean; onToggle: (enabled: boolean) => void };
+}
+
+function PaymentSheetOption({ sheet, busy }: { sheet: PayViewProps["paymentSheet"]; busy: boolean }) {
+  if (!sheet) return null;
+  return (
+    <label className="vk-optin" title="The browser shows payee and total in its own sheet; the account refuses anything else">
+      <input type="checkbox" checked={sheet.enabled} disabled={busy} onChange={e => sheet.onToggle(e.target.checked)} />
+      <span>Confirm in the browser's payment sheet <small>payee and total are signed and checked on-chain</small></span>
+    </label>
+  );
 }
 
 type BusyStatus = "authenticating" | "proving" | "relaying" | "confirming";
@@ -117,6 +132,7 @@ export function PayDesktop(props: PayViewProps) {
                 Try over the cap
               </button>
             </div>
+            <PaymentSheetOption sheet={props.paymentSheet} busy={busy} />
             <SubmitHints problem={props.problem} overCap={props.overCap} state={state} />
           </div>
         </div>
@@ -182,6 +198,7 @@ export function PayMobile(props: PayViewProps) {
         <button className="vk-btn vk-btn-quiet" disabled={busy} onClick={() => setEditingRecipient(open => !open)}>Pay someone else</button>
         <button className="vk-btn vk-btn-quiet" disabled={busy} onClick={props.onTryOverCap}>Try over the cap</button>
       </div>
+      <PaymentSheetOption sheet={props.paymentSheet} busy={busy} />
       {(editingRecipient || props.recipient) && (
         <input
           className="vk-input is-mono"

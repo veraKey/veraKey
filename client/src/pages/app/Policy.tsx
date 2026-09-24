@@ -1,7 +1,7 @@
-import { changePayload } from "@verakey/sdk/action";
+import { ZERO_HASH, changePayload } from "@verakey/sdk/action";
 import { ChangeKind } from "@verakey/sdk/constants";
 import type { TrackedChange } from "@verakey/sdk/client";
-import { CalendarClock, ShieldCheck, X } from "lucide-react";
+import { CalendarClock, Lock, ShieldCheck, Snowflake, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { decodeAbiParameters, isAddress, type Address } from "viem";
@@ -26,10 +26,16 @@ export function describeChange(change: Pick<TrackedChange, "kind" | "payload">):
       const [enabled] = decodeAbiParameters([{ type: "bool" }], change.payload);
       return enabled ? "Only pay allowlisted recipients" : "Pay any recipient";
     }
-    case ChangeKind.SetGuardian: {
-      const [guardian] = decodeAbiParameters([{ type: "address" }], change.payload);
-      return guardian === "0x0000000000000000000000000000000000000000" ? "Remove guardian" : `Guardian → ${shortHex(guardian)}`;
+    case ChangeKind.SetGuardian:
+      return change.payload === ZERO_HASH ? "Remove guardian" : "Set a private guardian (commitment)";
+    case ChangeKind.SetNewPayeeCap: {
+      const [cap] = decodeAbiParameters([{ type: "uint256" }], change.payload);
+      return `First payment to a new recipient → at most ${formatUsdg(cap)} USDG`;
     }
+    case ChangeKind.Freeze:
+      return "Freeze all payments";
+    case ChangeKind.Unfreeze:
+      return "Unfreeze payments";
     case ChangeKind.AddOwner:
       return `Add owner ${shortHex(change.payload, 8, 6)}`;
     case ChangeKind.RemoveOwner:
@@ -145,6 +151,7 @@ export function Policy() {
   const [perTx, setPerTx] = useState("");
   const [daily, setDaily] = useState("");
   const [recipient, setRecipient] = useState("");
+  const [newPayee, setNewPayee] = useState("");
 
   const schedule = (name: string, change: { kind: ChangeKind; payload: `0x${string}` }) =>
     action.run(name, async emit => {
@@ -152,10 +159,22 @@ export function Policy() {
       trackedChanges.add(tracked);
       await refreshAccounts();
     });
+  /** Tightening applies at once (`restrict`); the account refuses anything that loosens it. */
+  const restrict = (name: string, change: { kind: ChangeKind; payload: `0x${string}` }) =>
+    action.run(name, async emit => {
+      await client!.restrict(app.appId, change, emit);
+      toast.success(`${name}: applied now`);
+      await refreshAccounts();
+    });
+  const tightenOrSchedule = (name: string, change: { kind: ChangeKind; payload: `0x${string}` }, tightens: boolean) =>
+    tightens ? restrict(name, change) : schedule(name, change);
 
   const spentPct = account?.deployed && account.dailyCap > 0n ? Number((account.spentToday * 1000n) / account.dailyCap) / 10 : 0;
   const perTxUnits = parseUsdg(perTx);
   const dailyUnits = parseUsdg(daily);
+  const newPayeeUnits = parseUsdg(newPayee);
+  const capsTighten = !!account?.deployed && perTxUnits !== null && dailyUnits !== null && perTxUnits <= account.perTxCap && dailyUnits <= account.dailyCap;
+  const newPayeeTightens = !!account?.deployed && newPayeeUnits !== null && newPayeeUnits <= account.newPayeeCap;
 
   return (
     <div className={`vk-grid-2 vk-tone-${app.tone}`}>
@@ -165,8 +184,8 @@ export function Policy() {
           <h1 className="vk-title">Authentication<br /><em>is not authorization.</em></h1>
           <p className="vk-lede">
             A valid proof only says "an owner's passkey approved this". The account's own rules decide
-            whether it may happen. Raising a limit or adding an owner is timelocked, so a stolen, unlocked
-            phone cannot quietly lift the caps and drain the account.
+            whether it may happen. Tightening applies at once; loosening (raising a limit, adding an owner,
+            unfreezing) waits for the timelock, so a stolen, unlocked phone cannot quietly lift the caps.
           </p>
         </div>
         <AppSwitch value={appKey} onChange={setAppKey} disabled={action.busy} />
@@ -179,18 +198,39 @@ export function Policy() {
               <div className="vk-panel-body vk-quote" style={{ paddingTop: 4 }}>
                 <div><span>Per-payment cap</span><span className="vk-mono">{formatUsdg(account.perTxCap)} USDG</span></div>
                 <div><span>Daily cap</span><span className="vk-mono">{formatUsdg(account.dailyCap)} USDG</span></div>
-                <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ display: "grid", gap: 8, width: "100%" }}>
                   <span style={{ display: "flex", justifyContent: "space-between", color: "var(--vk-muted)" }}>
                     <span>Spent today</span><span className="vk-mono" style={{ color: "var(--vk-ink)" }}>{formatUsdg(account.spentToday)}</span>
                   </span>
                   <span className="vk-bar"><i style={{ width: `${Math.min(spentPct, 100)}%` }} /></span>
                 </div>
                 <div><span>Recipients</span><span className="vk-mono">{account.allowlistEnabled ? "allowlist only" : "anyone"}</span></div>
+                <div><span>First payment to a new recipient</span><span className="vk-mono">at most {formatUsdg(account.newPayeeCap)} USDG</span></div>
+                <div><span>Payments</span><span className="vk-mono" style={{ color: account.frozen ? "var(--vk-orange)" : undefined }}>{account.frozen ? "frozen" : "active"}</span></div>
+              </div>
+            </div>
+
+            <div className="vk-panel" style={account.frozen ? { borderColor: "rgba(255,174,120,.5)" } : undefined}>
+              <div className="vk-panel-head"><span>Emergency</span><span>{account.frozen ? "frozen" : "applies at once"}</span></div>
+              <div className="vk-panel-body vk-form">
+                <p style={{ margin: 0, color: "var(--vk-muted)", fontSize: 12, lineHeight: 1.6 }}>
+                  Lost a device, or saw a payment you did not make? Freezing stops every payment immediately; your
+                  guardian can freeze too. Unfreezing is a timelocked change that you or the guardian can cancel.
+                </p>
+                {account.frozen ? (
+                  <button className="vk-btn vk-btn-ghost" disabled={action.busy} onClick={() => schedule("Unfreeze", changePayload.unfreeze())}>
+                    <Lock size={14} /> Schedule unfreeze ({formatDuration(Number(account.changeDelay))})
+                  </button>
+                ) : (
+                  <button className="vk-btn vk-btn-primary" disabled={action.busy} onClick={() => restrict("Freeze payments", changePayload.freeze())}>
+                    <Snowflake size={14} /> Freeze payments now
+                  </button>
+                )}
               </div>
             </div>
 
             <div className="vk-panel">
-              <div className="vk-panel-head"><span>Schedule a change</span><span>one passkey approval each</span></div>
+              <div className="vk-panel-head"><span>Change the policy</span><span>tighter: at once · looser: timelocked</span></div>
               <div className="vk-panel-body vk-form">
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "end" }}>
                   <label className="vk-field"><span>Per payment</span><input className="vk-input" inputMode="decimal" placeholder={formatUsdg(account.perTxCap)} value={perTx} onChange={e => setPerTx(e.target.value)} /></label>
@@ -199,9 +239,20 @@ export function Policy() {
                     className="vk-btn vk-btn-primary"
                     style={{ minHeight: 44 }}
                     disabled={action.busy || !perTxUnits || !dailyUnits || perTxUnits > dailyUnits}
-                    onClick={() => schedule("Set caps", changePayload.setLimits(perTxUnits!, dailyUnits!))}
+                    onClick={() => tightenOrSchedule("Set caps", changePayload.setLimits(perTxUnits!, dailyUnits!), capsTighten)}
                   >
-                    Set caps
+                    {perTxUnits && dailyUnits && capsTighten ? "Lower now" : "Set caps"}
+                  </button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "end" }}>
+                  <label className="vk-field"><span>First payment to a new recipient, at most</span><input className="vk-input" inputMode="decimal" placeholder={formatUsdg(account.newPayeeCap)} value={newPayee} onChange={e => setNewPayee(e.target.value)} /></label>
+                  <button
+                    className="vk-btn vk-btn-ghost"
+                    style={{ minHeight: 44 }}
+                    disabled={action.busy || newPayeeUnits === null}
+                    onClick={() => tightenOrSchedule("Set new-recipient cap", changePayload.setNewPayeeCap(newPayeeUnits!), newPayeeTightens)}
+                  >
+                    {newPayeeUnits !== null && newPayeeTightens ? "Lower now" : "Set"}
                   </button>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "end" }}>
@@ -218,7 +269,11 @@ export function Policy() {
                 <button
                   className="vk-btn vk-btn-ghost"
                   disabled={action.busy}
-                  onClick={() => schedule(account.allowlistEnabled ? "Allow any recipient" : "Require allowlist", changePayload.setAllowlist(!account.allowlistEnabled))}
+                  onClick={() =>
+                    account.allowlistEnabled
+                      ? schedule("Allow any recipient", changePayload.setAllowlist(false))
+                      : restrict("Require allowlist", changePayload.setAllowlist(true))
+                  }
                 >
                   <ShieldCheck size={14} /> {account.allowlistEnabled ? "Allow payments to anyone" : "Only pay allowlisted recipients"}
                 </button>
