@@ -122,24 +122,34 @@ const POLICY_COPY: Record<string, string> = {
   CannotVetoGuardianChange: "A guardian cannot cancel a change to the guardian itself.",
 };
 
+/** The refusals whose advice names an app page, worded for the account a site keeps: players act in the popup. */
+const SITE_COPY: Record<string, string> = {
+  TokenTransferFailed: "Your proof is valid, but this account holds less USDG than the amount plus the relayer fee. Top it up, then try again.",
+  NewPayeeCapExceeded: "Your proof is valid, but this is the account's first payment to this recipient and it is above the new-recipient cap. The site can ask for a smaller amount first.",
+  AccountFrozen: "Your proof is valid, but this account is frozen.",
+  PaymentSheetRequired: "This account only pays through the browser's payment sheet.",
+  TooManyPendingChanges: "Eight changes are already waiting on this account.",
+};
+
 const HEADLINE: Record<string, string> = {
   funds: "Not enough USDG.",
   policy: "Authenticated, not authorized.",
   device: "This device can't be used.",
 };
 
-export function RejectionNote({ state }: { state: Extract<ProofState, { status: "rejected" }> }) {
+/** `site`: the account a site keeps for the player, shown in the Sign in with VeraKey popup. */
+export function RejectionNote({ state, site = false }: { state: Extract<ProofState, { status: "rejected" }>; site?: boolean }) {
   // A valid proof whose payment or fee the account cannot cover.
   const unfunded = state.revert === "TokenTransferFailed";
   const soft = unfunded || state.stage === "policy" || state.stage === "funds";
-  const message = (state.revert && POLICY_COPY[state.revert]) ?? state.message;
+  const message = (state.revert && ((site && SITE_COPY[state.revert]) || POLICY_COPY[state.revert])) ?? state.message;
   return (
     <div className={`vk-note ${soft ? "is-policy" : "is-error"}`} role="alert">
       <AlertTriangle size={15} />
       <span>
         <b>{unfunded ? "Authenticated, not funded." : (HEADLINE[state.stage] ?? "Not completed.")}</b>{" "}
         {message}
-        {state.stage === "funds" && " Get demo USDG on the Accounts page."}
+        {state.stage === "funds" && (site ? " Top up the account, then try again." : " Get demo USDG on the Accounts page.")}
         {state.revert && <span className="vk-mono"> ({state.revert})</span>}
       </span>
     </div>

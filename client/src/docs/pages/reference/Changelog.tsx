@@ -9,7 +9,7 @@ export default function ChangelogPage() {
       <ul>
         <li>
           <strong>Sign in with VeraKey</strong> (developer preview): a game or an app on its own domain signs players in
-          through VeraKey's popup, gets a player ID that only it knows, and takes USDG payments. See{" "}
+          through VeraKey's popup, gets its own ID for each player, and takes USDG payments. See{" "}
           <A href="/docs/build/sign-in">Sign in with VeraKey</A>.
         </li>
         <li>

@@ -146,7 +146,7 @@ export const PAGES: DocPage[] = [
     title: "Sign in with VeraKey",
     group: "Build",
     preview: true,
-    description: "Let players sign in to your game or app with their VeraKey passkey, get a player ID that only your site knows, and take USDG payments through the VeraKey popup.",
+    description: "Let players sign in to your game or app with their VeraKey passkey, get a player ID for your site alone, and take USDG payments through the VeraKey popup.",
     keywords: ["sign in", "login", "auth", "popup", "game", "dapp", "player id", "connect", "web3 game"],
     sections: ["How sign-in works", "Add the button", "Verify on your server", "Take a payment", "Security checklist", "Errors and limits"],
     headingKeywords: {
@@ -293,7 +293,7 @@ export const PAGES: DocPage[] = [
       "WebAuthn helpers": ["createPasskey", "getAssertion", "getSpcAssertion", "spcAvailability", "formatSpcTotal", "webauthnDigest", "verifyPasskeySignature", "recoverPublicKeys", "publicKeyFromSpki", "derToLowS", "normalizeLowS", "prfSalt", "randomChallenge", "PrfUnsupportedError", "LocalPasskeyStore", "MemoryPasskeyStore"],
       "Disclosure helpers": ["verifyDisclosure", "linkDisclosureChallenge", "VerifyDisclosureOptions", "LinkStatement", "DisclosurePackage", "DisclosureVerdict", "LinkProver"],
       "Validator helpers": ["validatorInstallData", "validatorSignature", "validatorErc1271Challenge", "VALIDATOR_VERIFICATION_GAS"],
-      "Sign-in helpers": ["VeraKeyConnect", "VeraKeyConnectError", "verifySignIn", "verifyPayment", "appIdFromOrigin", "accountAddressOf", "signInChallenge", "proveSignIn"],
+      "Sign-in helpers": ["VeraKeyConnect", "VeraKeyConnectError", "verifySignIn", "verifyPayment", "appIdFromOrigin", "accountAddressOf", "signInChallenge", "proveSignIn", "findPayment"],
     },
     load: () => import("./pages/reference/SdkReference"),
   },

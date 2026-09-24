@@ -64,6 +64,34 @@ describe("what the docs tell people", () => {
     expect(await render("/docs/reference/glossary")).toMatch(/<dt>Player ID<\/dt>/);
   });
 
+  it("says the player ID identifies a player but is not a secret", async () => {
+    expect(plain(await render("/docs/build/sign-in"))).toMatch(/not a secret/);
+    for (const page of PAGES) expect(plain(await render(page.path))).not.toMatch(/only (your site|it|this game) knows/);
+  });
+
+  it("promises a site's players only the protections they get, and says they cannot withdraw yet", async () => {
+    const text = plain(await render("/docs/build/sign-in"));
+    expect(text).not.toMatch(/allowlist/);
+    expect(text).toMatch(/cannot yet[^.]*withdraw/);
+  });
+
+  it("tells sites to bind each nonce to the browser session and to keep their origin", async () => {
+    const text = plain(await render("/docs/build/sign-in"));
+    expect(text).toMatch(/browser session/);
+    expect(text).toMatch(/www\./);
+  });
+
+  it("explains what makes the popup unavailable, and how a page keeps cross-origin isolation", async () => {
+    const text = plain(await render("/docs/build/sign-in"));
+    expect(text).toMatch(/VeraKey URL/);
+    expect(text).toContain("Document-Isolation-Policy");
+  });
+
+  it("tells sites how to find a payment the popup was sending, and to tie payments to the signed-in player", async () => {
+    const text = displayed(await render("/docs/build/sign-in"));
+    for (const phrase of ["findPayment", "error.pending", "account: session.account"]) expect(text).toContain(phrase);
+  });
+
   it("the quickstart deploys and funds the account before it pays", async () => {
     const text = displayed(await render("/docs/build/quickstart"));
     const deploy = text.indexOf("ensureAccount(");

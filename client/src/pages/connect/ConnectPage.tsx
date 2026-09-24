@@ -210,7 +210,7 @@ export default function ConnectPage() {
           )}
 
           {state.status !== "idle" && state.status !== "rejected" && <ProofTimeline state={state} offChain={!payment} />}
-          {state.status === "rejected" && <RejectionNote state={state} />}
+          {state.status === "rejected" && <RejectionNote site state={state} />}
           {finished === "done" && <p className="vk-lede"><Check size={15} /> Done. You can close this window.</p>}
           {finished === null && <button className="vk-btn vk-btn-quiet" onClick={cancel}><X size={14} /> Cancel</button>}
           {finished === "failed" && <button className="vk-btn vk-btn-ghost" onClick={() => window.close()}>Close</button>}

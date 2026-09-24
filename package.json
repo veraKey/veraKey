@@ -21,6 +21,7 @@
     "test": "pnpm --filter @verakey/sdk test",
     "test:e2e": "pnpm --filter @verakey/sdk test:e2e",
     "test:docs": "vitest run --config vite.config.ts --dir client/src/docs",
+    "test:web": "vitest run --config vite.config.ts --dir client/src",
     "deploy:local": "scripts/deploy.sh local",
     "deploy:sepolia": "scripts/deploy.sh sepolia",
     "deploy:sepolia:check": "scripts/deploy.sh sepolia --check",

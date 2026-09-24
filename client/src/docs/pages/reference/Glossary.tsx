@@ -31,7 +31,7 @@ const TERMS: [string, ReactNode][] = [
   ["Passkey", "A WebAuthn credential kept by iCloud Keychain or Google Password Manager and unlocked with Face ID, Touch ID or the device PIN."],
   ["Payment sheet", "The browser's Secure Payment Confirmation dialog. The browser itself shows the payee and total and signs them. An owner can require it for every payment."],
   ["Per-payment cap", "The most one payment can send, fee included."],
-  ["Player ID", "The ID a site gets for a player through Sign in with VeraKey: the player's nullifier for the site's app id. It is the same on every visit, and different on every other site."],
+  ["Player ID", "The ID a site gets for a player through Sign in with VeraKey: the player's nullifier for the site's app id. It is the same on every visit, and different on every other site. It is not a secret: once the player's account is used on-chain, anyone can read it."],
   ["PRF", "The WebAuthn pseudo-random function extension. The passkey turns a fixed input into a secret only it can produce, which goes into every nullifier."],
   ["Proof", "An UltraHonk zero-knowledge proof that an owner's passkey approved an action. HonkVerifier checks it on-chain."],
   ["Public inputs", "What a proof is checked against: the client data hash, the rpId hash, the app id and the nullifier."],
