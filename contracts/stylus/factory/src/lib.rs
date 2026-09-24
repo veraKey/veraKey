@@ -22,7 +22,7 @@ use stylus_sdk::{
     prelude::*,
     storage::{StorageAddress, StorageB256, StorageBytes, StorageU256, StorageU64},
 };
-use verakey_core::{clone, field};
+use verakey_core::{clone, config, field};
 
 sol_interface! {
     interface IVeraKeyAccount {
@@ -93,16 +93,22 @@ impl VeraKeyFactory {
         fee_recipient: Address,
         max_fee: U256,
     ) -> Result<(), FactoryError> {
+        // The same bounds every account checks when it is initialized: a factory that deploys can create
+        // accounts.
+        let policy = config::Policy {
+            per_tx_cap,
+            daily_cap,
+            new_payee_cap,
+            change_delay,
+            recovery_delay,
+            max_fee,
+            origin_len: origin.len(),
+        };
         if implementation == Address::ZERO
             || verifier == Address::ZERO
             || usdg == Address::ZERO
-            || origin.is_empty()
-            || per_tx_cap.is_zero()
-            || per_tx_cap > daily_cap
-            || daily_cap > U256::from(u128::MAX)
-            || new_payee_cap > U256::from(u128::MAX)
             || fee_recipient == Address::ZERO
-            || max_fee > U256::from(u64::MAX)
+            || !config::is_valid_policy(&policy)
         {
             return Err(FactoryError::InvalidConfig(InvalidConfig {}));
         }

@@ -9,5 +9,6 @@ pub mod base64url;
 pub mod changes;
 pub mod client_data;
 pub mod clone;
+pub mod config;
 pub mod field;
 pub mod spending;

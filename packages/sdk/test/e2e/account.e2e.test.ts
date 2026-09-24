@@ -513,13 +513,9 @@ describe("owners and recovery", () => {
     const first = await schedule(backup, apps.pay, accounts.pay, removePrimary);
     await sleepUntil(first.eta);
     await apply(accounts.pay, first.changeId, removePrimary);
+    // Removing the last owner could never apply, so it is refused as soon as it is scheduled.
     const removeBackup = changePayload.removeOwner(fieldHex(backup.nullifier));
-    const second = await schedule(backup, apps.pay, accounts.pay, removeBackup);
-    await sleepUntil(second.eta);
-    expect(await revertName(publicClient.simulateContract({
-      address: accounts.pay, abi: veraKeyAccountAbi, functionName: "applyChange",
-      args: [second.changeId, removeBackup.kind, removeBackup.payload], account: devAccount,
-    }))).toBe("LastOwner");
+    expect(await revertName(scheduleRequest(backup, apps.pay, accounts.pay, removeBackup))).toBe("LastOwner");
   });
 
   it("guardian_recovery_rotates_owners_and_owner_can_cancel", async () => {

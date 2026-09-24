@@ -110,6 +110,12 @@ pub fn is_valid(kind: u8, payload: &[u8]) -> bool {
     }
 }
 
+/// Whether a change keeps every fee payable: a limits change may not lower the per-payment cap below the
+/// account's largest fee, or the owners could no longer pay for any action through the relayer.
+pub fn keeps_fees_payable(kind: u8, payload: &[u8], max_fee: U256) -> bool {
+    kind != SET_LIMITS || (payload.len() == 64 && U256::from_be_slice(&payload[..32]) >= max_fee)
+}
+
 /// The limits a tightening change is compared against.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
@@ -236,6 +242,15 @@ mod tests {
         assert!(!is_valid(SET_PAYMENT_SHEET, &word(2)));
         assert!(!is_valid(SET_PAYMENT_SHEET, &[]));
         assert!(!is_valid(99, &word(1)));
+    }
+
+    #[test]
+    fn limits_never_drop_below_the_largest_fee() {
+        assert!(keeps_fees_payable(SET_LIMITS, &limits_payload(5, 10), u(5)));
+        assert!(!keeps_fees_payable(SET_LIMITS, &limits_payload(4, 10), u(5)));
+        // Other kinds are unaffected.
+        assert!(keeps_fees_payable(SET_NEW_PAYEE_CAP, &word(0), u(5)));
+        assert!(keeps_fees_payable(FREEZE, &[], u(5)));
     }
 
     #[test]

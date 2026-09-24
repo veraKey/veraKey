@@ -36,6 +36,15 @@ pub fn spend(
     }
 }
 
+/// Records `amount` (a fee) in the window at `now` without refusing it, whatever the caps: freezing,
+/// restricting and cancelling must work even when the day's cap is spent. The account stores the day's
+/// spending as a `u128`, so the total saturates there.
+pub fn record(window: Window, now: u64, amount: U256) -> Window {
+    let today = now / SECONDS_PER_DAY;
+    let already = if window.day == today { window.spent } else { U256::ZERO };
+    Window { day: today, spent: already.saturating_add(amount).min(U256::from(u128::MAX)) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -72,6 +81,17 @@ mod tests {
         let w = spend(u(10), u(10), Window::default(), 2 * DAY - 1, u(10)).unwrap();
         let w = spend(u(10), u(10), w, 2 * DAY, u(10)).unwrap();
         assert_eq!(w, Window { day: 2, spent: u(10) });
+    }
+
+    #[test]
+    fn recording_a_fee_never_refuses_it() {
+        // Already over the cap: the fee is still recorded, so payments see it.
+        assert_eq!(record(Window { day: 1, spent: u(25) }, DAY + 5, u(3)), Window { day: 1, spent: u(28) });
+        // A new UTC day starts from zero.
+        assert_eq!(record(Window { day: 1, spent: u(25) }, 2 * DAY, u(3)), Window { day: 2, spent: u(3) });
+        // The account stores the day's spending as a u128: saturate there instead of overflowing.
+        let full = U256::from(u128::MAX);
+        assert_eq!(record(Window { day: 1, spent: full }, DAY, u(1)).spent, full);
     }
 
     #[test]
