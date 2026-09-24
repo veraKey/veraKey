@@ -6,20 +6,26 @@
   "origin": "https://verakey.mdloglabs.org",
   "rpIdHash": "0x0fe14846fe0610bfa7471c5396156cdf8b0c6594cc04194ffadcf8e8a490f4e1",
   "contracts": {
-    "honkVerifier": "0x9d79c603a39df96b2bE254719B99e4592094678f",
-    "accountImplementation": "0x88abfff2cdc7a5ffd6990204dc4ee3fffe34cc9d",
-    "factory": "0x6217e8372aa97b1d48730347b44a636c5878f1dd",
+    "honkVerifier": "0x0cB71548faa63543F8c0F04370F163875279A234",
+    "linkVerifier": "0xF7d79c2a6f58809a1c045ea1b131c08f67bdfDCF",
+    "veraKeyValidator": "0x9C1e30be51dFa0f0424968AAd7b0Dd3B2E1179e1",
+    "accountImplementation": "0x72bb20016847e06c1eba897c7dc504abff164c50",
+    "factory": "0x45bbaf84eea0c285db53fd7d72187e9e3843c3e4",
     "factoryAlt": "",
     "usdg": "0xFFC95faa3d63Cde504a05B567C600B78C0b41892"
   },
   "policy": {
     "perTxCap": "10000000",
     "dailyCap": "25000000",
+    "newPayeeCap": "2000000",
+    "maxFee": "250000",
+    "feeRecipient": "0x6D377a3927df664FDA9946Aa0E6fb8F707844fA8",
     "changeDelay": 120,
     "recoveryDelay": 300
   },
-  "configHash": "0xbbd8d1a12b46db2b4d31e73de4a086667ce5b24e1a6ddded741ccd0240c86e0b",
+  "configHash": "0x9d584d65853c7a2c6809929eec24071376caba939270ac8de2d7bb4c3e057183",
   "circuitVkHash": "0x16378935c4dee31e952a8c42d2f20d4d5dbd00ee2e8225a1eb16e908caf37f12",
+  "linkCircuitVkHash": "0x16256f66baa7cfcdc09869a3fa825033c24bc198a2929908165b8e5280f21683",
   "deployer": "0x841CE1e27407EB9Bb6D14AC91374DAE60B41590A",
-  "deployedAt": "2026-09-23T21:45:25Z"
+  "deployedAt": "2026-09-24T00:58:21Z"
 }

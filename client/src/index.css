@@ -368,3 +368,21 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outli
   .showcase-browser, .showcase-phone, .showcase-page { transform: none; transition: none; }
   .hero-showcase.is-paid .showcase-page { transform: translateY(-196px); }
 }
+
+/* The safety net: what the account itself enforces when something goes wrong. */
+.safety-section { background: #10181d; border-top: 1px solid rgba(213,235,218,.08); }
+.safety-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 63px; }
+.safety-card { position: relative; display: flex; flex-direction: column; min-height: 318px; padding: 22px 22px 20px; border: 1px solid rgba(126,224,209,.16); background: linear-gradient(160deg, rgba(34,52,55,.55), rgba(16,24,29,.9)); transition: opacity .75s cubic-bezier(.23,1,.32,1), transform .45s cubic-bezier(.23,1,.32,1), border-color .25s ease, background .25s ease; }
+.safety-card:hover { border-color: rgba(201,255,91,.42); transform: translateY(-3px); background: linear-gradient(160deg, rgba(58,77,45,.5), rgba(16,24,29,.9)); }
+.safety-card-top { display: flex; align-items: center; justify-content: space-between; }
+.safety-icon { display: grid; place-items: center; width: 42px; height: 42px; color: #c9ff5b; border: 1px solid rgba(201,255,91,.55); border-radius: 50%; box-shadow: 0 0 0 7px rgba(201,255,91,.04); }
+.safety-index { color: #56706b; font-size: 9px; letter-spacing: .16em; }
+.safety-card h3 { margin: 38px 0 0; color: #eef4ea; font-size: 23px; line-height: 1.04; letter-spacing: -.05em; font-weight: 550; }
+.safety-card p { margin: 13px 0 22px; color: #8b9c99; font-size: 12px; line-height: 1.62; }
+.safety-tag { align-self: flex-start; margin-top: auto; padding: 5px 8px; border: 1px solid rgba(126,224,209,.24); color: #7ee0d1; font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }
+.safety-card[data-reveal]:nth-child(2) { transition-delay: .06s; }
+.safety-card[data-reveal]:nth-child(3) { transition-delay: .12s; }
+.safety-card[data-reveal]:nth-child(4) { transition-delay: .18s; }
+@media (max-width: 980px) { .safety-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 740px) { .safety-grid { grid-template-columns: 1fr; margin-top: 45px; } .safety-card { min-height: 0; } .safety-card h3 { margin-top: 26px; } }
+@media (prefers-reduced-motion: reduce) { .safety-card, .safety-card:hover { transform: none; transition: none; } }

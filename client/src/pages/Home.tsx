@@ -13,6 +13,8 @@ import {
   CircleDashed,
   Cpu,
   CreditCard,
+  EyeOff,
+  FileCheck2,
   Fingerprint,
   KeyRound,
   Layers3,
@@ -23,8 +25,11 @@ import {
   Route,
   ScanFace,
   ShieldCheck,
+  ReceiptText,
+  Snowflake,
   Sparkles,
   Terminal,
+  UserPlus,
   X,
   Zap,
 } from "lucide-react";
@@ -61,10 +66,10 @@ const pillars = [
     number: "03",
     eyebrow: "POLICY-AWARE",
     title: "Authenticated is not authorized.",
-    copy: "A valid proof only says an owner approved. The account's on-chain policy decides: per-payment and daily USDG caps, a recipient allowlist, and timelocks on every change.",
+    copy: "A valid proof only says an owner approved. The account's on-chain policy decides: per-payment and daily USDG caps, a smaller cap for a first payment to a new recipient and an optional allowlist. Tightening is instant; anything that loosens the policy waits out a timelock.",
     icon: LockKeyhole,
     metric: "Timelocked",
-    metricCopy: "Caps · allowlist · recovery",
+    metricCopy: "Caps · freeze · recovery",
     color: "violet",
   },
   {
@@ -136,10 +141,52 @@ const useCases = [
     title: "Your app",
     subtitle: "@verakey/sdk",
     copy: "Add passkey accounts to any Arbitrum app with the SDK: register, derive the account, authorize, pay. Proving runs in your users' browsers.",
-    detail: "Next milestone: an ERC-7579 validator so ZeroDev Kernel accounts can use VeraKey proofs.",
+    detail: "Already on a smart account? Kernel and Nexus accounts can install the VeraKey ERC-7579 validator and accept the same proofs.",
     icon: Building2,
     color: "orange",
-    tags: ["typescript sdk", "gasless relay", "erc-7579 next"],
+    tags: ["typescript sdk", "gasless relay", "erc-7579 validator"],
+  },
+  {
+    id: "disclosure",
+    label: "03",
+    title: "Compliance",
+    subtitle: "Linkable by consent",
+    copy: "When an auditor or an exchange needs to know that two of your accounts are yours, approve a disclosure for them. A second circuit proves that one passkey owns both, without revealing the key.",
+    detail: "The disclosure names its audience and an expiry, anyone can check it against Arbitrum, and it cannot move funds.",
+    icon: FileCheck2,
+    color: "violet",
+    tags: ["link circuit", "on-chain verifier", "expires"],
+  },
+];
+
+const safetyNet = [
+  {
+    id: "freeze",
+    title: "Freeze in one approval.",
+    copy: "One Face ID stops every payment and cancels anything scheduled on the account. Unfreezing, like anything that loosens the policy, waits out a timelock that you or your guardian can cancel.",
+    tag: "restrict · instant",
+    icon: Snowflake,
+  },
+  {
+    id: "new-recipient",
+    title: "First payments stay small.",
+    copy: "A recipient you have never paid receives at most 2 USDG in a first payment, even inside your caps. A look-alike address or a tampered page gets a small amount, not the balance.",
+    tag: "new-recipient cap",
+    icon: UserPlus,
+  },
+  {
+    id: "payment-sheet",
+    title: "The browser shows what you pay.",
+    copy: "In Chrome on macOS, Windows and Android, the browser's own payment sheet shows the payee and the total, and the account checks both. Make the sheet a requirement, and a tampered page cannot pay without the browser showing you what you pay.",
+    tag: "secure payment confirmation",
+    icon: ReceiptText,
+  },
+  {
+    id: "guardian",
+    title: "A guardian nobody can see.",
+    copy: "Your recovery guardian is stored as a salted hash, so nobody reading the chain can tell who it is until it acts. It can freeze and veto changes, but never block its own replacement.",
+    tag: "guardian commitment",
+    icon: EyeOff,
   },
 ];
 
@@ -320,6 +367,7 @@ export default function Home() {
             <button onClick={() => scrollTo("why")}>Why now</button>
             <button onClick={() => scrollTo("stack")}>Proof stack</button>
             <button onClick={() => scrollTo("architecture")}>Architecture</button>
+            <button onClick={() => scrollTo("safety")}>Safety net</button>
             <button onClick={openDocs}>Docs</button>
             <div className="mobile-nav-cta">
               <button className="button button-primary magnetic-button" onClick={openApp}>Open app <ArrowUpRight size={16} /></button>
@@ -353,7 +401,7 @@ export default function Home() {
                 <ul className="hero-facts">
                   <li><Check size={13} /> Live on Arbitrum Sepolia</li>
                   <li><Check size={13} /> 1.9 s proof in your browser</li>
-                  <li><Check size={13} /> 34 end-to-end tests</li>
+                  <li><Check size={13} /> 61 end-to-end tests</li>
                 </ul>
               </div>
             </div>
@@ -500,21 +548,33 @@ export default function Home() {
           </div>
         </section>
 
+        <section className="safety-section section-pad" id="safety" data-reveal>
+          <div className="container">
+            <div className="section-heading split-heading"><div><SectionKicker light>THE SAFETY NET</SectionKicker><h2>When things go wrong,<br /><em>the account holds.</em></h2></div><div className="heading-aside"><p>A passkey can be tricked into approving, a page can be tampered with, a phone can be lost. Each protection here is enforced by the account on Arbitrum, not by the app.</p><span className="aside-line" /></div></div>
+            <div className="safety-grid">
+              {safetyNet.map((item, index) => {
+                const Icon = item.icon;
+                return <article key={item.id} className="safety-card" data-reveal><div className="safety-card-top"><span className="safety-icon"><Icon size={19} /></span><span className="safety-index">0{index + 1} / 04</span></div><h3>{item.title}</h3><p>{item.copy}</p><span className="safety-tag">{item.tag}</span></article>;
+              })}
+            </div>
+          </div>
+        </section>
+
         <section className="metrics-section section-pad" data-reveal>
           <div className="container metrics-layout">
-            <div><SectionKicker>THE COST OF PRIVACY</SectionKicker><h2>Privacy has a price.<br /><em>We publish it.</em></h2><p className="metrics-lede">Arbitrum verifies an UltraHonk proof instead of a bare P-256 signature. That costs more gas than the precompile, and buys an account that shares no key with your other apps. Moving to bb 5's optimized verifier cut a payment from 4.17M to 1.07M gas. Gas is measured on a nitro devnode at ArbOS 61; dollars use Arbitrum One's gas price and the ETH price on 24 Sep 2026.</p><button className="outline-button" onClick={openDocs}><ShieldCheck size={15} /> Read the threat model</button></div>
+            <div><SectionKicker>THE COST OF PRIVACY</SectionKicker><h2>Privacy has a price.<br /><em>We publish it.</em></h2><p className="metrics-lede">Arbitrum verifies an UltraHonk proof instead of a bare P-256 signature. That costs more gas than the precompile, and buys an account that shares no key with your other apps. bb 5's optimized verifier, packed storage and cached Stylus programs cut a payment from 4.17M to 1.04M gas. Gas is measured on a nitro devnode at ArbOS 61; dollars use Arbitrum One's gas price and the ETH price on 24 Sep 2026.</p><button className="outline-button" onClick={openDocs}><ShieldCheck size={15} /> Read the threat model</button></div>
             <div className="metrics-chart">
               <div className="chart-header"><span>MEASURED GAS PER OPERATION</span><span>NITRO DEVNODE · ARBOS 61</span></div>
               <div className="bar-row"><div className="bar-label"><span>P256VERIFY precompile (no privacy)</span><strong>3,450</strong></div><div className="bar-track"><div className="bar-fill bar-new" style={{ width: "1%" }} /></div></div>
               <div className="bar-row"><div className="bar-label"><span>HonkVerifier.verify (the proof)</span><strong>712,554</strong></div><div className="bar-track"><div className="bar-fill bar-old" style={{ width: "17%" }} /></div></div>
-              <div className="bar-row"><div className="bar-label"><span>VeraKey pay (proof + policy + 2 USDG transfers)</span><strong className="accent-number">1,073,882</strong></div><div className="bar-track"><div className="bar-fill bar-old" style={{ width: "26%" }} /></div></div>
+              <div className="bar-row"><div className="bar-label"><span>VeraKey pay (proof + policy + 2 USDG transfers)</span><strong className="accent-number">1,043,768</strong></div><div className="bar-track"><div className="bar-fill bar-old" style={{ width: "25%" }} /></div></div>
               <div className="bar-row"><div className="bar-label"><span>The same pay with bb's default verifier (before)</span><strong className="muted-number">4,171,302</strong></div><div className="bar-track"><div className="bar-fill bar-muted" style={{ width: "100%" }} /></div></div>
               <div className="chart-cost">
                 <div><span>PAY ON ARBITRUM ONE</span><strong>≈ $0.06</strong><small>0.02 gwei · ETH at $2,668</small></div>
                 <div><span>BEFORE THE OPTIMIZED VERIFIER</span><strong>≈ $0.22</strong><small>the same payment, 4.17M gas</small></div>
                 <div><span>PROOF CALLDATA (L1)</span><strong>≈ $0.002</strong><small>about 9 KB per payment</small></div>
               </div>
-              <div className="chart-foot"><span><Zap size={14} /> account creation: <b>≈479k gas</b> (clone + storage init)</span><span>STYLUS · RUST</span></div>
+              <div className="chart-foot"><span><Zap size={14} /> account creation: <b>≈383k gas</b> (clone + storage init)</span><span>STYLUS · RUST</span></div>
             </div>
           </div>
         </section>
@@ -524,7 +584,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="site-footer"><div className="container footer-inner"><div className="footer-brand"><button className="brand-lockup" onClick={() => scrollTo("top")}><BrandMark /><span className="brand-wordmark">Vera<span>Key</span></span></button><p>Passkey-native authorization<br />for the Arbitrum era.</p></div><div className="footer-links"><div><span>EXPLORE</span><button onClick={() => scrollTo("why")}>Why now</button><button onClick={() => scrollTo("architecture")}>Architecture</button></div><div><span>RESOURCES</span><button onClick={openApp}>Open the app</button><button onClick={openDocs}>Developer docs</button></div><div><span>STATUS</span><p className="status-online"><span /> Live on Arbitrum Sepolia</p><p>Arbitrum Open House<br />Singapore · 2026</p></div></div></div><div className="container footer-bottom"><span>© 2026 VERAKEY SYSTEMS</span><span>BUILT WITH WEBAUTHN · ZK · STYLUS</span><span>TESTNET PREVIEW · CONTRACTS UNAUDITED</span></div></footer>
+      <footer className="site-footer"><div className="container footer-inner"><div className="footer-brand"><button className="brand-lockup" onClick={() => scrollTo("top")}><BrandMark /><span className="brand-wordmark">Vera<span>Key</span></span></button><p>Passkey-native authorization<br />for the Arbitrum era.</p></div><div className="footer-links"><div><span>EXPLORE</span><button onClick={() => scrollTo("why")}>Why now</button><button onClick={() => scrollTo("architecture")}>Architecture</button><button onClick={() => scrollTo("safety")}>Safety net</button></div><div><span>RESOURCES</span><button onClick={openApp}>Open the app</button><button onClick={openDocs}>Developer docs</button></div><div><span>STATUS</span><p className="status-online"><span /> Live on Arbitrum Sepolia</p><p>Arbitrum Open House<br />Singapore · 2026</p></div></div></div><div className="container footer-bottom"><span>© 2026 VERAKEY SYSTEMS</span><span>BUILT WITH WEBAUTHN · ZK · STYLUS</span><span>TESTNET PREVIEW · CONTRACTS UNAUDITED</span></div></footer>
     </div>
   );
 }

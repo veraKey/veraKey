@@ -41,7 +41,7 @@ const BLOCK = 311_900_418n;
 const RECEIPT: ReceiptData = {
   title: "Paid 2.00 USDG",
   hash: TX_HASH,
-  gasUsed: 1_073_882n,
+  gasUsed: 1_021_759n,
   provingMs: PROVING_MS,
   publicKeyOccurrences: 0,
   proofBytes: PROOF_BYTES,
