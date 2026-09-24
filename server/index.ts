@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ApiError } from "../shared/api";
 import { loadConfig } from "./config";
-import { RateLimiter } from "./rate-limit";
+import { RateLimiter, VisitorKeys } from "./rate-limit";
 import { RelayError, Relayer } from "./relayer";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -16,6 +16,7 @@ const config = loadConfig(ROOT);
 const relayer = new Relayer(config);
 config.network.relayer.address = relayer.address;
 
+const visitors = new VisitorKeys();
 const perIp = new RateLimiter(Number(process.env.API_REQUESTS_PER_IP_PER_MINUTE ?? 30), 60_000);
 const rpcPerIp = new RateLimiter(900, 60_000);
 
@@ -67,7 +68,7 @@ app.use("/api", express.json({ limit: "64kb" }));
 // Browser reads go through the relayer origin: the CSP stays 'self'-only, the upstream RPC (and any
 // provider key) stays server-side, and nodes without CORS headers still work.
 app.post("/api/rpc", async (req, res) => {
-  if (!rpcPerIp.take(`rpc:${req.ip}`)) return void res.status(429).json({ error: "Too many requests." });
+  if (!rpcPerIp.take(`rpc:${visitors.key(req.ip)}`)) return void res.status(429).json({ error: "Too many requests." });
   const calls = Array.isArray(req.body) ? req.body : [req.body];
   if (calls.length > 20 || calls.some(c => !c || typeof c.method !== "string" || !RPC_METHODS.has(c.method))) {
     return void res.status(400).json({ jsonrpc: "2.0", id: null, error: { code: -32601, message: "Method not allowed" } });
@@ -87,7 +88,7 @@ app.post("/api/rpc", async (req, res) => {
 
 app.use("/api", (req, res, next) => {
   if (req.path === "/rpc") return next();
-  if (!perIp.take(`ip:${req.ip}`)) return void res.status(429).json({ error: "Too many requests." } satisfies ApiError);
+  if (!perIp.take(`ip:${visitors.key(req.ip)}`)) return void res.status(429).json({ error: "Too many requests." } satisfies ApiError);
   next();
 });
 
@@ -120,7 +121,7 @@ app.post(
 app.post(
   "/api/faucet",
   route(async (req, res) => {
-    if (!faucetPerIp.take(`faucet:${req.ip}`)) throw new RelayError(429, `The faucet allows ${process.env.FAUCET_ACCOUNTS_PER_IP ?? 3} accounts per day per visitor.`);
+    if (!faucetPerIp.take(`faucet:${visitors.key(req.ip)}`)) throw new RelayError(429, `The faucet allows ${process.env.FAUCET_ACCOUNTS_PER_IP ?? 3} accounts per day per visitor.`);
     res.json({ hash: await relayer.faucet(req.body?.account) });
   })
 );

@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
@@ -152,6 +153,11 @@ export class Relayer {
       throw new RelayError(402, "The signed relayer fee is too low.");
     }
     await this.assertOurAccount(body.account);
+    // Optional random delay before broadcasting (RELAY_JITTER_MAX_MS), so submission times say less about
+    // which requests arrived together. Off by default: it adds latency and only helps alongside real
+    // traffic or several relayers. It never changes what is submitted.
+    const jitter = Number(process.env.RELAY_JITTER_MAX_MS ?? 0);
+    if (jitter > 0) await new Promise(resolve => setTimeout(resolve, randomInt(0, jitter)));
     return this.submit({ address: body.account, abi: veraKeyAccountAbi, functionName: body.functionName, args } as never);
   }
 
