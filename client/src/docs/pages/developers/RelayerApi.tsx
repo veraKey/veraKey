@@ -48,7 +48,8 @@ export default function RelayerApiPage() {
     "changeDelay": 120, "recoveryDelay": 300
   },
   "relayer": { "address": "0x6D377a3927df664FDA9946Aa0E6fb8F707844fA8", "fee": "20000", "faucetAmount": "5000000" },
-  "circuitVkHash": "0x16378935c4dee31e952a8c42d2f20d4d5dbd00ee2e8225a1eb16e908caf37f12"
+  "circuitVkHash": "0x16378935c4dee31e952a8c42d2f20d4d5dbd00ee2e8225a1eb16e908caf37f12",
+  "configHash": "0x9d584d65853c7a2c6809929eec24071376caba939270ac8de2d7bb4c3e057183"
 }
 `}</Code>
       <p>

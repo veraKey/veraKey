@@ -142,6 +142,22 @@ export const PAGES: DocPage[] = [
     load: () => import("./pages/developers/Quickstart"),
   },
   {
+    path: "/docs/build/sign-in",
+    title: "Sign in with VeraKey",
+    group: "Build",
+    preview: true,
+    description: "Let players sign in to your game or app with their VeraKey passkey, get a player ID that only your site knows, and take USDG payments through the VeraKey popup.",
+    keywords: ["sign in", "login", "auth", "popup", "game", "dapp", "player id", "connect", "web3 game"],
+    sections: ["How sign-in works", "Add the button", "Verify on your server", "Take a payment", "Security checklist", "Errors and limits"],
+    headingKeywords: {
+      "Add the button": ["VeraKeyConnect", "signIn"],
+      "Verify on your server": ["verifySignIn"],
+      "Take a payment": ["pay", "verifyPayment"],
+      "Errors and limits": ["blocked", "unavailable", "closed", "busy", "cancelled"],
+    },
+    load: () => import("./pages/developers/SignIn"),
+  },
+  {
     path: "/docs/build/sdk",
     title: "SDK guide",
     group: "Build",
@@ -244,7 +260,7 @@ export const PAGES: DocPage[] = [
     description: "What VeraKey guarantees, what it assumes, and what it does not hide.",
     keywords: ["security", "threat model", "invariants", "trust assumptions", "privacy", "guarantees"],
     sections: ["What VeraKey protects", "Invariants", "Trust assumptions", "What still leaks", "Threat model"],
-    subsections: ["The VeraKey page code", "The relayer", "The USDG issuer", "The proof system", "Browsers"],
+    subsections: ["Sign in with VeraKey", "The VeraKey page code", "The relayer", "The USDG issuer", "The proof system", "Browsers"],
     load: () => import("./pages/security/SecurityModel"),
   },
   {
@@ -263,7 +279,7 @@ export const PAGES: DocPage[] = [
     preview: true,
     description: "Every public method and type of the VeraKey SDK, with its signature.",
     keywords: ["api reference", "veraKeyclient", "methods", "types", "signatures"],
-    sections: ["VeraKeyClient", "Types", "Action helpers", "WebAuthn helpers", "Disclosure helpers", "Validator helpers"],
+    sections: ["VeraKeyClient", "Types", "Action helpers", "WebAuthn helpers", "Disclosure helpers", "Validator helpers", "Sign-in helpers"],
     subsections: ["VeraKeyConfig", "Passkeys and sessions", "Accounts", "Actions", "Payment sheet, guardians and disclosures", "Properties and lower-level classes"],
     headingKeywords: {
       "VeraKeyConfig": ["rpId", "relayerUrl", "relayerFee", "appIds", "loadProver", "paymentInstrument"],
@@ -277,6 +293,7 @@ export const PAGES: DocPage[] = [
       "WebAuthn helpers": ["createPasskey", "getAssertion", "getSpcAssertion", "spcAvailability", "formatSpcTotal", "webauthnDigest", "verifyPasskeySignature", "recoverPublicKeys", "publicKeyFromSpki", "derToLowS", "normalizeLowS", "prfSalt", "randomChallenge", "PrfUnsupportedError", "LocalPasskeyStore", "MemoryPasskeyStore"],
       "Disclosure helpers": ["verifyDisclosure", "linkDisclosureChallenge", "VerifyDisclosureOptions", "LinkStatement", "DisclosurePackage", "DisclosureVerdict", "LinkProver"],
       "Validator helpers": ["validatorInstallData", "validatorSignature", "validatorErc1271Challenge", "VALIDATOR_VERIFICATION_GAS"],
+      "Sign-in helpers": ["VeraKeyConnect", "VeraKeyConnectError", "verifySignIn", "verifyPayment", "appIdFromOrigin", "accountAddressOf", "signInChallenge", "proveSignIn"],
     },
     load: () => import("./pages/reference/SdkReference"),
   },
@@ -331,7 +348,7 @@ export const PAGES: DocPage[] = [
     keywords: ["glossary", "terms", "definitions", "dictionary"],
     sections: ["Terms"],
     headingKeywords: {
-      "Terms": ["Account", "Action hash", "Allowlist", "App", "appId", "Authenticator data", "Barretenberg", "Change delay", "clientDataJSON", "configHash", "CRS", "Daily cap", "Disclosure", "EIP-1167", "ERC-1271", "ERC-7579", "Fee recipient", "Guardian", "Guardian card", "maxFee", "New-recipient cap", "Nonce", "Nullifier", "Origin", "Owner epoch", "Passkey", "Payment sheet", "Per-payment cap", "PRF", "Proof", "Public inputs", "Recovery", "Recovery delay", "Relayer", "restrict", "rpId", "rpIdHash", "Scheduled change", "Stylus", "Timelock", "UltraHonk", "USDG", "User verification", "Verifier"],
+      "Terms": ["Account", "Action hash", "Allowlist", "App", "appId", "Authenticator data", "Barretenberg", "Change delay", "clientDataJSON", "configHash", "CRS", "Daily cap", "Disclosure", "EIP-1167", "ERC-1271", "ERC-7579", "Fee recipient", "Guardian", "Guardian card", "maxFee", "New-recipient cap", "Nonce", "Nullifier", "Origin", "Owner epoch", "Passkey", "Payment sheet", "Per-payment cap", "Player ID", "PRF", "Proof", "Public inputs", "Recovery", "Recovery delay", "Relayer", "restrict", "rpId", "rpIdHash", "Scheduled change", "Sign in with VeraKey", "Stylus", "Timelock", "UltraHonk", "USDG", "User verification", "Verifier"],
     },
     load: () => import("./pages/reference/Glossary"),
   },

@@ -33,7 +33,8 @@ nullifier = Poseidon2("VERAKEY_NULLIFIER_V1", publicKey.x, publicKey.y, prfSecre
       <H2>Per-app accounts</H2>
       <p>
         An app, here, is an app id within one VeraKey deployment. Apps on the VeraKey origin share its rpId, so one
-        passkey serves them all. An app on another domain needs its own VeraKey deployment, relayer and passkey.
+        passkey serves them all. A site on another domain uses VeraKey through the{" "}
+        <A href="/docs/build/sign-in">Sign in with VeraKey</A> popup, with an app id derived from its own origin.
       </p>
       <p>
         Every app gets its own smart account. Its address follows from the app id, your nullifier and the deployment's

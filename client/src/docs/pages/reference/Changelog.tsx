@@ -8,6 +8,11 @@ export default function ChangelogPage() {
       <H2>2026-09-24</H2>
       <ul>
         <li>
+          <strong>Sign in with VeraKey</strong> (developer preview): a game or an app on its own domain signs players in
+          through VeraKey's popup, gets a player ID that only it knows, and takes USDG payments. See{" "}
+          <A href="/docs/build/sign-in">Sign in with VeraKey</A>.
+        </li>
+        <li>
           <strong>Documentation.</strong> This site: 30 pages for people who use VeraKey and developers who build on it, with
           search, an outline on every page and examples you can copy.
         </li>

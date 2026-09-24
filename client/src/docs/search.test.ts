@@ -52,6 +52,9 @@ describe("search ranking", () => {
     ["NewPayeeCap", "/docs/reference/errors#account-errors"],
     ["pendingChangeIds", "/docs/reference/contracts#account-views"],
     ["factory errors", "/docs/reference/errors#factory-errors"],
+    ["sign in", "/docs/build/sign-in"],
+    ["login", "/docs/build/sign-in"],
+    ["verifySignIn", "/docs/build/sign-in#verify-on-your-server"],
   ])("%s opens %s", (query, href) => {
     expect(first(query)).toBe(href);
   });

@@ -325,6 +325,24 @@ interface DisclosedAccount {
       <p>
         See <A href="/docs/build/erc-7579">ERC-7579 validator</A> for installing the module and signing user operations.
       </p>
+      <H2>Sign-in helpers</H2>
+      <p>For sites that use <A href="/docs/build/sign-in">Sign in with VeraKey</A>: <code>@verakey/sdk/connect</code> in the page, <code>@verakey/sdk/signin</code> on the server.</p>
+      <Table
+        stack
+        head={["Export", "Signature", "What it does"]}
+        rows={methods([
+          ["VeraKeyConnect", "new VeraKeyConnect({ url })", "Opens VeraKey's popup for one request at a time."],
+          ["signIn", "({ nonce: Hex | () => Promise<Hex> }): Promise<SignInResult>", "Signs the player in; call it from a click."],
+          ["pay", "({ to: Address; amount: bigint }): Promise<PaymentResult>", "Asks the player to pay; call it from a click."],
+          ["VeraKeyConnectError", "{ code, message, revert?, hash? }", "Why a request failed; hash is set when a payment was already sent."],
+          ["verifySignIn", "(result, { origin, nonce, publicClient, deployment, prover?, clockSkewSeconds? })", "Checks a sign-in on the site's server and returns every check."],
+          ["verifyPayment", "(hash, { publicClient, account, to, amount })", "Checks that a transaction paid this amount from this account to this recipient."],
+          ["appIdFromOrigin", "(origin: string): bigint", "The app id a site gets, derived from its origin."],
+          ["accountAddressOf", "(deployment, appId, nullifier): Address", "An account's address, computed offline."],
+          ["signInChallenge", "(statement): Hex", "What the passkey signs for a sign-in."],
+          ["VeraKeyClient.proveSignIn", "(appId, { nonce, origin }, emit?): Promise<SignInResult>", "The popup's side: signs and proves a sign-in."],
+        ])}
+      />
     </>
   );
 }

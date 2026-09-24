@@ -57,6 +57,13 @@ describe("the registry matches the pages", () => {
 });
 
 describe("what the docs tell people", () => {
+  it("tells sites to verify on their server, use each nonce once, pin the deployment and keep the popup's opener", async () => {
+    const text = plain(await render("/docs/build/sign-in"));
+    for (const phrase of ["verifySignIn", "nonce", "Referrer-Policy", "same-origin-allow-popups", "Deployments"]) expect(text).toContain(phrase);
+    expect(plain(await render("/docs/concepts"))).toMatch(/Sign in with VeraKey/);
+    expect(await render("/docs/reference/glossary")).toMatch(/<dt>Player ID<\/dt>/);
+  });
+
   it("the quickstart deploys and funds the account before it pays", async () => {
     const text = displayed(await render("/docs/build/quickstart"));
     const deploy = text.indexOf("ensureAccount(");

@@ -179,6 +179,19 @@ export default function SecurityModelPage() {
         head={["#", "Invariant", "How it is enforced", "Tests"]}
         rows={INVARIANTS.map(([invariant, how, tests], i) => [String(i + 1), <strong key="i">{invariant}</strong>, how, tests])}
       />
+      <H3>Sign in with VeraKey</H3>
+      <Table
+        stack
+        head={["#", "Invariant", "How it is enforced", "Tests"]}
+        rows={[
+          ["S1", <strong key="i">A site only receives the player ID and account for its own origin.</strong>, "The popup derives the app id from the origin the browser reports for the window that opened it.", "unit: appIdFromOrigin, acceptRequest; browser: the popup names the game"],
+          ["S2", <strong key="i">A sign-in proof cannot move funds, and a payment proof is no sign-in.</strong>, "Accounts accept only action hashes as challenges; verifySignIn recomputes the sign-in statement.", "e2e: a sign-in proof cannot move funds; unit: a changed statement is refused"],
+          ["S3", <strong key="i">A sign-in is bound to one origin, one nonce and five minutes.</strong>, "The statement signs all three; verifySignIn checks them.", "unit: verifySignIn; e2e: a real proof moved onto another statement"],
+          ["S4", <strong key="i">The popup shows the real requesting origin, and pays only from that origin's account.</strong>, "The origin comes from the browser, never from the request.", "browser: sign-in and payment"],
+          ["S5", <strong key="i">The popup answers only the window that opened it, once.</strong>, "acceptRequest ignores every other window and refuses a second request.", "unit: acceptRequest"],
+          ["S6", <strong key="i">During a sign-in, no request to VeraKey's server carries the proof, the player ID, the app id or the nonce.</strong>, "The popup computes the account address offline and never looks accounts up on-chain.", "browser: every popup request checked"],
+        ]}
+      />
 
       <H2>Trust assumptions</H2>
       <H3>The VeraKey page code</H3>
