@@ -20,6 +20,8 @@ Built for the Arbitrum Open House Singapore Buildathon (HackQuest), September–
 
 App: **https://verakey.mdloglabs.org**. Open `/app` on a device with an iCloud Keychain or Google Password Manager passkey.
 
+Docs: **https://verakey.mdloglabs.org/docs** (users, developers and reviewers).
+
 | Contract | Address |
 |---|---|
 | `VeraKeyFactory` (Stylus) | [`0x45bbaf84eea0c285db53fd7d72187e9e3843c3e4`](https://sepolia.arbiscan.io/address/0x45bbaf84eea0c285db53fd7d72187e9e3843c3e4) |

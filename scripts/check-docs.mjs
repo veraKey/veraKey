@@ -6,6 +6,7 @@
 //   - deep links land on their section;
 //   - unknown pages show the docs 404;
 //   - Deployments works without /api/config.
+//   - the docs never load the prover (bb.js, Noir, the CRS or WebAssembly).
 //
 //   node scripts/check-docs.mjs <baseUrl> [outDir]
 import { spawn } from "node:child_process";
@@ -182,6 +183,15 @@ try {
     if (!pages.includes(page)) continue;
     await open(`${BASE}${page}`);
     await shot(`desktop${page.replace(/\//g, "-")}`);
+  }
+
+  // 8. The docs never load the prover: no bb.js, Noir, CRS or WebAssembly (the app does, on /app).
+  const PROVER = /barretenberg|@aztec|@noir-lang|bb\.js|\/crs\/|\.wasm(\?|$)/i;
+  for (const page of ["/docs", "/docs/reference/deployments"]) {
+    await open(`${BASE}${page}`);
+    await sleep(1_000);
+    const loaded = ((await evaluate(`performance.getEntriesByType("resource").map(r => r.name)`)) ?? []).filter(name => PROVER.test(name));
+    if (loaded.length) fail(`${page}: loads the prover (${loaded.slice(0, 2).join(", ")})`);
   }
   console.log(`${pages.length} pages, ${links.length} links checked: ${failures.length ? `${failures.length} problem(s)` : "no problems"} (screenshots in ${OUT})`);
 } catch (error) {
