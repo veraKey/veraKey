@@ -1,8 +1,8 @@
 # @verakey/sdk
 
-Passkey accounts proven in zero knowledge, on Arbitrum. VeraKey gives a person one passkey and a separate USDG
-smart account for every app. Each approval is an UltraHonk proof made in the browser, so apps cannot link one
-person's accounts to each other.
+One passkey, unlinkable on-chain identities, on Arbitrum. VeraKey gives a person their own account and ID in every
+app, behind one passkey. Each approval is an UltraHonk proof made in the browser, so nothing on-chain links one
+person's identities.
 
 > **Developer preview on Arbitrum Sepolia (testnet).** The API may change before 1.0.
 

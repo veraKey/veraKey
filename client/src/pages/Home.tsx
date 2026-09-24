@@ -391,8 +391,8 @@ export default function Home() {
           <div className="container hero-grid">
             <div className="hero-copy">
               <div className="eyebrow-row"><span className="eyebrow-dot" /> HIDE-MY-EMAIL FOR WALLETS</div>
-              <h1>One passkey.<br /><em>Unlinkable accounts.</em></h1>
-              <p className="hero-lede">VeraKey gives every app its own USDG smart account behind one passkey. Your browser proves in zero knowledge that the passkey approved each payment, so Arbitrum never sees your key and no key material on-chain ties your accounts together.</p>
+              <h1>One passkey.<br /><em>Unlinkable <span className="no-break">on-chain</span> identities.</em></h1>
+              <p className="hero-lede">Every app gets its own USDG account and ID behind one passkey, with payments, sign-in and recovery built in. Your browser proves each approval in zero knowledge, so Arbitrum never sees your key and nothing on-chain links your identities. Unlinkable, not anonymous.</p>
               <div className="hero-actions">
                 <button className="button button-primary button-large magnetic-button" onClick={openApp}>Open the app <ArrowRight size={17} /></button>
                 <button className="text-button" onClick={() => scrollTo("architecture")}>Explore the stack <ChevronRight size={16} /></button>
@@ -401,7 +401,7 @@ export default function Home() {
                 <ul className="hero-facts">
                   <li><Check size={13} /> Live on Arbitrum Sepolia</li>
                   <li><Check size={13} /> 1.9 s proof in your browser</li>
-                  <li><Check size={13} /> 61 end-to-end tests</li>
+                  <li><Check size={13} /> 75 end-to-end tests</li>
                 </ul>
               </div>
             </div>

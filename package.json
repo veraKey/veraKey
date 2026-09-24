@@ -114,5 +114,5 @@
       "tailwindcss>nanoid": "3.3.7"
     }
   },
-  "description": "VeraKey: one passkey, unlinkable per-app smart accounts, ZK-authorized USDG payments on Arbitrum."
+  "description": "VeraKey: one passkey, unlinkable on-chain identities. Per-app USDG accounts, sign-in and ZK-authorized payments on Arbitrum."
 }

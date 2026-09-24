@@ -1,14 +1,17 @@
 # VeraKey
 
-**Hide-My-Email for wallets: one passkey, unlinkable USDG accounts on Arbitrum.**
+**Hide-My-Email for wallets: one passkey, unlinkable on-chain identities on Arbitrum.**
 
-VeraKey gives every app its own smart account behind a single passkey.
+Every app gets its own USDG account and ID behind a single passkey, with payments, sign-in and recovery built in, and
+nothing on-chain links them. Unlinkable, not anonymous: each account's own history stays public.
 - **Proof, not key.** Each action is authorized by a zero-knowledge proof, generated in the user's browser, that the passkey signed exactly that action. The chain receives the proof, a per-app nullifier and the browser's `clientDataJSON`. It never receives the passkey's public key or signature, so no key material links a user's accounts across apps.
 - **Accounts that protect themselves.**
   - caps, plus a small cap on a first payment to a new recipient;
   - an instant freeze that also cancels anything scheduled;
   - a guardian nobody can see;
   - optionally, the browser's own payment sheet for every payment.
+- **Sign in with VeraKey.** Any https site can sign people in through VeraKey's popup. Each site gets its own ID for a
+  person, and its server verifies a zero-knowledge proof of every sign-in.
 - **Unlinkable by default, linkable by consent.** The owner can prove to an auditor that two accounts share a passkey, without revealing the key.
 - **Not only VeraKey accounts.** An ERC-7579 validator module brings the same proofs to modular smart accounts such as Kernel and Nexus.
 

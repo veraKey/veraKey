@@ -112,6 +112,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outli
 .eyebrow-row { display: inline-flex; align-items: center; gap: 9px; color: #94a4a4; font-size: 10px; letter-spacing: .16em; font-weight: 650; }
 .eyebrow-dot { width: 7px; height: 7px; border: 1px solid #c9ff5b; border-radius: 50%; box-shadow: 0 0 0 4px rgba(201,255,91,.08); }
 .hero-copy h1 { max-width: 630px; margin: 23px 0 23px; font-size: clamp(54px, 6.1vw, 86px); line-height: .93; letter-spacing: -.08em; font-weight: 650; }
+/* Keeps "on-chain" whole: a display headline must not break at its hyphen. */
+.hero-copy h1 .no-break { white-space: nowrap; }
 .hero-copy h1 em, h2 em, h3 em { color: #7ee0d1; font-family: "DM Serif Display", Georgia, serif; font-style: italic; font-weight: 400; letter-spacing: -.055em; }
 .hero-lede { max-width: 490px; margin: 0; color: #9ba8a8; font-size: 16px; line-height: 1.65; }
 .hero-actions { display: flex; align-items: center; gap: 25px; margin-top: 32px; }

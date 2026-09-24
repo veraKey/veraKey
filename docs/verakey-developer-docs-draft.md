@@ -1,6 +1,6 @@
 # VeraKey Developer Docs
 
-## One passkey, unlinkable accounts on Arbitrum
+## One passkey, unlinkable on-chain identities on Arbitrum
 
 VeraKey is an authentication and account layer for consumer apps on Arbitrum. A user enrolls one passkey.
 Each app gets its own smart account, owned by a per-app nullifier. Every action is authorized by a

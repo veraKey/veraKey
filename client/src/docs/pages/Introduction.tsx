@@ -6,24 +6,27 @@ export default function Introduction() {
     <>
       <H2>What VeraKey is</H2>
       <p>
-        VeraKey is an account layer for passkey wallets on Arbitrum. You enroll one passkey, from iCloud Keychain or
-        Google Password Manager, and each app built on VeraKey gives you a separate USDG smart account. Each approval, such as a
-        payment, is proven in your browser with a zero-knowledge proof: the chain learns that your passkey approved
-        exactly this action, but it never receives your passkey's public key or signature.
+        One passkey, unlinkable on-chain identities. VeraKey is an account layer for passkey wallets on Arbitrum: you
+        enroll one passkey, from iCloud Keychain or Google Password Manager, and every app built on VeraKey gives you your
+        own USDG account and ID in it, with payments, sign-in and recovery built in. Each approval, such as a payment, is
+        proven in your browser with a zero-knowledge proof: the chain learns that your passkey approved exactly this
+        action, but it never receives your passkey's public key or signature.
       </p>
       <p>
-        So nothing on-chain ties your accounts in different apps together, unless you choose to prove the link to
-        someone. VeraKey is to wallets what Hide My Email is to email addresses.
+        So nothing on-chain ties your identities in different apps together, unless you choose to prove the link to
+        someone. VeraKey is to wallets what Hide My Email is to email addresses. It is unlinkable, not anonymous: each
+        account's own history stays public.
       </p>
       <H2>Who it is for</H2>
       <ul>
         <li><strong>People who pay with USDG</strong>, who want one Face ID or Touch ID for every app without one public history across all of them.</li>
-        <li><strong>App developers</strong>, who want passkey accounts, gasless USDG payments and account protections without running a wallet.</li>
+        <li><strong>App developers and games</strong>, who want passkey sign-in, accounts, gasless USDG payments and account protections without running a wallet.</li>
         <li><strong>Smart-account builders</strong>, who can bring the same proofs to ERC-7579 accounts through the VeraKey validator module.</li>
       </ul>
       <H2>What you can do</H2>
       <ul>
         <li>Create a passkey and get one account per app, derived before it is ever deployed.</li>
+        <li>Sign in to a site through VeraKey: each site gets its own ID for you, and nothing links it to the IDs other sites get.</li>
         <li>Pay in USDG with one passkey approval; a relayer pays the gas and takes a small USDG fee you approved.</li>
         <li>Protect the account: caps, a smaller cap on first payments to new recipients, an instant freeze, a private guardian and, in Chrome, the browser's own payment sheet.</li>
         <li>Prove to an auditor that two of your accounts share a passkey, without revealing the key.</li>

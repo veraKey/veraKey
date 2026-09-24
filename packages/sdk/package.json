@@ -1,7 +1,7 @@
 {
   "name": "@verakey/sdk",
   "version": "0.1.0",
-  "description": "VeraKey SDK: passkey (WebAuthn + PRF) authentication proven in zero knowledge, verified by Stylus smart accounts on Arbitrum.",
+  "description": "VeraKey SDK: one passkey, unlinkable on-chain identities. Sign-in, per-app accounts and payments on Arbitrum, each passkey approval proven in zero knowledge.",
   "keywords": [
     "passkey",
     "webauthn",

@@ -204,6 +204,13 @@ describe("what the docs tell people", () => {
     expect(text).toMatch(/never persist/i);
   });
 
+  it("leads with one passkey and unlinkable on-chain identities, and says VeraKey is not anonymous", async () => {
+    const intro = plain(await render("/docs"));
+    expect(intro).toMatch(/One passkey, unlinkable on-chain identities/);
+    expect(intro).toMatch(/sign-in/);
+    expect(intro).toMatch(/unlinkable, not anonymous/i);
+  });
+
   it("says what an app is", async () => {
     expect(plain(await render("/docs"))).not.toMatch(/every app you use/i);
     expect(await render("/docs/reference/glossary")).toMatch(/<dt>App<\/dt>/);
