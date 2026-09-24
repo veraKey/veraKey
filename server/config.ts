@@ -15,6 +15,7 @@ export interface DeploymentFile {
   contracts: NetworkConfig["contracts"];
   policy: NetworkConfig["policy"];
   circuitVkHash: Hex;
+  configHash: Hex;
 }
 
 export interface ServerConfig {
@@ -60,6 +61,7 @@ export function loadConfig(root: string): ServerConfig {
         faucetAmount: process.env.FAUCET_USDG_UNITS ?? "5000000", // 5 USDG
       },
       circuitVkHash: deployment.circuitVkHash,
+      configHash: deployment.configHash,
     },
   };
 }

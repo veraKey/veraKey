@@ -175,3 +175,21 @@ describe("relayer", () => {
     expect((await api("10.0.0.6", "GET", "/config")).status).toBe(200);
   });
 });
+
+describe("relayer: Sign in with VeraKey", () => {
+  it("GET /api/config carries the factory's configuration hash", async () => {
+    const { status, body } = await api("10.0.2.1", "GET", "/config");
+    expect(status).toBe(200);
+    expect(body.configHash).toBe((deployment as unknown as { configHash: string }).configHash);
+  });
+
+  it("isolates every page, and the /connect popup without cutting it off from its opener", async () => {
+    const page = await fetch(`${baseUrl}/`);
+    expect(page.headers.get("cross-origin-opener-policy")).toBe("same-origin");
+    expect(page.headers.get("document-isolation-policy")).toBeNull();
+    const popup = await fetch(`${baseUrl}/connect`);
+    expect(popup.headers.get("cross-origin-opener-policy")).toBeNull();
+    expect(popup.headers.get("cross-origin-embedder-policy")).toBeNull();
+    expect(popup.headers.get("document-isolation-policy")).toBe("isolate-and-require-corp");
+  });
+});

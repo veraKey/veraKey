@@ -49,9 +49,15 @@ app.disable("x-powered-by");
 app.set("trust proxy", 1);
 
 // Cross-origin isolation (multi-threaded proving) and a strict CSP. bb.js needs 'wasm-unsafe-eval'.
-app.use((_req, res, next) => {
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+// The Sign in with VeraKey popup (/connect) must keep its link to the site that opened it, which COOP would cut,
+// so it isolates itself with Document-Isolation-Policy instead.
+app.use((req, res, next) => {
+  if (req.path === "/connect") {
+    res.setHeader("Document-Isolation-Policy", "isolate-and-require-corp");
+  } else {
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+    res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+  }
   res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "no-referrer");

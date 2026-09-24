@@ -1,7 +1,7 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
-import { defineConfig } from "vite";
+import { defineConfig, type Connect, type Plugin } from "vite";
 
 const ROOT = import.meta.dirname;
 const WEB_PORT = Number(process.env.VERAKEY_WEB_PORT ?? 5190);
@@ -14,8 +14,28 @@ const isolationHeaders = {
   "Cross-Origin-Embedder-Policy": "require-corp",
 };
 
+/**
+ * Cross-origin isolation for every page, except the Sign in with VeraKey popup: COOP would cut it off from the site
+ * that opened it, so it isolates itself with Document-Isolation-Policy.
+ */
+function isolation(): Plugin {
+  const setHeaders: Connect.NextHandleFunction = (req, res, next) => {
+    if ((req.url ?? "").split("?")[0] === "/connect") {
+      res.setHeader("Document-Isolation-Policy", "isolate-and-require-corp");
+    } else {
+      for (const [name, value] of Object.entries(isolationHeaders)) res.setHeader(name, value);
+    }
+    next();
+  };
+  return {
+    name: "verakey-isolation",
+    configureServer: server => void server.middlewares.use(setHeaders),
+    configurePreviewServer: server => void server.middlewares.use(setHeaders),
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), isolation()],
   resolve: {
     alias: {
       "@": path.resolve(ROOT, "client", "src"),
@@ -38,7 +58,6 @@ export default defineConfig({
     host: "localhost",
     port: WEB_PORT,
     strictPort: true,
-    headers: isolationHeaders,
     proxy: { "/api": `http://localhost:${API_PORT}` },
     fs: {
       strict: true,
@@ -46,5 +65,4 @@ export default defineConfig({
       deny: [".env", ".env.*", "**/.*", "**/*.pem"],
     },
   },
-  preview: { headers: isolationHeaders },
 });

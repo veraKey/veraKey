@@ -37,6 +37,8 @@ export interface NetworkConfig {
     faucetAmount: string;
   };
   circuitVkHash: `0x${string}`;
+  /** The factory's configuration hash: with the factory and the implementation it gives account addresses offline. */
+  configHash: `0x${string}`;
 }
 
 /** Account functions the relayer is willing to submit. */
