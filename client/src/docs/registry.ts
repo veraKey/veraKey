@@ -31,6 +31,33 @@ export const PAGES: DocPage[] = [
     sections: ["What VeraKey is", "Who it is for", "What you can do", "Project status", "Where to go next"],
     load: () => import("./pages/Introduction"),
   },
+  {
+    path: "/docs/problem",
+    title: "The problem",
+    group: "Get started",
+    description: "Passkeys removed the seed phrase, but today's passkey wallets still let anyone reading the chain connect your activity across apps.",
+    keywords: ["linkability", "tracking", "cross-app", "public key", "privacy"],
+    sections: ["One passkey, one global identity", "The public key is on-chain", "Why one passkey per app is not enough", "What VeraKey changes", "Unlinkable, not anonymous"],
+    load: () => import("./pages/Problem"),
+  },
+  {
+    path: "/docs/how-it-works",
+    title: "How VeraKey works",
+    group: "Get started",
+    description: "Follow one payment from Face ID to a settled USDG transfer: the action hash, the passkey signature, the in-browser proof, the relayer and the account's checks.",
+    keywords: ["flow", "payment", "proof", "relayer", "walkthrough", "lifecycle"],
+    sections: ["The journey of one payment", "Step by step", "What the chain sees", "What never leaves your device"],
+    load: () => import("./pages/HowItWorks"),
+  },
+  {
+    path: "/docs/concepts",
+    title: "Key concepts",
+    group: "Get started",
+    description: "The ideas behind VeraKey in plain language: passkeys and PRF, nullifiers, per-app accounts, proofs, the relayer, policy and timelocks, guardians and disclosures.",
+    keywords: ["concepts", "nullifier", "prf", "timelock", "relayer", "guardian", "disclosure", "explained"],
+    sections: ["Passkeys and the PRF extension", "Nullifiers", "Per-app accounts", "Zero-knowledge proofs", "The relayer and fees", "Policy and timelocks", "Guardians and recovery", "Disclosures"],
+    load: () => import("./pages/Concepts"),
+  },
 ];
 
 function normalize(path: string): string {
