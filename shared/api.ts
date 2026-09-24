@@ -15,6 +15,8 @@ export interface NetworkConfig {
     honkVerifier: `0x${string}`;
     /** Verifier of the consent-to-link circuit (disclosures). */
     linkVerifier?: `0x${string}`;
+    /** ERC-7579 validator module: VeraKey proofs for Kernel / Nexus smart accounts. */
+    veraKeyValidator?: `0x${string}`;
     usdg: `0x${string}`;
   };
   policy: { perTxCap: string; dailyCap: string; newPayeeCap: string; changeDelay: number; recoveryDelay: number };

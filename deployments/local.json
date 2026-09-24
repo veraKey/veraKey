@@ -6,12 +6,13 @@
   "origin": "http://localhost:5190",
   "rpIdHash": "0x49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d9763",
   "contracts": {
-    "honkVerifier": "0x710d4c75e0cB03bCd229033690567a936661aECE",
-    "linkVerifier": "0x6BfEc96c9637556ADA9999cD0307C4953A817f0A",
-    "accountImplementation": "0x8a4e3997dafbd64b507bbb42b5ba21865abefadb",
-    "factory": "0x49e772bd7efd483c043402331fbf03533852850f",
-    "factoryAlt": "0x740b6a46585474eb113f81999c1117e69d4be1be",
-    "usdg": "0x5C2171EB7fA1900AF693CC79B46e06E5a4Fb3B13"
+    "honkVerifier": "0x1eFfE0934Bd4c77D8a9e50db317560557ed2235B",
+    "linkVerifier": "0x1b0678E3C7cE0781dAC4DD6e76e0D68Efc445554",
+    "veraKeyValidator": "0x683439C8e55Da0A7F6A93CCaB08d882ce7c0939F",
+    "accountImplementation": "0x46e21eed59ad0652b638231653e11c5f7b3e7f9b",
+    "factory": "0xe1f6ff1f3efb2fb92846f97a2e4e017b311245b9",
+    "factoryAlt": "0x141ea9d975236de4cb3720115c04440008066de1",
+    "usdg": "0x142aaaa718cf7B1B4510c01BeEE9972f1B1F675e"
   },
   "policy": {
     "perTxCap": "50000000",
@@ -20,9 +21,9 @@
     "changeDelay": 10,
     "recoveryDelay": 15
   },
-  "configHash": "0x94576271af4779c54133b71694db02a5f2da80dc153f66bc70efa0e881861fed",
+  "configHash": "0xfd35bbf2ed47155dea908c5fa755731fe17b290ee712f21e20db0d1ce1f23caa",
   "circuitVkHash": "0x16378935c4dee31e952a8c42d2f20d4d5dbd00ee2e8225a1eb16e908caf37f12",
   "linkCircuitVkHash": "0x16256f66baa7cfcdc09869a3fa825033c24bc198a2929908165b8e5280f21683",
   "deployer": "0x3f1Eae7D46d88F08fc2F8ed27FCb2AB183EB2d0E",
-  "deployedAt": "2026-09-23T23:31:46Z"
+  "deployedAt": "2026-09-24T00:14:22Z"
 }

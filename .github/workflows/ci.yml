@@ -57,8 +57,12 @@ jobs:
 
       - name: Circuit tests, verification key and verifier
         run: scripts/build-circuit.sh
-      - name: Committed verifier and circuit artifact match the circuit source
-        run: git diff --exit-code -- contracts/evm/src/HonkVerifier.sol packages/sdk/src/circuit/verakey_webauthn.json
+      - name: Committed verifiers and circuit artifacts match the circuit sources
+        run: >-
+          git diff --exit-code -- contracts/evm/src/HonkVerifier.sol contracts/evm/src/LinkHonkVerifier.sol
+          packages/sdk/src/circuit/verakey_webauthn.json packages/sdk/src/circuit/verakey_link.json
+      - name: Solidity tests (VeraKeyValidator, real UltraHonk proofs)
+        run: forge test --root contracts/evm -vv
 
       - name: Rust unit tests
         run: pnpm contracts:test

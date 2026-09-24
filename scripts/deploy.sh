@@ -141,8 +141,9 @@ RP_ID_HASH=0x$(printf '%s' "$RP_ID" | sha256sum | cut -d' ' -f1)
 ORIGIN_HEX=0x$(printf '%s' "$ORIGIN" | xxd -p | tr -d '\n')
 echo "network=$NETWORK chainId=$CHAIN_ID deployer=$DEPLOYER rpId=$RP_ID origin=$ORIGIN"
 
-forge_deploy() { # <script>:<contract> -> address returned by run()
-  (cd "$ROOT/contracts/evm" && forge script "$1" --rpc-url "$RPC" --private-key "$KEY" --broadcast --slow 2>&1) \
+forge_deploy() { # <script>:<contract> [forge script args...] -> address returned by run()
+  local script=$1; shift
+  (cd "$ROOT/contracts/evm" && forge script "$script" --rpc-url "$RPC" --private-key "$KEY" --broadcast --slow "$@" 2>&1) \
     | awk '/^== Return ==/{getline; print $NF}' | tail -1
 }
 
@@ -163,6 +164,11 @@ echo "==> HonkVerifier"
 VERIFIER=$(forge_deploy script/DeployVerifier.s.sol:DeployVerifier)
 [ -n "$VERIFIER" ] || { echo "verifier deployment failed" >&2; exit 1; }
 echo "    $VERIFIER"
+
+echo "==> VeraKeyValidator (ERC-7579 module for Kernel / Nexus accounts)"
+VALIDATOR=$(forge_deploy script/DeployValidator.s.sol:DeployValidator --sig "run(address,bytes32,string)" "$VERIFIER" "$RP_ID_HASH" "$ORIGIN")
+[ -n "$VALIDATOR" ] || { echo "validator deployment failed" >&2; exit 1; }
+echo "    $VALIDATOR"
 
 echo "==> LinkHonkVerifier (consent-to-link disclosures)"
 LINK_VERIFIER=$(forge_deploy script/DeployLinkVerifier.s.sol:DeployLinkVerifier)
@@ -234,6 +240,7 @@ cat > "$ROOT/deployments/$NETWORK.json" <<JSON
   "contracts": {
     "honkVerifier": "$VERIFIER",
     "linkVerifier": "$LINK_VERIFIER",
+    "veraKeyValidator": "$VALIDATOR",
     "accountImplementation": "$IMPLEMENTATION",
     "factory": "$FACTORY",
     "factoryAlt": "$FACTORY_ALT",
