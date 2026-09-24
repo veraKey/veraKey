@@ -118,6 +118,17 @@ describe("VeraKeyConnect", () => {
     await outcome;
   });
 
+  it("says 'unavailable', not 'closed', when the page's opener policy cuts the popup off before it answers", async () => {
+    vi.useFakeTimers();
+    const window = new FakeWindow();
+    const signingIn = new VeraKeyConnect({ url: VERAKEY, host: window }).signIn({ nonce: NONCE });
+    // With Cross-Origin-Opener-Policy: same-origin, the site sees the popup as closed about 50 ms after opening it.
+    window.popup!.closed = true;
+    const outcome = expect(signingIn).rejects.toMatchObject({ code: "unavailable", message: expect.stringContaining("Cross-Origin-Opener-Policy") });
+    await vi.advanceTimersByTimeAsync(500);
+    await outcome;
+  });
+
   it("says 'closed' when the player closes the popup, keeping a payment's hash if it was already sent", async () => {
     vi.useFakeTimers();
     const window = new FakeWindow();

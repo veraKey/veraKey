@@ -1,9 +1,11 @@
 import { acceptRequest, envelope, type ConnectErrorCode, type ConnectRequest } from "@verakey/sdk/connect";
 import type { PaymentResult, SignInResult } from "@verakey/sdk/signin";
 import { useEffect, useState } from "react";
-import type { Hex } from "viem";
+import type { Address, Hex } from "viem";
 
 export interface ConnectReply {
+  /** The payment is about to go to the relayer: if the window closes now, the site can still find it. */
+  sending(account: Address, nonce: bigint): void;
   progress(hash: Hex): void;
   result(value: SignInResult | PaymentResult): void;
   error(code: ConnectErrorCode, message: string, revert?: string): void;
@@ -46,6 +48,7 @@ export function useConnectRequest(): Connection {
         origin,
         request,
         reply: {
+          sending: (account, nonce) => post({ type: "progress", stage: "sending", account, nonce: nonce.toString() }, false),
           progress: hash => post({ type: "progress", stage: "submitted", hash }, false),
           result: value => post({ type: "result", result: value }, true),
           error: (code, message, revert) => post({ type: "error", code, message, revert }, true),

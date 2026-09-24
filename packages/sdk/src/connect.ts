@@ -12,6 +12,8 @@ export const CONNECT_VERSION = 1;
 /** Every request uses one named window, so a site never stacks VeraKey popups. */
 export const CONNECT_WINDOW = "verakey-connect";
 const READY_TIMEOUT_MS = 30_000;
+const UNAVAILABLE =
+  "The VeraKey window did not answer. If this page sends Cross-Origin-Opener-Policy: same-origin, send same-origin-allow-popups instead; also check the VeraKey URL.";
 const CLOSED_POLL_MS = 500;
 const MAX_AMOUNT = 1n << 128n;
 
@@ -217,13 +219,12 @@ export class VeraKeyConnect {
       };
       this.host.addEventListener("message", onMessage);
       readyTimer = setTimeout(() => {
-        if (!ready) {
-          fail("unavailable",
-            "The VeraKey window did not answer. If this page sends Cross-Origin-Opener-Policy: same-origin, send same-origin-allow-popups instead.");
-        }
+        if (!ready) fail("unavailable", UNAVAILABLE);
       }, READY_TIMEOUT_MS);
       closedPoll = setInterval(() => {
-        if (popup.closed) {
+        // A popup that closes before it ever answered was cut off (the usual cause: this page's opener policy).
+        if (popup.closed && !ready) fail("unavailable", UNAVAILABLE);
+        else if (popup.closed) {
           fail("closed",
             sent ? "The VeraKey window closed after the payment was sent: verify it before asking again."
               : sending ? "The VeraKey window closed while the payment was being sent: find it with findPayment before asking again."

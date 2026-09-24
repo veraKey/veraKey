@@ -7,7 +7,7 @@ import path from "node:path";
 import express from "express";
 import { createPublicClient, defineChain, http, type Address, type Hex } from "viem";
 import { createServer as createVite } from "vite";
-import { verifyPayment, verifySignIn, type SignInResult } from "@verakey/sdk/signin";
+import { findPayment, verifyPayment, verifySignIn, type SignInResult } from "@verakey/sdk/signin";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
 const PORT = Number(process.env.DEMO_GAME_PORT ?? 5191);
@@ -41,8 +41,10 @@ const guarded =
     void handler(req, res).catch(error => res.status(400).json({ ok: false, error: error instanceof Error ? error.message : String(error) }));
 
 const app = express();
-app.use((_req, res, next) => {
+app.use((req, res, next) => {
   res.setHeader("Referrer-Policy", "no-referrer");
+  // ?coop=same-origin shows what that header does to Sign in with VeraKey: the SDK reports "unavailable".
+  if (req.query.coop === "same-origin") res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
   next();
 });
 app.use(express.json({ limit: "64kb" }));
@@ -80,13 +82,20 @@ app.post("/game-api/sign-in", guarded(async (req, res) => {
 }));
 
 app.post("/game-api/verify-payment", guarded(async (req, res) => {
-  const { session, hash } = req.body as { session?: string; hash?: Hex };
+  const { session, hash, nonce } = req.body as { session?: string; hash?: string; nonce?: string };
   const player = session ? sessions.get(session) : undefined;
-  if (!player || typeof hash !== "string") return void res.status(401).json({ ok: false, error: "Sign in first." });
-  if (paid.has(hash.toLowerCase())) return void res.status(409).json({ ok: false, error: "This payment already bought a sword." });
-  const verdict = await verifyPayment(hash, { publicClient: publicClient as never, account: player.account, to: MERCHANT, amount: PRICE });
-  if (verdict.valid) paid.add(hash.toLowerCase());
-  res.status(verdict.valid ? 200 : 400).json({ ok: verdict.valid, checks: verdict.checks });
+  if (!player) return void res.status(401).json({ ok: false, error: "Sign in first." });
+  // A popup that closed while sending the payment leaves only the account's action nonce: find the payment by it.
+  const found =
+    typeof hash === "string" ? (hash as Hex)
+      : typeof nonce === "string" && /^[0-9]{1,20}$/.test(nonce)
+        ? await findPayment({ publicClient: publicClient as never, account: player.account, nonce: BigInt(nonce) })
+        : null;
+  if (!found) return void res.status(400).json({ ok: false, error: "No payment found." });
+  if (paid.has(found.toLowerCase())) return void res.status(409).json({ ok: false, error: "This payment already bought a sword." });
+  const verdict = await verifyPayment(found, { publicClient: publicClient as never, account: player.account, to: MERCHANT, amount: PRICE });
+  if (verdict.valid) paid.add(found.toLowerCase());
+  res.status(verdict.valid ? 200 : 400).json({ ok: verdict.valid, hash: found, checks: verdict.checks });
 }));
 
 // Its own dependency cache: VeraKey's dev server keeps node_modules/.vite, and sharing it would reload VeraKey.

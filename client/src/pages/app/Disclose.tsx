@@ -112,7 +112,7 @@ export function Disclose() {
           <div className="vk-panel">
             <div className="vk-panel-head"><span>Disclosure</span><span>{state.status}</span></div>
             <div className="vk-panel-body">
-              <ProofTimeline state={state} offChain />
+              <ProofTimeline state={state} offChain="disclosure" />
               {state.status === "rejected" && <div style={{ marginTop: 14 }}><RejectionNote state={state} /></div>}
             </div>
           </div>

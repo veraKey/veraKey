@@ -44,8 +44,8 @@ const REJECTION_STEP: Record<string, StepKey> = {
 };
 
 /** The authorization pipeline, step by step: passkey, proof, relay, chain. */
-/** `offChain`: a proof made to hand to someone (a disclosure), so there is no relay or transaction. */
-export function ProofTimeline({ state, lastProvingMs, offChain = false }: { state: ProofState; lastProvingMs?: number; offChain?: boolean }) {
+/** `offChain`: a proof made to hand to someone (a disclosure, or a sign-in for a site), so there is no relay or transaction. */
+export function ProofTimeline({ state, lastProvingMs, offChain }: { state: ProofState; lastProvingMs?: number; offChain?: "disclosure" | "sign-in" }) {
   const failedAt = state.status === "rejected" ? ORDER.indexOf(REJECTION_STEP[state.stage]) : -1;
   // A rejection at step k means every earlier step succeeded (e.g. a valid proof blocked by policy).
   const current = state.status === "rejected" ? failedAt : stepIndex(state);
@@ -75,12 +75,18 @@ export function ProofTimeline({ state, lastProvingMs, offChain = false }: { stat
     },
   ];
 
-  const shown = offChain
-    ? [
-        { ...steps[0], detail: "Face ID, Touch ID or PIN approves this exact disclosure statement." },
-        { ...steps[1], detail: "Proves one passkey owns both accounts. The key, signature and PRF secret stay here." },
-      ]
-    : steps;
+  const shown =
+    offChain === "disclosure"
+      ? [
+          { ...steps[0], detail: "Face ID, Touch ID or PIN approves this exact disclosure statement." },
+          { ...steps[1], detail: "Proves one passkey owns both accounts. The key, signature and PRF secret stay here." },
+        ]
+      : offChain === "sign-in"
+        ? [
+            { ...steps[0], detail: "Face ID, Touch ID or PIN approves this sign-in, for this site only." },
+            { ...steps[1], detail: "Proves your passkey approved it. The key, signature and PRF secret stay here." },
+          ]
+        : steps;
   return (
     <div className="vk-timeline" aria-live="polite">
       {shown.map((step, i) => {

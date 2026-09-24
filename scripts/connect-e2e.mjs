@@ -147,6 +147,8 @@ try {
   await step("the game loads on its own origin", async () => {
     await send("Page.navigate", { url: GAME }, game);
     await waitFor(game, hasText("Sign in with VeraKey"), 30_000);
+    // A player ID is public once the account is used on-chain: the game must not call it a secret.
+    if (await evaluate(game, hasText("only this game knows"))) throw new Error("the game calls the player ID a secret");
     return new URL(GAME).origin;
   });
 
@@ -155,6 +157,7 @@ try {
     await nextPopupDocument();
     const shown = await evaluate(popup, `document.querySelector("[data-requester]")?.textContent`);
     if (shown !== new URL(GAME).origin) throw new Error(`the popup names ${shown}`);
+    if (await evaluate(popup, hasText("only it knows"))) throw new Error("the popup calls the player ID a secret");
     await waitFor(popup, `document.documentElement.dataset.prover === "ready"`, 60_000);
     const isolated = await evaluate(popup, "crossOriginIsolated");
     const threads = Number(await evaluate(popup, "document.documentElement.dataset.proverThreads"));
@@ -167,6 +170,9 @@ try {
   await step("the player creates a passkey and signs in, and the game's server verifies it", async () => {
     await click(popup, "Create a VeraKey passkey");
     await click(popup, "Sign in to", 120_000);
+    // What the player approves, while the proof is made: a sign-in, never a disclosure.
+    await waitFor(popup, hasText("approves this sign-in"), 30_000);
+    if (await evaluate(popup, hasText("disclosure"))) throw new Error("the sign-in screen talks about a disclosure");
     await waitFor(game, `${hasText("Signed in")} || ${hasText("Not signed in")}`, 180_000);
     if (!(await evaluate(game, hasText("Signed in")))) throw new Error(await evaluate(game, `document.querySelector("#status").textContent`));
     player = await evaluate(game, `({ ...document.querySelector("#status").dataset })`);
@@ -198,11 +204,43 @@ try {
     await waitFor(popup, `!!${button("Pay 1.00 USDG")}`, 120_000);
     await shot(popup, "pay");
     await click(popup, "Pay 1.00 USDG");
+    // While the payment is under way, it cannot be cancelled, and closing the window asks first (a listener cancels
+    // beforeunload).
+    const midPayment = `(() => {
+      if (!document.querySelector(".vk-step.is-active")) return null;
+      const cancel = !!${button("Cancel")};
+      const guarded = !window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+      return { cancel, guarded };
+    })()`;
+    await waitFor(popup, `!!${midPayment}`, 10_000);
+    const during = await evaluate(popup, midPayment);
+    if (during?.cancel || !during?.guarded) throw new Error(`mid-payment: Cancel ${during?.cancel ? "enabled" : "disabled"}, closing ${during?.guarded ? "asks" : "does not ask"}`);
     await waitFor(game, `${hasText("Payment verified")} || ${hasText("No payment")}`, 180_000);
     const receipt = await evaluate(game, `document.querySelector("#receipt").textContent`);
     if (!receipt.includes("Payment verified")) throw new Error(receipt);
     await shot(game, "paid");
     return receipt;
+  });
+
+  await step("the popup refuses to pay from another account than the one the site names", async () => {
+    await markPopup();
+    // A payment request for some other player's account, sent with the SDK from the game's page.
+    const { verakeyUrl } = await (await fetch(`${GAME}/game-api/config`)).json();
+    const sdk = path.resolve(import.meta.dirname, "../packages/sdk/src/connect.ts");
+    await evaluate(game, `import("/@fs${sdk}").then(({ VeraKeyConnect }) => {
+      window.__otherAccount = new VeraKeyConnect({ url: ${JSON.stringify(verakeyUrl)} })
+        .pay({ to: "0x5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe", amount: 1000000n, account: "0x000000000000000000000000000000000000dEaD" })
+        .then(() => "paid", error => error.code);
+    })`);
+    await nextPopupDocument();
+    await click(popup, "Unlock with passkey");
+    await waitFor(popup, hasText("different player"), 60_000);
+    await shot(popup, "other-account");
+    if (await evaluate(popup, `!!${button("Pay ")}`)) throw new Error("the popup offers to pay from another account");
+    await click(popup, "Cancel");
+    const outcome = await evaluate(game, "window.__otherAccount");
+    if (outcome !== "cancelled") throw new Error(`the site got ${outcome}`);
+    return "refused, then cancelled";
   });
 
   await step("cancelling in the popup tells the game 'cancelled'", async () => {
@@ -222,6 +260,15 @@ try {
     popup = null;
     await waitFor(game, hasText("closed"));
     return "closed";
+  });
+
+  await step("a page that sends Cross-Origin-Opener-Policy: same-origin is told 'unavailable', not 'closed'", async () => {
+    await send("Page.navigate", { url: `${GAME}/?coop=same-origin` }, game);
+    await click(game, "Sign in with VeraKey", 30_000);
+    await waitFor(game, `${hasText("unavailable")} || ${hasText("closed")}`, 40_000);
+    const status = await evaluate(game, `document.querySelector("#status").textContent`);
+    if (!status.includes("unavailable") || !status.includes("Cross-Origin-Opener-Policy")) throw new Error(status);
+    return "unavailable";
   });
 
   const passed = results.filter(r => r.ok).length;

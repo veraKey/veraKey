@@ -47,6 +47,8 @@ export default function ConnectPage() {
   const fee = config ? BigInt(config.relayer.fee) : 0n;
   const payment = request?.request.method === "pay" ? request.request.params : null;
   const amount = payment ? BigInt(payment.amount) : 0n;
+  // The site named the signed-in player's account, and this passkey's account for the site is another one.
+  const otherPlayer = !!payment?.account && !!account && payment.account.toLowerCase() !== account.toLowerCase();
 
   const fail = (error: unknown) => {
     const failure = error instanceof VeraKeyError ? error : new VeraKeyError("relay", error instanceof Error ? error.message : String(error));
@@ -99,20 +101,30 @@ export default function ConnectPage() {
   };
 
   const pay = async () => {
-    if (!client || !request || !payment || appId === null || !account) return;
+    if (!client || !request || !payment || appId === null || !account || otherPlayer) return;
     setBusy(true);
+    // Closing the window mid-payment asks first: the payment may already be on its way.
+    const stay = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", stay);
     try {
+      const { nonce } = await client.account(appId);
       const receipt = await client.pay(appId, payment.to, amount, next => {
         setState(next);
+        if (next.status === "relaying") request.reply.sending(account, nonce);
         if (next.status === "confirming") request.reply.progress(next.hash);
       });
       const result: PaymentResult = { version: 1, hash: receipt.transactionHash, account, to: payment.to, amount: amount.toString(), fee: fee.toString() };
+      window.removeEventListener("beforeunload", stay);
       request.reply.result(result);
       setFinished("done");
       window.close();
     } catch (error) {
       fail(error);
     } finally {
+      window.removeEventListener("beforeunload", stay);
       setBusy(false);
     }
   };
@@ -143,7 +155,19 @@ export default function ConnectPage() {
   return (
     <div className="vk-app vk-connect">
       <header className="vk-connect-head"><BrandMark /><b>VeraKey</b></header>
-      {connection.status === "no-opener" && <p className="vk-lede">Open this window from a site's Sign in with VeraKey button.</p>}
+      {connection.status === "no-opener" && (
+        <div className="vk-connect-actions">
+          <p className="vk-lede">
+            This window is not connected to a site, so it cannot sign you in. Close it, and use the site's Sign in with
+            VeraKey button again.
+          </p>
+          <p className="vk-note">
+            Site developers: a page that sends Cross-Origin-Opener-Policy: same-origin cuts this window off. Send
+            same-origin-allow-popups instead.
+          </p>
+          <button className="vk-btn vk-btn-ghost" onClick={() => window.close()}>Close</button>
+        </div>
+      )}
       {connection.status === "waiting" && <p className="vk-lede"><span className="vk-spinner" /> Waiting for the site…</p>}
       {connection.status === "rejected" && <div className="vk-note is-error" role="alert">{connection.message}</div>}
       {request && (
@@ -155,9 +179,12 @@ export default function ConnectPage() {
               <p>
                 {payment
                   ? `Pay ${formatUsdg(amount)} USDG with your VeraKey passkey.`
-                  : "Sign in with your VeraKey passkey. This site gets a player ID that only it knows."}
+                  : "Sign in with your VeraKey passkey. This site gets a player ID of its own: other sites get different IDs, and nobody can link them."}
               </p>
-              {hasPasskey ? (
+              {payment?.account ? (
+                // A payment for a signed-in player: only the passkey they signed in with can pay it.
+                <button className="vk-btn vk-btn-primary" disabled={busy || !client} onClick={() => unlock(false)}><KeyRound size={15} /> Unlock with passkey</button>
+              ) : hasPasskey ? (
                 <>
                   <button className="vk-btn vk-btn-primary" disabled={busy || !client} onClick={() => unlock(false)}><KeyRound size={15} /> Unlock with passkey</button>
                   <button className="vk-btn vk-btn-ghost" disabled={busy || !client} onClick={() => unlock(true)}>Create a VeraKey passkey</button>
@@ -184,7 +211,20 @@ export default function ConnectPage() {
             </div>
           )}
 
-          {player !== null && finished === null && payment && (
+          {player !== null && finished === null && payment && otherPlayer && (
+            <div className="vk-connect-actions">
+              <div className="vk-note is-error" role="alert">
+                <span>
+                  This passkey is a different player on this site. The site asked for a payment from{" "}
+                  <code>{shortHex(payment.account!, 8, 6)}</code>, the account you signed in with, and this passkey pays from{" "}
+                  <code>{account ? shortHex(account, 8, 6) : "…"}</code>. Unlock the passkey you signed in with.
+                </span>
+              </div>
+              <button className="vk-btn vk-btn-ghost" disabled={busy} onClick={() => unlock(false)}><KeyRound size={15} /> Unlock another passkey</button>
+            </div>
+          )}
+
+          {player !== null && finished === null && payment && !otherPlayer && (
             <div className="vk-connect-actions">
               <div className="vk-facts">
                 <div className="vk-fact"><span>Pay</span><code>{payment.to}</code></div>
@@ -193,7 +233,7 @@ export default function ConnectPage() {
               </div>
               {holding && !holding.knownRecipient && amount > holding.cap && (
                 <div className="vk-note" role="note">
-                  This account's first payment to a new recipient is capped at {formatUsdg(holding.cap)} USDG, so this payment will be refused.
+                  <span>This account's first payment to a new recipient is capped at {formatUsdg(holding.cap)} USDG, so this payment will be refused.</span>
                 </div>
               )}
               {holding && holding.balance < amount + fee ? (
@@ -209,10 +249,10 @@ export default function ConnectPage() {
             </div>
           )}
 
-          {state.status !== "idle" && state.status !== "rejected" && <ProofTimeline state={state} offChain={!payment} />}
+          {state.status !== "idle" && state.status !== "rejected" && <ProofTimeline state={state} offChain={payment ? undefined : "sign-in"} />}
           {state.status === "rejected" && <RejectionNote site state={state} />}
           {finished === "done" && <p className="vk-lede"><Check size={15} /> Done. You can close this window.</p>}
-          {finished === null && <button className="vk-btn vk-btn-quiet" onClick={cancel}><X size={14} /> Cancel</button>}
+          {finished === null && <button className="vk-btn vk-btn-quiet" disabled={busy} onClick={cancel}><X size={14} /> Cancel</button>}
           {finished === "failed" && <button className="vk-btn vk-btn-ghost" onClick={() => window.close()}>Close</button>}
         </>
       )}
