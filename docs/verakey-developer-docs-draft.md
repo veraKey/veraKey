@@ -167,8 +167,8 @@ one, its nonce), so a forwarded disclosure fails; disclosures valid for more tha
 
 ## ERC-7579 validator
 
-`contracts/evm/src/modules/VeraKeyValidator.sol` lets ERC-7579 accounts (ZeroDev Kernel, Biconomy Nexus)
-use VeraKey proofs:
+`contracts/evm/src/modules/VeraKeyValidator.sol` brings VeraKey proofs to ERC-7579 accounts such as ZeroDev
+Kernel and Biconomy Nexus. It is tested with real proofs as a module, not yet inside those accounts:
 
 - install with `validatorInstallData(appId, nullifier)`;
 - sign a user operation by proving an assertion whose challenge is the `userOpHash`, and pass

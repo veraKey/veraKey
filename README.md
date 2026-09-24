@@ -126,7 +126,7 @@ Nothing on-chain connects a user's accounts in different apps. When someone need
 | `pay`, first payment to a new recipient | 1,043,768 gas; ≈ $0.06 on Arbitrum One at 0.02 gwei and ETH $2,668 |
 | `pay`, a recipient paid before | 988,934 gas |
 | `pay` through the payment sheet, a recipient paid before | 994,246 gas |
-| `pay` from the app in Chrome to the demo merchant, through the relayer | 1,021,759 gas; the same payment took 4,171,302 with bb's default verifier |
+| `pay` from the app in Chrome to the demo merchant, through the relayer | 1,021,759 gas, ≈ $0.05 on Arbitrum One; the same payment took 4,171,302 with bb's default verifier (≈ $0.22) |
 | `restrict` (e.g. lower the caps) | 979,007 gas |
 | `createAccount` (EIP-1167 clone + storage init, programs cached) | 383,296 gas |
 | Baseline: `P256VERIFY` precompile (no privacy) | 3,450 gas |

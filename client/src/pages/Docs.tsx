@@ -58,7 +58,7 @@ verdict.valid;                                  // plus one entry per check in v
 
 const VALIDATOR = `import { validatorInstallData, validatorSignature, VALIDATOR_VERIFICATION_GAS } from "@verakey/sdk/validator";
 
-// Install on a Kernel or Nexus account (module type 1, validator).
+// Install on an ERC-7579 account such as Kernel or Nexus (module type 1, validator).
 const initData = validatorInstallData(appIdHex, nullifierHex);
 
 // Sign a user operation: prove a passkey assertion whose challenge is the userOpHash.
@@ -157,7 +157,8 @@ export function Docs() {
         <h2>ERC-7579 validator</h2>
         <p>
           Accounts that are not VeraKey accounts can still use VeraKey proofs. <code>VeraKeyValidator</code> is an
-          ERC-7579 validator module for Kernel and Nexus: a user operation is signed by proving a passkey
+          ERC-7579 validator module, built for modular accounts such as Kernel and Nexus and tested with real
+          proofs as a module (not yet inside those accounts): a user operation is signed by proving a passkey
           assertion whose challenge is the userOpHash. ERC-1271 signatures are bound to the chain and the
           account, so they cannot be replayed to another account that installed the same nullifier. The module
           enforces no spending policy: pair it with a policy or hook module.

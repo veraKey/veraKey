@@ -141,7 +141,7 @@ const useCases = [
     title: "Your app",
     subtitle: "@verakey/sdk",
     copy: "Add passkey accounts to any Arbitrum app with the SDK: register, derive the account, authorize, pay. Proving runs in your users' browsers.",
-    detail: "Already on a smart account? Kernel and Nexus accounts can install the VeraKey ERC-7579 validator and accept the same proofs.",
+    detail: "On a modular smart account? The VeraKey ERC-7579 validator verifies the same proofs. It is built for accounts such as Kernel and Nexus and tested with real proofs as a module.",
     icon: Building2,
     color: "orange",
     tags: ["typescript sdk", "gasless relay", "erc-7579 validator"],
@@ -456,7 +456,7 @@ export default function Home() {
               <div className="friction-note is-facts"><Sparkles size={16} /><span>WHY NOW</span><ul>
                 <li><b>iOS 18.4</b> passkey PRF works the same on every Apple device</li>
                 <li><b>Kohaku</b> Ethereum's privacy wallet roadmap defaults to a new address per app</li>
-                <li><b>ArbOS 60</b> Stylus runs 40 KB Rust accounts</li>
+                <li><b>ArbOS 60</b> Stylus runs 46 KB Rust accounts</li>
               </ul></div>
             </div>
           </div>
@@ -562,15 +562,15 @@ export default function Home() {
 
         <section className="metrics-section section-pad" data-reveal>
           <div className="container metrics-layout">
-            <div><SectionKicker>THE COST OF PRIVACY</SectionKicker><h2>Privacy has a price.<br /><em>We publish it.</em></h2><p className="metrics-lede">Arbitrum verifies an UltraHonk proof instead of a bare P-256 signature. That costs more gas than the precompile, and buys an account that shares no key with your other apps. bb 5's optimized verifier, packed storage and cached Stylus programs cut a payment from 4.17M to 1.04M gas. Gas is measured on a nitro devnode at ArbOS 61; dollars use Arbitrum One's gas price and the ETH price on 24 Sep 2026.</p><button className="outline-button" onClick={openDocs}><ShieldCheck size={15} /> Read the threat model</button></div>
+            <div><SectionKicker>THE COST OF PRIVACY</SectionKicker><h2>Privacy has a price.<br /><em>We publish it.</em></h2><p className="metrics-lede">Arbitrum verifies an UltraHonk proof instead of a bare P-256 signature. That costs more gas than the precompile, and buys an account that shares no key with your other apps. bb 5's optimized verifier, packed storage and cached Stylus programs cut the same payment from 4.17M to 1.02M gas. Gas is measured on a nitro devnode at ArbOS 61; dollars use Arbitrum One's gas price and the ETH price on 24 Sep 2026.</p><button className="outline-button" onClick={openDocs}><ShieldCheck size={15} /> Read the threat model</button></div>
             <div className="metrics-chart">
               <div className="chart-header"><span>MEASURED GAS PER OPERATION</span><span>NITRO DEVNODE · ARBOS 61</span></div>
               <div className="bar-row"><div className="bar-label"><span>P256VERIFY precompile (no privacy)</span><strong>3,450</strong></div><div className="bar-track"><div className="bar-fill bar-new" style={{ width: "1%" }} /></div></div>
               <div className="bar-row"><div className="bar-label"><span>HonkVerifier.verify (the proof)</span><strong>712,554</strong></div><div className="bar-track"><div className="bar-fill bar-old" style={{ width: "17%" }} /></div></div>
-              <div className="bar-row"><div className="bar-label"><span>VeraKey pay (proof + policy + 2 USDG transfers)</span><strong className="accent-number">1,043,768</strong></div><div className="bar-track"><div className="bar-fill bar-old" style={{ width: "25%" }} /></div></div>
-              <div className="bar-row"><div className="bar-label"><span>The same pay with bb's default verifier (before)</span><strong className="muted-number">4,171,302</strong></div><div className="bar-track"><div className="bar-fill bar-muted" style={{ width: "100%" }} /></div></div>
+              <div className="bar-row"><div className="bar-label"><span>VeraKey payment from the app (proof, policy, 2 USDG transfers)</span><strong className="accent-number">1,021,759</strong></div><div className="bar-track"><div className="bar-fill bar-old" style={{ width: "24%" }} /></div></div>
+              <div className="bar-row"><div className="bar-label"><span>The same payment with bb's default verifier (before)</span><strong className="muted-number">4,171,302</strong></div><div className="bar-track"><div className="bar-fill bar-muted" style={{ width: "100%" }} /></div></div>
               <div className="chart-cost">
-                <div><span>PAY ON ARBITRUM ONE</span><strong>≈ $0.06</strong><small>0.02 gwei · ETH at $2,668</small></div>
+                <div><span>PAY ON ARBITRUM ONE</span><strong>≈ $0.05</strong><small>0.02 gwei · ETH at $2,668</small></div>
                 <div><span>BEFORE THE OPTIMIZED VERIFIER</span><strong>≈ $0.22</strong><small>the same payment, 4.17M gas</small></div>
                 <div><span>PROOF CALLDATA (L1)</span><strong>≈ $0.002</strong><small>about 9 KB per payment</small></div>
               </div>
