@@ -80,12 +80,12 @@ Sepolia policy for new accounts:
 
 | Protection | What happens |
 |---|---|
-| Caps | Per-payment and daily USDG caps. Fees count against them. |
+| Caps | Per-payment and daily USDG caps. Payments and their fees count against them, but a spent cap never stops a freeze or a veto. |
 | New-recipient cap | A first payment to a recipient the account has never paid is at most `newPayeeCap`, unless the recipient is allowlisted. A look-alike address or a tampered page gets a small amount, not the balance. |
 | Fees | At most `maxFee`, always to the relayer fixed in the factory. Whoever submits a transaction cannot pocket the fee. |
 | Freeze | One approval stops every payment and cancels every scheduled change. The guardian can freeze too. |
 | Timelocks | Loosening changes are scheduled and wait out the change delay. This covers raising caps, adding an owner, changing the guardian, unfreezing and dropping the payment sheet. Any owner or the guardian can cancel them, and they are listed on-chain so every device sees them. Tightening changes apply at once (`restrict`). |
-| Private guardian | Stored as `keccak256(abi.encode(typehash, account, guardian, salt))`, with a PRF-derived salt per app. It can freeze, veto and recover, but not block its own replacement. |
+| Private guardian | Stored as `keccak256(abi.encode(typehash, account, guardian, salt))`, with a PRF-derived salt per app. It can freeze, veto and recover, but not block its own replacement. Changing it waits the change delay plus the recovery delay and cancels its pending recovery. |
 | Payment sheet | Optionally required. The browser's own sheet shows the payee and the total, and the account checks both byte for byte. |
 | Recovery | The guardian can replace all owners after the recovery delay, and any owner can cancel. Executing it revokes the old owners and their scheduled changes. |
 

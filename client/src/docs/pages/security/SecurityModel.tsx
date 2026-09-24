@@ -12,9 +12,17 @@ const INVARIANTS: [string, ReactNode, ReactNode][] = [
     <>e2e: authorization binding (origin, type, other account, other chain, tampered proof, replay, deadlines)</>,
   ],
   [
-    "Every movement is capped.",
-    <>A payment plus its fee, and every fee a management action pays, counts against the per-payment and daily caps.</>,
-    <>e2e: policy; prop: <code>a_day_never_spends_more_than_its_caps</code></>,
+    "Every payment is capped, and the caps never stop the owners from defending the account.",
+    <>
+      A payment plus its fee, and the fee of a scheduled change, count against the per-payment and daily caps. Freezing,
+      restricting and cancelling a change or a recovery are never refused because of the caps, so a thief who spends the
+      day's cap cannot stop the owners; their fee, at most <code>maxFee</code>, still counts toward the day's spending.
+      The per-payment cap never drops below <code>maxFee</code>.
+    </>,
+    <>
+      e2e: policy; audit: <code>with the day's cap spent, the owner still vetoes a waiting change and freezes</code>,{" "}
+      <code>the per-payment cap can't drop below the largest fee</code>; prop: <code>a_day_never_spends_more_than_its_caps</code>
+    </>,
   ],
   [
     "Fees cannot be redirected.",
@@ -39,7 +47,8 @@ const INVARIANTS: [string, ReactNode, ReactNode][] = [
   [
     "Freezing is instant and cancels what is scheduled; unfreezing is not instant.",
     <>
-      Owners freeze with a proof (<code>restrict</code>), the guardian with its salt. A frozen account makes no payments.
+      Owners freeze with a proof (<code>restrict</code>), the guardian with its salt; a freeze cannot be scheduled. A frozen
+      account makes no payments.
       A freeze cancels every scheduled change; a guardian's freeze keeps changes to the guardian itself. Unfreezing is a
       timelocked change that owners or the guardian can cancel.
     </>,
@@ -53,7 +62,8 @@ const INVARIANTS: [string, ReactNode, ReactNode][] = [
     <>
       <code>restrict</code> applies at once only a freeze, lower limits, enabling the allowlist, removing a recipient or
       requiring the payment sheet. Owners, the guardian, unfreezing, higher limits and dropping the payment sheet wait for
-      the change delay.
+      the change delay; a change to the guardian also waits the recovery delay. A change that could never apply (adding an
+      existing owner, removing a non-owner or the last owner) is refused when it is scheduled.
     </>,
     <>
       e2e: <code>restrict_tightens_at_once_and_refuses_to_loosen</code>; prop:{" "}
@@ -94,14 +104,16 @@ const INVARIANTS: [string, ReactNode, ReactNode][] = [
   [
     "A guardian can delay the owners, and takes over only through a recovery nobody cancels.",
     <>
-      The guardian can freeze, veto scheduled changes and start a recovery. It cannot veto a change to the guardian, which
-      waits the change delay plus the recovery delay, so a recovery started in time still finishes first. A recovery waits
+      The guardian can freeze, veto scheduled changes and start a recovery. It cannot veto a change to the guardian. Every
+      change to the guardian waits the change delay plus the recovery delay, so a recovery started in time still finishes
+      first, and cancels a recovery the previous guardian started, so a removed guardian keeps no way in. A recovery waits
       the recovery delay, any owner can cancel it, and executing it bumps the owner epoch, which voids every previous owner
       and scheduled change. A recovery nobody cancels makes the guardian's chosen nullifier the only owner.
     </>,
     <>
       e2e: <code>the_guardian_cannot_veto_a_change_to_the_guardian_which_waits_longer</code>,{" "}
-      <code>guardian_recovery_rotates_owners_and_owner_can_cancel</code>
+      <code>guardian_recovery_rotates_owners_and_owner_can_cancel</code>; audit:{" "}
+      <code>removing the guardian cancels the recovery it started just before</code>
     </>,
   ],
   [

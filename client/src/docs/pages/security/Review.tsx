@@ -7,17 +7,20 @@ export default function ReviewPage() {
       <ul>
         <li>VeraKey is a testnet preview on Arbitrum Sepolia.</li>
         <li>The circuits and contracts have <strong>not had an independent audit</strong>, and UltraHonk itself has not been independently audited.</li>
-        <li>An internal adversarial review was done on 2026-09-24 and its findings are fixed. It does not replace an audit.</li>
+        <li>
+          Two internal reviews were done on 2026-09-24, the second a Nemesis audit of the contracts and circuits, and their
+          findings are fixed. They do not replace an audit.
+        </li>
       </ul>
       <Callout kind="warning">Do not use VeraKey with real funds until it has been audited.</Callout>
       <p>What is tested instead:</p>
       <ul>
         <li>18 circuit tests: 11 for the authorization circuit, 7 for the link circuit;</li>
-        <li>39 unit tests and 9 property tests of 2,000 cases each for the account's logic;</li>
+        <li>44 unit tests and 9 property tests of 2,000 cases each for the account's logic;</li>
         <li>36 tests for the ERC-7579 validator, with real proofs;</li>
         <li>
-          61 end-to-end tests that deploy the real contracts to a local Arbitrum Nitro node and use real proofs: 44 for the account, 10 for
-          disclosures and 7 that drive the relayer over HTTP;
+          75 end-to-end tests that deploy the real contracts to a local Arbitrum Nitro node and use real proofs: 44 for the account, 7
+          that replay the audit's attacks, 10 for disclosures, 5 for Sign in with VeraKey and 9 that drive the relayer over HTTP;
         </li>
         <li>
           an automated browser workflow that drives the app in headless Chrome with a virtual
@@ -67,6 +70,47 @@ export default function ReviewPage() {
             <Badge key="s">Low</Badge>,
             "The relayer trusted a contract's own config() answer and allowed 12M gas.",
             "A clone-code check, a 2.5M gas cap and a per-visitor limit on new accounts.",
+          ],
+        ]}
+      />
+      <p>
+        A second internal audit the same day ran Nemesis over the Stylus contracts, the ERC-7579 validator and both circuits:
+        alternating passes that question every line and map every piece of state that must change together, until nothing
+        new surfaces. Each finding was reproduced on a local Arbitrum Nitro node with real proofs, and each fix has a
+        regression test that replays the attack.
+      </p>
+      <Table
+        head={["Severity", "Finding", "Fix"]}
+        rows={[
+          [
+            <Badge key="s" tone="orange">High</Badge>,
+            "Freezing, restricting and cancelling paid their fee within the same caps as payments. A thief who spent the day's cap stopped the owners from freezing or vetoing until the next UTC day, so a change the thief scheduled applied unopposed; a per-payment cap below the fee locked every relayed action.",
+            "These actions are never refused because of the caps, and their fee still counts toward the day's spending. The per-payment cap never drops below maxFee (2).",
+          ],
+          [
+            <Badge key="s" tone="orange">Medium</Badge>,
+            "A recovery survived a change to the guardian, so a guardian the owners removed could still take the account with a recovery it started just before.",
+            "A change to the guardian cancels a pending recovery (10).",
+          ],
+          [
+            <Badge key="s">Low</Badge>,
+            "The longer delay for replacing a guardian was decided when the change was scheduled, so a replacement queued before a guardian existed skipped it.",
+            "Every change to the guardian waits the change delay plus the recovery delay (10).",
+          ],
+          [
+            <Badge key="s">Low</Badge>,
+            "A freeze scheduled through the timelock did not cancel the scheduled changes.",
+            "A freeze cannot be scheduled; it is always instant (5).",
+          ],
+          [
+            <Badge key="s">Low</Badge>,
+            "Owner changes that could never apply kept one of the eight pending slots.",
+            "They are refused when they are scheduled (6).",
+          ],
+          [
+            <Badge key="s">Low</Badge>,
+            "The factory accepted a configuration that every account then rejected.",
+            "The factory and the accounts check the same bounds.",
           ],
         ]}
       />

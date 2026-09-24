@@ -23,11 +23,11 @@ export default function ContractReferencePage() {
         head={["Function", "Caller", "What it does"]}
         rows={[
           [c("pay(address to, uint256 amount, …proof)"), "Owner's proof", "Pays amount USDG to to, and the fee to the fee recipient."],
-          [c("scheduleChange(uint8 change_kind, bytes payload, …proof) → bytes32"), "Owner's proof", "Schedules a change; returns its id. It applies after the change delay."],
-          [c("restrict(uint8 change_kind, bytes payload, …proof) → bytes32"), "Owner's proof", "Applies a tightening change at once; a freeze also cancels the scheduled changes."],
+          [c("scheduleChange(uint8 change_kind, bytes payload, …proof) → bytes32"), "Owner's proof", "Schedules a change; returns its id. It applies after the change delay; a change to the guardian waits the recovery delay too. A freeze, or an owner change that could never apply, is refused."],
+          [c("restrict(uint8 change_kind, bytes payload, …proof) → bytes32"), "Owner's proof", "Applies a tightening change at once; a freeze also cancels the scheduled changes. Never refused because of the caps."],
           [c("applyChange(bytes32 change_id, uint8 change_kind, bytes payload)"), "Anyone", "Applies a scheduled change whose delay has passed, with the exact kind and payload scheduled."],
-          [c("cancelChange(bytes32 change_id, …proof)"), "Owner's proof", "Cancels a scheduled change."],
-          [c("cancelRecovery(…proof)"), "Owner's proof", "Cancels a pending recovery."],
+          [c("cancelChange(bytes32 change_id, …proof)"), "Owner's proof", "Cancels a scheduled change. Never refused because of the caps."],
+          [c("cancelRecovery(…proof)"), "Owner's proof", "Cancels a pending recovery. Never refused because of the caps."],
           [c("guardianFreeze(bytes32 salt)"), "Guardian", "Freezes the account and cancels every scheduled change except changes to the guardian."],
           [c("guardianCancelChange(bytes32 change_id, bytes32 salt)"), "Guardian", "Vetoes a scheduled change, except a change to the guardian."],
           [c("initiateRecovery(bytes32 new_nullifier, bytes32 salt)"), "Guardian", "Starts replacing every owner with new_nullifier after the recovery delay."],
@@ -112,12 +112,12 @@ export default function ContractReferencePage() {
         rows={[
           ["1", "AddOwner", c("bytes32 nullifier"), "No"],
           ["2", "RemoveOwner", c("bytes32 nullifier"), "No; the last owner cannot be removed"],
-          ["3", "SetLimits", c("abi.encode(uint256 perTxCap, uint256 dailyCap)"), "When neither cap goes up; 0 < perTxCap ≤ dailyCap"],
+          ["3", "SetLimits", c("abi.encode(uint256 perTxCap, uint256 dailyCap)"), "When neither cap goes up; maxFee ≤ perTxCap ≤ dailyCap"],
           ["4", "SetRecipient", c("abi.encode(address recipient, bool allowed)"), "When removing a recipient"],
           ["5", "SetAllowlist", c("abi.encode(bool enabled)"), "When enabling"],
-          ["6", "SetGuardian", c("bytes32 commitment"), "No. Zero removes the guardian; replacing or removing one waits the change delay plus the recovery delay"],
+          ["6", "SetGuardian", c("bytes32 commitment"), "No. Zero removes the guardian. Any change to it waits the change delay plus the recovery delay, and cancels a pending recovery"],
           ["7", "SetNewPayeeCap", c("abi.encode(uint256 cap)"), "When the cap does not go up"],
-          ["8", "Freeze", "empty", "Yes; it also cancels every scheduled change"],
+          ["8", "Freeze", "empty", "Always, and only through restrict: it cannot be scheduled. It also cancels every scheduled change"],
           ["9", "Unfreeze", "empty", "No"],
           ["10", "SetPaymentSheet", c("abi.encode(bool required)"), "When requiring the sheet"],
         ]}

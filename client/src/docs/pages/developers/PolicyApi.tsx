@@ -23,7 +23,8 @@ freeze(appId: bigint, emit?)   // = restrict(appId, changePayload.freeze(), emit
       <p>
         <code>restrict</code> applies a change immediately, but only if it cannot increase what the account can spend or
         change who controls it. Anything else is refused with <code>NotRestrictive</code>; schedule it instead. A freeze
-        also cancels every scheduled change.
+        also cancels every scheduled change. <code>restrict</code> and the cancellations are never refused because of the
+        caps, and the per-payment cap never drops below <code>maxFee</code> (<code>InvalidChange</code>).
       </p>
       <Code lang="ts">{`
 import { changePayload } from "@verakey/sdk/action";
@@ -40,9 +41,11 @@ scheduleChange(appId: bigint, change: { kind: ChangeKind; payload: Hex }, emit?)
 interface TrackedChange { account: Address; changeId: Hex; kind: ChangeKind; payload: Hex; eta: number }
 `}</Code>
       <p>
-        A scheduled change waits out the account's change delay (<code>eta</code> is in Unix seconds). A change that
-        replaces or removes a guardian waits the change delay plus the recovery delay. At most 8 changes wait at once;
-        a ninth is refused with <code>TooManyPendingChanges</code>.
+        A scheduled change waits out the account's change delay (<code>eta</code> is in Unix seconds). A change to the
+        guardian waits the change delay plus the recovery delay, and cancels a recovery the previous guardian started. A
+        freeze cannot be scheduled (use <code>restrict</code>), and an owner change that could never apply is refused at
+        once (<code>AlreadyOwner</code>, <code>NotOwner</code>, <code>LastOwner</code>). At most 8 changes wait at once; a
+        ninth is refused with <code>TooManyPendingChanges</code>.
       </p>
 
       <H2>Applying and cancelling</H2>
@@ -73,12 +76,12 @@ isPending(account: Address, changeId: Hex): Promise<boolean>
         rows={[
           [<code key="1">addOwner(nullifier)</code>, "1", "Never"],
           [<code key="2">removeOwner(nullifier)</code>, "2", "Never. The last owner cannot be removed (LastOwner)."],
-          [<code key="3">setLimits(perTxCap, dailyCap)</code>, "3", "When both are at most the current caps"],
+          [<code key="3">setLimits(perTxCap, dailyCap)</code>, "3", "When both are at most the current caps (perTxCap never below maxFee)"],
           [<code key="4">setRecipient(recipient, allowed)</code>, "4", "When allowed is false (removing a recipient)"],
           [<code key="5">setAllowlist(enabled)</code>, "5", "When enabled is true"],
           [<code key="6">setGuardian(commitment)</code>, "6", "Never. The zero hash removes the guardian."],
           [<code key="7">setNewPayeeCap(cap)</code>, "7", "When it is at most the current cap"],
-          [<code key="8">freeze()</code>, "8", "Always. Also cancels every scheduled change."],
+          [<code key="8">freeze()</code>, "8", "Always, and only with restrict. Also cancels every scheduled change."],
           [<code key="9">unfreeze()</code>, "9", "Never"],
           [<code key="10">setPaymentSheet(required)</code>, "10", "When required is true"],
         ]}

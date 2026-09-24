@@ -28,7 +28,9 @@ export default function ProtectGuide() {
       <p>
         Enter a new per-payment and daily cap under <strong>Change the policy</strong>. If both are lower than or equal
         to the current caps, the button says <strong>Lower now</strong> and they apply immediately. Otherwise it says{" "}
-        <strong>Set caps</strong>, and the change is scheduled.
+        <strong>Set caps</strong>, and the change is scheduled. The per-payment cap cannot go below the largest fee (0.25
+        USDG on Arbitrum Sepolia). And a spent cap never stops you: freezing and cancelling work even when today's cap is
+        used up.
       </p>
 
       <H2>The new-recipient cap</H2>

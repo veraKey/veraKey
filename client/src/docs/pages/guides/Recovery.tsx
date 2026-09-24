@@ -36,8 +36,9 @@ keccak256(abi.encode(GUARDIAN_TYPEHASH, account, guardian, salt))
         is until it acts, and one guardian used by several of your apps leaves nothing on-chain that links them.
       </p>
       <Callout kind="warning" title="Set only schedules the guardian">
-        Naming a guardian is a loosening change, so it waits the change delay (2 minutes on Arbitrum Sepolia; replacing a
-        guardian waits the recovery delay too). When the countdown ends, select <strong>Apply</strong> under{" "}
+        Naming a guardian is a loosening change, so it waits the change delay plus the recovery delay (7 minutes on Arbitrum
+        Sepolia). A thief with your passkey could not install a guardian of its own any faster, and you can cancel it in
+        the meantime. When the countdown ends, select <strong>Apply</strong> under{" "}
         <strong>Scheduled changes</strong> on the Policy page. Until the change is applied, the guardian cannot act.
       </Callout>
 
@@ -85,7 +86,7 @@ keccak256(abi.encode(GUARDIAN_TYPEHASH, account, guardian, salt))
         head={["A guardian can", "A guardian cannot"]}
         rows={[
           ["Freeze the account at once. This also cancels scheduled changes, except changes to the guardian.", "Pay or move funds directly. It can take control only through a recovery that nobody cancels."],
-          ["Veto any scheduled change, except a change to the guardian.", "Block its own replacement or removal. That change waits the change delay plus the recovery delay."],
+          ["Veto any scheduled change, except a change to the guardian.", "Block its own replacement or removal. That change waits the change delay plus the recovery delay, and cancels any recovery the guardian started."],
           ["Start a recovery that replaces every owner after the recovery delay. If nobody cancels it in time, whoever holds the new passkey controls the account and its funds.", "Finish a recovery that an owner cancelled."],
         ]}
       />

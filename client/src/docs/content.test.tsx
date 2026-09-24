@@ -111,6 +111,17 @@ describe("what the docs tell people", () => {
     expect(sections(security).get("What VeraKey protects")).toMatch(/guardian/i);
   });
 
+  it("says the caps never stop the owners from freezing or vetoing, and what a change to the guardian waits for", async () => {
+    const security = plain(await render("/docs/security"));
+    expect(security).toMatch(/never refused because of the caps/);
+    expect(security).toMatch(/cancels a recovery the previous guardian started/);
+    const reference = plain(await render("/docs/reference/contracts"));
+    expect(reference).toMatch(/maxFee ≤ perTxCap ≤ dailyCap/);
+    expect(reference).not.toMatch(/replacing or removing one waits/);
+    expect(sections(await render("/docs/guides/recovery")).get("Name a guardian")).toMatch(/recovery delay/);
+    expect(plain(await render("/docs/security/review"))).toMatch(/Nemesis/);
+  });
+
   it("a disclosure reveals the link to anyone who gets the file, for good", async () => {
     for (const path of ["/docs/guides/disclosures", "/docs/build/disclosures", "/docs/reference/glossary", "/docs/security"]) {
       expect(plain(await render(path)), path).not.toMatch(/only to them|useless to its new holder|It fails under any other audience name/i);

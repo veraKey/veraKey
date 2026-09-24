@@ -3,7 +3,7 @@
 **Status.**
 - VeraKey is a testnet preview on Arbitrum Sepolia.
 - The circuits and contracts have **not had an independent audit**.
-- An internal adversarial review has been done, and its findings are fixed (see "Internal review" below). It does not replace an audit.
+- Two internal reviews have been done, the second a Nemesis audit of the contracts and circuits, and their findings are fixed (see "Internal review" below). They do not replace an audit.
 
 ## What must always hold
 
@@ -18,9 +18,11 @@ Each invariant below names where it is enforced and which tests exercise it:
    - The challenge is `keccak256(abi.encode(typehash, chainId, account, nonce, kind, target, amount, dataHash, fee, deadline))`.
    - The account checks the challenge in `clientDataJSON` (`type` `webauthn.get`, exact origin, no `crossOrigin:true`) and consumes the nonce before it transfers anything.
    - Tests: `e2e` authorization binding (origin, type, other account, other chain, tampered proof, replay, deadlines).
-2. **Every movement is capped.**
-   - A payment plus its fee, and every fee a management action pays, counts against the per-payment and daily caps.
-   - Tests: `e2e` policy; `prop` a_day_never_spends_more_than_its_caps.
+2. **Every payment is capped, and the caps never stop the owners from defending the account.**
+   - A payment plus its fee, and the fee of a scheduled change, count against the per-payment and daily caps.
+   - Freezing, restricting and cancelling a change or a recovery are never refused because of the caps, so a thief who spends the day's cap cannot stop the owners. Their fee, at most `maxFee`, still counts toward the day's spending.
+   - The per-payment cap never drops below `maxFee`, so every fee stays payable.
+   - Tests: `e2e` policy, audit (with the day's cap spent, the owner still vetoes a waiting change and freezes; the per-payment cap can't drop below the largest fee); `prop` a_day_never_spends_more_than_its_caps.
 3. **Fees cannot be redirected.**
    - Every fee goes to the factory's `feeRecipient` (the relayer) and is at most `maxFee` (0.25 USDG on Sepolia). Both are bound into the account address.
    - So whoever submits a transaction, or whoever tricks a user into approving one, cannot turn the signed fee into a payment to themselves, not even from a frozen account.
@@ -30,7 +32,7 @@ Each invariant below names where it is enforced and which tests exercise it:
    - This bounds what a look-alike address (address poisoning) or a tampered page can take at once. After one payment the recipient is known and only the ordinary caps apply.
    - Tests: `e2e` protections.
 5. **Freezing is instant, cancels what is scheduled, and unfreezing is not instant.**
-   - Owners freeze with a proof (`restrict`). The guardian freezes with its salt.
+   - Owners freeze with a proof (`restrict`). The guardian freezes with its salt. A freeze cannot be scheduled.
    - A frozen account makes no payments.
    - Freezing also cancels every scheduled change, so nothing a thief scheduled survives the emergency stop. A guardian's freeze keeps changes to the guardian itself (see 10).
    - Unfreezing is a timelocked change that owners or the guardian can cancel.
@@ -59,9 +61,10 @@ Each invariant below names where it is enforced and which tests exercise it:
    - Tests: `e2e` one_passkey_three_apps_have_distinct_accounts_and_nullifiers, guardian_is_private_until_it_acts_and_freezes_with_its_salt_only.
 10. **A guardian can delay the owners, but never hold the account.**
     - The guardian can freeze, veto scheduled changes and start a recovery.
-    - It cannot veto a change to the guardian itself. Such a change (replacing or removing a set guardian) waits the change delay plus the recovery delay, so a guardian recovery started in time still finishes first.
+    - It cannot veto a change to the guardian itself. Every change to the guardian waits the change delay plus the recovery delay, so a guardian recovery started in time still finishes first, and a thief cannot install a guardian quickly.
+    - A change to the guardian cancels a recovery the previous guardian started, so a removed guardian keeps no way in.
     - A recovery waits for the recovery delay and any owner can cancel it. When it executes it bumps the owner epoch, which voids every previous owner and scheduled change.
-    - Tests: `e2e` the_guardian_cannot_veto_a_change_to_the_guardian_which_waits_longer, guardian_recovery_rotates_owners_and_owner_can_cancel.
+    - Tests: `e2e` the_guardian_cannot_veto_a_change_to_the_guardian_which_waits_longer, guardian_recovery_rotates_owners_and_owner_can_cancel, audit (removing the guardian cancels the recovery it started just before).
 11. **The payment sheet shows what is paid, and an owner can require it.**
     - A Secure Payment Confirmation (`payment.get`) client data is accepted only for `pay`, and only byte for byte:
       - same challenge, origin and topOrigin;
@@ -170,6 +173,17 @@ It found the issues below, and each fix has a regression test.
 | Medium | A freeze left changes a thief had scheduled alive, and the app listed only changes made in the same browser | Freezing cancels scheduled changes; the list is on-chain (invariants 5 and 7) |
 | Low–medium | Disclosure audience and nonce were not enforced by the verifier | `verifyDisclosure` requires the audience, checks the nonce and bounds the lifetime (invariant 13) |
 | Low | The relayer trusted a contract's own `config()` answer and allowed 12M gas | Clone-code check, 2.5M gas cap, per-visitor limit on new accounts |
+
+A second internal audit the same day ran Nemesis (alternating Feynman and state-inconsistency passes until nothing new surfaced) over the Stylus contracts, the ERC-7579 validator and both circuits. Each finding was reproduced on a local Nitro devnode with real proofs, and each fix has a regression test in `packages/sdk/test/e2e/audit.e2e.test.ts`.
+
+| Severity | Finding | Fix |
+|---|---|---|
+| High | Freezing, restricting and cancelling paid their fee within the same caps as payments. A thief who spent the day's cap stopped the owners from freezing or vetoing until the next UTC day, so a change the thief scheduled applied unopposed; a per-payment cap below the fee locked every relayed action | These actions are never refused because of the caps, and their fee still counts toward the day's spending; the per-payment cap never drops below `maxFee` (invariant 2) |
+| Medium | A recovery survived a change to the guardian, so a guardian the owners removed could still take the account with a recovery it started just before | A change to the guardian cancels a pending recovery (invariant 10) |
+| Low | The longer delay for replacing a guardian was decided when the change was scheduled | Every change to the guardian waits the change delay plus the recovery delay (invariant 10) |
+| Low | A freeze scheduled through the timelock did not cancel the scheduled changes | A freeze cannot be scheduled; it is always instant (invariant 5) |
+| Low | Owner changes that could never apply kept one of the eight pending slots | They are refused when they are scheduled (invariant 6) |
+| Low | The factory accepted a configuration every account then rejected | The factory and the accounts check the same bounds (`verakey_core::config`) |
 
 ## Reporting
 
