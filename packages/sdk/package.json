@@ -17,7 +17,7 @@
   "homepage": "https://verakey.mdloglabs.org/docs/build/sdk",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/agentgate-0g/veraKey.git",
+    "url": "git+https://github.com/veraKey/veraKey.git",
     "directory": "packages/sdk"
   },
   "license": "MIT",

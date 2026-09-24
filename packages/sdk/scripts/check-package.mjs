@@ -56,7 +56,7 @@ async function main() {
     assert.deepEqual(heavy.map(entry => `${entry.path} (${entry.size} bytes)`), [], "every declaration file stays under 100 KB");
     for (const path of ["README.md", "LICENSE"]) assert.ok(files.includes(path), `the tarball has ${path}`);
     assert.equal(manifest.license, "MIT");
-    assert.match(manifest.repository?.url ?? "", /github\.com\/agentgate-0g\/veraKey/);
+    assert.match(manifest.repository?.url ?? "", /github\.com\/veraKey\/veraKey/);
     assert.equal(manifest.main, "./dist/index.js");
     assert.equal(manifest.types, "./dist/index.d.ts");
     const modules = readdirSync(join(sdk, "src")).filter(name => name.endsWith(".ts")).map(name => name.slice(0, -3));
