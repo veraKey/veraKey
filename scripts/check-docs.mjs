@@ -93,7 +93,8 @@ try {
   const ids = new Map();
   const links = [];
   for (const page of pages) {
-    if (!(await open(`${BASE}${page}`))) { fail(`${page}: did not render`); continue; }
+    // One retry: a dev server compiles a page's chunk on its first request.
+    if (!(await open(`${BASE}${page}`)) && !(await open(`${BASE}${page}`))) { fail(`${page}: did not render`); continue; }
     const info = await evaluate(`({
       notFound: !!document.querySelector(".dx-notfound"),
       title: document.querySelector(".dx-page-head h1")?.textContent ?? "",
