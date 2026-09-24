@@ -21,7 +21,17 @@ export interface DocPage {
 }
 
 /** Every docs page in reading order: the sidebar, previous/next and search all follow it. */
-export const PAGES: DocPage[] = [];
+export const PAGES: DocPage[] = [
+  {
+    path: "/docs",
+    title: "Introduction",
+    group: "Get started",
+    description: "VeraKey gives every app its own USDG smart account behind one passkey, and proves each approval in zero knowledge, so no key links your accounts.",
+    keywords: ["overview", "what is verakey", "passkey", "privacy", "arbitrum", "usdg"],
+    sections: ["What VeraKey is", "Who it is for", "What you can do", "Project status", "Where to go next"],
+    load: () => import("./pages/Introduction"),
+  },
+];
 
 function normalize(path: string): string {
   const bare = path.split(/[?#]/)[0].replace(/\/+$/, "");

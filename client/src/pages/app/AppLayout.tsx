@@ -13,7 +13,7 @@ const NAV = [
   { href: "/app/policy", label: "Policy", no: "03" },
   { href: "/app/recovery", label: "Recovery", no: "04" },
   { href: "/app/disclose", label: "Disclose", no: "05" },
-  { href: "/docs", label: "Developer docs", short: "Docs", no: "06" },
+  { href: "/docs", label: "Documentation", short: "Docs", no: "06" },
 ];
 
 export interface AppTopProps {

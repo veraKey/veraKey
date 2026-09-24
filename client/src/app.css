@@ -1,6 +1,7 @@
 /* VeraKey app: a vault console. Same language as the landing page (dark field, lime = verified,
    teal = private data, violet = policy/time), tuned for dense, legible financial UI. */
-.vk-app {
+/* The tokens live on :root so the docs and portalled dialogs share them with the app. */
+:root {
   --vk-bg: #0d1117;
   --vk-ink: #f2f5ec;
   --vk-muted: #8fa19e;
@@ -14,6 +15,8 @@
   --vk-red: #ff8a7a;
   --vk-panel: linear-gradient(150deg, rgba(27, 45, 47, 0.62), rgba(11, 17, 22, 0.94) 62%);
   --vk-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+.vk-app {
   position: relative;
   min-height: 100vh;
   color: var(--vk-ink);

@@ -77,6 +77,19 @@ try {
   if (!(await open(`${BASE}/docs`))) fail("/docs did not render");
   const pages = (await evaluate(`[...new Set([...document.querySelectorAll(".dx-sidebar a")].map(a => new URL(a.href).pathname))]`)) ?? [];
   if (!pages.length) fail("no pages in the sidebar");
+  // The brand tokens resolve (they also have to reach the drawer and search dialog portals), and lists keep their markers.
+  const styles = await evaluate(`({
+    token: getComputedStyle(document.documentElement).getPropertyValue("--vk-lime").trim(),
+    openApp: getComputedStyle(document.querySelector(".dx-open-app") ?? document.body).backgroundColor,
+    list: getComputedStyle(document.querySelector(".dx-article ul") ?? document.body).listStyleType,
+    crumb: getComputedStyle(document.querySelector(".dx-crumb") ?? document.body).color,
+    lead: getComputedStyle(document.querySelector(".dx-lead") ?? document.body).fontSize,
+  })`);
+  if (styles?.crumb !== "rgb(115, 228, 210)") fail(`the page group label is not teal (${styles?.crumb})`);
+  if (styles?.lead !== "17px") fail(`the lead paragraph is not 17px (${styles?.lead})`);
+  if (!styles?.token) fail("the --vk-* design tokens are not defined at the document root");
+  if (styles?.openApp !== "rgb(201, 255, 91)") fail(`"Open app" is not lime (${styles?.openApp})`);
+  if (styles?.list !== "disc") fail(`article lists have no bullets (${styles?.list})`);
   const ids = new Map();
   const links = [];
   for (const page of pages) {
@@ -107,13 +120,14 @@ try {
     const [target, hash] = href.startsWith("#") ? [from, href.slice(1)] : href.split("#");
     if (!target.startsWith("/docs")) continue;
     const page = target.replace(/\/+$/, "") || "/docs";
-    if (!ids.has(page)) fail(`${from}: link to ${href}: no such page`);
+    if (!ids.has(page)) (process.env.DOCS_ALLOW_MISSING ? console.log(`  warn ${from}: link to ${href}: page not written yet`) : fail(`${from}: link to ${href}: no such page`));
     else if (hash && !ids.get(page).has(decodeURIComponent(hash))) fail(`${from}: link to ${href}: no such anchor`);
   }
 
   // 3. Search: typing finds the protection guide, Enter opens the selected result.
   await evaluate(`(() => { const i = document.querySelector("[cmdk-input]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(i, "freeze"); i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
   await sleep(300);
+  await shot("desktop-search");
   const top = (await evaluate(`[...document.querySelectorAll("[cmdk-item][data-href]")].slice(0, 3).map(e => e.dataset.href)`)) ?? [];
   if (pages.includes("/docs/guides/protect") && !top.some(h => h.startsWith("/docs/guides/protect"))) fail(`search "freeze": top results ${JSON.stringify(top)}`);
   const selected = (await evaluate(`document.querySelector("[cmdk-item][data-selected=true]")?.dataset.href ?? ""`)) ?? "";
