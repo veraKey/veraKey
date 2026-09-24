@@ -149,6 +149,8 @@ export interface VerifySignInOptions {
 const isField = (value: unknown): value is Hex =>
   typeof value === "string" && isHex(value) && value.length === 66 && BigInt(value) < BN254_R;
 const isBytes32 = (value: unknown): value is Hex => typeof value === "string" && isHex(value) && value.length === 66;
+/** Seconds since 1970, before 2106. */
+const isTimestamp = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) < 2 ** 32;
 
 /**
  * Checks a sign-in end to end: it was made for this deployment, for this site and its app id, with the nonce the
@@ -165,12 +167,28 @@ export async function verifySignIn(
     checks.push({ name, ok, detail });
     return ok;
   };
+  try {
+    return await checkSignIn(result, options, checks, check);
+  } catch (error) {
+    // The result comes from the player's browser: crafted input must be a refusal, never a crash of the site's server.
+    check("Checked without errors", false, error instanceof Error ? error.message : String(error));
+    return { valid: false, checks, playerId: null, account: null };
+  }
+}
+
+async function checkSignIn(
+  result: SignInResult,
+  options: VerifySignInOptions,
+  checks: SignInCheck[],
+  check: (name: string, ok: boolean, detail?: string) => boolean
+): Promise<{ valid: boolean; checks: SignInCheck[]; playerId: Hex | null; account: Address | null }> {
   const refuse = () => ({ valid: false, checks, playerId: null, account: null });
   const s = result?.statement;
   if (!check("Format", result?.version === 1 && typeof s === "object" && s !== null, "not a VeraKey sign-in (v1)")) return refuse();
   const wellFormed =
     isField(s.appId) && isField(s.nullifier) && isBytes32(s.nonce) && isAddress(s.factory) && typeof s.origin === "string" &&
-    Number.isSafeInteger(s.chainId) && Number.isSafeInteger(s.issuedAt) && Number.isSafeInteger(s.expiresAt) &&
+    Number.isSafeInteger(s.chainId) && s.chainId > 0 && isTimestamp(s.issuedAt) && isTimestamp(s.expiresAt) &&
+    s.issuedAt <= s.expiresAt &&
     result.playerId === s.nullifier && isAddress(result.account) && Array.isArray(result.publicInputs) &&
     result.publicInputs.length === 6 && isHex(result.clientDataJSON) && isHex(result.proof);
   if (!check("Well-formed fields", wellFormed)) return refuse();
@@ -195,15 +213,16 @@ export async function verifySignIn(
     `valid until ${until}; check the device clock`);
 
   const clientData = hexToBytes(result.clientDataJSON);
-  let parsed: { type?: string; challenge?: string; origin?: string; crossOrigin?: boolean } = {};
+  let parsed: { type?: unknown; challenge?: unknown; origin?: unknown; crossOrigin?: unknown } = {};
   try {
-    parsed = JSON.parse(new TextDecoder().decode(clientData));
+    const json: unknown = JSON.parse(new TextDecoder().decode(clientData));
+    if (typeof json === "object" && json !== null) parsed = json;
   } catch {
     // reported below
   }
   check("Passkey signed this sign-in",
     parsed.type === "webauthn.get" && parsed.challenge === base64UrlEncode(hexToBytes(signInChallenge(s))));
-  check("Signed on VeraKey", parsed.origin === deployment.origin && parsed.crossOrigin !== true, parsed.origin);
+  check("Signed on VeraKey", parsed.origin === deployment.origin && parsed.crossOrigin !== true, String(parsed.origin));
 
   const [cdhHi, cdhLo] = limbs(await sha256(clientData));
   const [rpHi, rpLo] = limbs(hexToBytes(deployment.rpIdHash));

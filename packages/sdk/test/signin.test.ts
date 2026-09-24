@@ -166,8 +166,8 @@ describe("verifySignIn", () => {
     expect(failed(await verify(await signedIn(), { nonce: `0x${"22".repeat(32)}` }))).toEqual(["Carries the nonce you issued"]);
   });
   it("tolerates a device clock up to a minute off, and names the clock beyond that", async () => {
-    expect((await verify(await signedIn({ expiresAt: NOW - 30 }))).valid).toBe(true);
-    const late = await verify(await signedIn({ expiresAt: NOW - 61 }));
+    expect((await verify(await signedIn({ issuedAt: NOW - 330, expiresAt: NOW - 30 }))).valid).toBe(true);
+    const late = await verify(await signedIn({ issuedAt: NOW - 361, expiresAt: NOW - 61 }));
     expect(failed(late)).toEqual(["Not expired"]);
     expect(late.checks.find(c => c.name === "Not expired")?.detail).toMatch(/device clock/);
   });
@@ -201,6 +201,16 @@ describe("verifySignIn", () => {
     expect(failed(await verify(await signedIn(), { client: chain({ deployed: true, owner: false }) }))).toEqual([
       "Player still owns the account",
     ]);
+  });
+  it("never throws on crafted input: a site's server gets a refusal, not a crash", async () => {
+    const result = await signedIn();
+    const statementWith = (fields: Partial<SignInStatement>): SignInResult => ({ ...result, statement: { ...result.statement, ...fields } });
+    for (const crafted of [statementWith({ expiresAt: 1e13 }), statementWith({ issuedAt: -1 }), statementWith({ chainId: -1 }), statementWith({ issuedAt: NOW + 400 })]) {
+      expect(failed(await verify(crafted))).toEqual(["Well-formed fields"]);
+    }
+    const nullClientData = await verify({ ...result, clientDataJSON: bytesToHex(new TextEncoder().encode("null")) });
+    expect(nullClientData.valid).toBe(false);
+    expect(failed(nullClientData)).toContain("Passkey signed this sign-in");
   });
   it("refuses anything that is not a well-formed version 1 sign-in", async () => {
     const result = await signedIn();
