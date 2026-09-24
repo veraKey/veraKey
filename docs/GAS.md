@@ -42,7 +42,7 @@ The traced transaction is a first payment to a recipient the account has never p
 |---|---:|
 | `pay`, first payment to a new recipient | 1,043,768 |
 | `pay`, a recipient paid before | 988,934 |
-| `pay` through the payment sheet (Secure Payment Confirmation, 256 more bytes of client data) | 994,246 |
+| `pay` through the payment sheet (Secure Payment Confirmation, 256 more bytes of client data), a recipient paid before | 994,246 |
 | `pay` from the app in Chrome, through the relayer, to the demo merchant (also the fee recipient) | 1,021,759 |
 | `restrict` (lower the caps) | 979,007 |
 | `restrict` (freeze) that cancels 8 scheduled changes | 1,021,974 |

@@ -10,7 +10,7 @@ VeraKey gives every app its own smart account behind a single passkey.
   - a guardian nobody can see;
   - optionally, the browser's own payment sheet for every payment.
 - **Unlinkable by default, linkable by consent.** The owner can prove to an auditor that two accounts share a passkey, without revealing the key.
-- **Not only VeraKey accounts.** An ERC-7579 validator lets Kernel and Nexus smart accounts accept the same proofs.
+- **Not only VeraKey accounts.** An ERC-7579 validator module brings the same proofs to modular smart accounts such as Kernel and Nexus.
 
 Built for the Arbitrum Open House Singapore Buildathon (HackQuest), September–October 2026.
 
@@ -31,7 +31,7 @@ App: **https://verakey.mdloglabs.org**. Open `/app` on a device with an iCloud K
 
 - Accounts are EIP-1167 clones created by the factory.
 - The full configuration is in `deployments/sepolia.json`.
-- The Solidity contracts are source-verified on [Sourcify](https://sourcify.dev).
+- The Solidity contracts are source-verified on Sourcify (exact match): [`HonkVerifier`](https://repo.sourcify.dev/421614/0x0cB71548faa63543F8c0F04370F163875279A234), [`LinkHonkVerifier`](https://repo.sourcify.dev/421614/0xF7d79c2a6f58809a1c045ea1b131c08f67bdfDCF), [`VeraKeyValidator`](https://repo.sourcify.dev/421614/0x9C1e30be51dFa0f0424968AAd7b0Dd3B2E1179e1).
 - The Stylus programs build from `contracts/stylus` with the pinned toolchain below.
 
 Sepolia policy for new accounts:
@@ -106,7 +106,8 @@ Nothing on-chain connects a user's accounts in different apps. When someone need
 |---|---|
 | WebAuthn registration and PRF unlock in the browser | real (`packages/sdk/src/webauthn.ts`) |
 | UltraHonk proof of a P-256 passkey signature, generated in the browser | real, 1.85 s with 8 threads (desktop Chrome, measured) |
-| Stylus account and factory, Solidity verifiers, ERC-7579 validator | real, deployed with `scripts/deploy.sh` |
+| Stylus account and factory, Solidity verifiers | real, deployed with `scripts/deploy.sh` |
+| ERC-7579 validator | real and deployed; tested with real proofs as a module (36 Foundry tests), not yet installed in a Kernel or Nexus account |
 | Disclosures (link circuit, on-chain verifier, verify page) | real |
 | Secure Payment Confirmation | real in Chrome on macOS, Windows and Android; tested in headless Chrome with its SPC test mode |
 | USDG | Paxos Global Dollar on Arbitrum Sepolia `0xFFC95faa3d63Cde504a05B567C600B78C0b41892` (a mintable stand-in is used only on a local devnode) |
@@ -122,9 +123,10 @@ Nothing on-chain connects a user's accounts in different apps. When someone need
 | Proof | 8,768 bytes, 6 public inputs |
 | Proving, browser (headless Chrome, 8 threads) | 1.85 s (median of 3) |
 | `HonkVerifier.verify` (inside `pay`) | 712,554 gas with bb's optimized ZK verifier; 3,781,398 with the default one ([docs/GAS.md](docs/GAS.md)) |
-| `pay`, first payment to a new recipient | 1,043,768 gas (4,171,302 with the default verifier); ≈ $0.06 on Arbitrum One at 0.02 gwei and ETH $2,668 |
-| `pay`, a known recipient | 988,934 gas |
-| `pay` through the payment sheet | 994,246 gas |
+| `pay`, first payment to a new recipient | 1,043,768 gas; ≈ $0.06 on Arbitrum One at 0.02 gwei and ETH $2,668 |
+| `pay`, a recipient paid before | 988,934 gas |
+| `pay` through the payment sheet, a recipient paid before | 994,246 gas |
+| `pay` from the app in Chrome to the demo merchant, through the relayer | 1,021,759 gas; the same payment took 4,171,302 with bb's default verifier |
 | `restrict` (e.g. lower the caps) | 979,007 gas |
 | `createAccount` (EIP-1167 clone + storage init, programs cached) | 383,296 gas |
 | Baseline: `P256VERIFY` precompile (no privacy) | 3,450 gas |
@@ -164,8 +166,12 @@ Nothing on-chain connects a user's accounts in different apps. When someone need
   - 44 cover the account: front-running, replay, cross-account and cross-chain proofs, tampered proofs, caps, fees, the new-recipient cap, freezing, timelocks, the payment sheet, backup owners, the guardian and recovery;
   - 10 cover disclosures;
   - 7 drive the relayer over HTTP.
-- A browser workflow runs the app in headless Chrome with a virtual passkey, on desktop, on mobile and through the payment sheet.
-- CI (`.github/workflows/ci.yml`) rebuilds the circuits, verifiers and contracts from source and runs all of them on every push.
+- A browser workflow (`scripts/browser-e2e.mjs`) drives the app in headless Chrome with a virtual passkey, on desktop, on mobile and through the payment sheet:
+  - it registers, funds and pays;
+  - it runs into the new-recipient cap;
+  - it finds a change scheduled elsewhere and freezes;
+  - it discloses and verifies, and makes a guardian card.
+- CI (`.github/workflows/ci.yml`) rebuilds the circuits, verifiers and contracts from source and runs everything above except the browser workflow on every push.
 
 ## Repository layout
 
@@ -178,7 +184,7 @@ contracts/evm            Foundry: bb-generated verifiers, ERC-7579 validator + t
 packages/sdk             @verakey/sdk: WebAuthn/PRF/SPC, action hashing, provers, VeraKeyClient, disclosures, validator
 server                   Express relayer: /api/config, /api/accounts, /api/relay, /api/faucet, /api/rpc
 client                   Vite + React app: landing page, /app (accounts, pay, policy, recovery, disclose, verify), /docs
-scripts                  build-circuit.sh, gen-abi.sh, devnode.sh (local chain), deploy.sh, build-server.mjs
+scripts                  build-circuit.sh, gen-abi.sh, devnode.sh (local chain), deploy.sh, browser-e2e.mjs, build-server.mjs
 deployments              addresses per network
 ```
 
@@ -200,6 +206,7 @@ scripts/devnode.sh up               # nitro devnode on :8649, upgraded to ArbOS 
 scripts/deploy.sh local             # verifiers, validator, test USDG, account implementation, factories
 pnpm test:e2e                       # 61 end-to-end tests with real proofs
 pnpm dev                            # relayer on :3090, app on http://localhost:5190
+node scripts/browser-e2e.mjs http://localhost:5190 /tmp/verakey-browser desktop  # also: mobile; add "spc" for the payment sheet
 ```
 
 The devnode keeps no state: after `scripts/devnode.sh down` or a reboot, run `up` and `deploy.sh local`
@@ -237,22 +244,27 @@ again.
 import { VeraKeyClient } from "@verakey/sdk/client";
 import { changePayload } from "@verakey/sdk/action";
 import { appIdFromName } from "@verakey/sdk/nullifier";
+import { spcAvailability } from "@verakey/sdk/webauthn";
 
 const APP_ID = appIdFromName("my-app");
 const vera = new VeraKeyClient({
   rpId, chainId, rpcUrl, factory, usdg, rpIdHash, // GET /api/config
   relayerUrl: "/api",
-  relayerFee: 20_000n,                            // 0.02 USDG
+  relayerFee: 20_000n,                            // 0.02 USDG; the account refuses more than its maxFee
   appIds: [APP_ID],
   loadProver: async () => (await import("@verakey/sdk/prover")).VeraKeyProver.create({ srsSize: 2 ** 17 }),
+  paymentInstrument: { displayName: "My app · USDG", icon: "/icon.png" }, // shown in the payment sheet
 });
 
-await vera.register("Alice");                                  // passkey + PRF
+// Passkey + PRF, also enrolled for the browser's payment sheet where the browser offers it.
+await vera.register("Alice", { payment: (await spcAvailability()) === "available" });
 await vera.pay(APP_ID, merchant, 2_000_000n, s => console.log(s.status));
 // idle → authenticating → proving → relaying → confirming → verified | rejected
 
-await vera.freeze(APP_ID);                                     // instant; cancels scheduled changes
-await vera.restrict(APP_ID, changePayload.setPaymentSheet(true)); // every payment through the browser's sheet
+if (await vera.canConfirmPayments()) {
+  await vera.restrict(APP_ID, changePayload.setPaymentSheet(true)); // from now on, pay only through the sheet
+}
+await vera.freeze(APP_ID);                                          // instant; cancels scheduled changes
 const pkg = await vera.createDisclosure({ appIdA: APP_ID, appIdB: OTHER_APP_ID, audience: "auditor@example.com" });
 ```
 
@@ -262,7 +274,7 @@ const pkg = await vera.createDisclosure({ appIdA: APP_ID, appIdB: OTHER_APP_ID, 
 - The circuits and contracts are unaudited, and the verifiers are bb-generated Solidity contracts.
 - VeraKey requires the WebAuthn PRF extension: iCloud Keychain on iOS 18.4+ and macOS 15.4+, or Google Password Manager.
 - The payment sheet works only in Chromium.
-- About 1.05M gas per payment costs cents on Arbitrum, but far more than a non-private passkey wallet.
+- A payment takes about 1M gas (0.99M to 1.04M): cents on Arbitrum, but far more than a non-private passkey wallet.
 
 **Next steps:**
 - an independent audit;
