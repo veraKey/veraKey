@@ -56,6 +56,7 @@
     "prepack": "pnpm run build",
     "prepublishOnly": "node scripts/publish-guard.mjs",
     "pack:check": "node scripts/check-package.mjs",
+    "publish:github": "node scripts/publish-github.mjs",
     "test": "vitest run",
     "check": "tsc --noEmit -p tsconfig.json",
     "vectors": "node scripts/gen-test-vectors.mjs",

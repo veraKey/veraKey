@@ -208,6 +208,7 @@ scripts/devnode.sh up               # nitro devnode on :8649, upgraded to ArbOS 
 scripts/deploy.sh local             # verifiers, validator, test USDG, account implementation, factories
 pnpm test:e2e                       # 75 end-to-end tests with real proofs
 pnpm sdk:pack                       # build and pack @verakey/sdk, check the tarball from a fresh project
+pnpm sdk:publish:github             # the checked tarball to GitHub Packages too (GH_TOKEN with write:packages)
 pnpm dev                            # relayer on :3090, app on http://localhost:5190
 node scripts/browser-e2e.mjs http://localhost:5190 /tmp/verakey-browser desktop  # also: mobile; add "spc" for the payment sheet
 ```

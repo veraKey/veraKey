@@ -21,6 +21,7 @@
     "test": "pnpm --filter @verakey/sdk test",
     "test:e2e": "pnpm --filter @verakey/sdk test:e2e",
     "sdk:pack": "pnpm --filter @verakey/sdk pack:check",
+    "sdk:publish:github": "pnpm --filter @verakey/sdk publish:github",
     "test:docs": "vitest run --config vite.config.ts --dir client/src/docs",
     "test:web": "vitest run --config vite.config.ts --dir client/src",
     "deploy:local": "scripts/deploy.sh local",

@@ -106,7 +106,14 @@ async function main() {
     console.log(`${outputs.join(", ")}: ${(size / 1024).toFixed(0)} KB, no prover`);
 
     // INIT_CWD is where `pnpm sdk:pack` was typed; pnpm runs this script from packages/sdk.
-    console.log(`\n✓ ready to publish: npm publish ${relative(process.env.INIT_CWD ?? process.cwd(), tarball)} --access public`);
+    const where = relative(process.env.INIT_CWD ?? process.cwd(), tarball);
+    let onNpm = false;
+    try {
+      onNpm = execFileSync("npm", ["view", `@verakey/sdk@${version}`, "version"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() === version;
+    } catch {} // not on npm yet
+    console.log(onNpm
+      ? `\n✓ checked. ${version} is already on npm, which refuses it twice: bump the version for a new release. GitHub Packages: GH_TOKEN=… pnpm sdk:publish:github`
+      : `\n✓ ready to publish: npm publish ${where} --access public, then GH_TOKEN=… pnpm sdk:publish:github for GitHub Packages`);
   } finally {
     if (process.env.KEEP) console.log(`kept ${work}`);
     else rmSync(work, { recursive: true, force: true });
