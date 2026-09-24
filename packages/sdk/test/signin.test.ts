@@ -74,11 +74,11 @@ describe("accountAddressOf", () => {
   it("matches the factory on Arbitrum Sepolia", () => {
     // factory.accountAddress(1, 2), read from the Sepolia deployment on 2026-09-24
     const deployment = {
-      factory: "0x45bbaf84eea0c285db53fd7d72187e9e3843c3e4",
-      accountImplementation: "0x72bb20016847e06c1eba897c7dc504abff164c50",
-      configHash: "0x9d584d65853c7a2c6809929eec24071376caba939270ac8de2d7bb4c3e057183",
+      factory: "0x6a1505b412e934f6f57f6b8eedcd68c7c8acb276",
+      accountImplementation: "0x281476444a4b1c4ee019b2417539a8efc4af7930",
+      configHash: "0x7b702db55819b2adba4fc4406aed1150d7f437400936406ce9153cc8668e6701",
     } as const;
-    expect(accountAddressOf(deployment, 1n, 2n)).toBe("0xF54d3d9a835a4bB87594f55B21a4789b51B2F8F2");
+    expect(accountAddressOf(deployment, 1n, 2n)).toBe("0x4f8222091Abf79FfDD74a7aDFcD80B24DdaB4804");
   });
 });
 
