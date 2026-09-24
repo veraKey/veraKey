@@ -13,6 +13,7 @@ import {
 const VERAKEY = "https://verakey.example";
 const NONCE: Hex = `0x${"11".repeat(32)}`;
 const MERCHANT = "0x00000000000000000000000000000000000000cc";
+const PLAYER = "0x00000000000000000000000000000000000000aa";
 
 class FakePopup {
   closed = false;
@@ -130,6 +131,30 @@ describe("VeraKeyConnect", () => {
     await outcome;
   });
 
+  it("says a payment may have been sent when the popup closes while sending it, and how to find it", async () => {
+    vi.useFakeTimers();
+    const window = new FakeWindow();
+    const paying = new VeraKeyConnect({ url: VERAKEY, host: window }).pay({ to: MERCHANT, amount: 1n });
+    window.emit(envelope({ type: "ready" }));
+    await vi.advanceTimersByTimeAsync(0);
+    window.emit(envelope({ type: "progress", id: window.request.id, stage: "sending", account: PLAYER, nonce: "7" }));
+    window.popup!.closed = true;
+    const error = paying.catch(e => e);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(await error).toMatchObject({ code: "closed", pending: { account: PLAYER, nonce: 7n } });
+    expect((await error).hash).toBeUndefined();
+  });
+
+  it("names the signed-in player's account in a payment request", async () => {
+    const window = new FakeWindow();
+    const paying = new VeraKeyConnect({ url: VERAKEY, host: window }).pay({ to: MERCHANT, amount: 1_000_000n, account: PLAYER });
+    window.emit(envelope({ type: "ready" }));
+    await tick();
+    expect(window.request.params).toEqual({ to: MERCHANT, amount: "1000000", account: PLAYER });
+    window.emit(envelope({ type: "result", id: window.request.id, result: { hash: "0xab" } }));
+    await paying;
+  });
+
   it("passes on the popup's error with the contract error", async () => {
     const window = new FakeWindow();
     const paying = new VeraKeyConnect({ url: VERAKEY, host: window }).pay({ to: MERCHANT, amount: 1n });
@@ -192,6 +217,13 @@ describe("acceptRequest (the popup's gate)", () => {
   });
   it("takes one request per window", () => {
     expect(gate(request({ method: "signIn", params: { nonce: NONCE } }), { handled: true })).toMatchObject({ kind: "reject", code: "busy" });
+  });
+  it("accepts a payment request that names the player's account, and refuses a malformed account", () => {
+    expect(gate(request({ method: "pay", params: { to: MERCHANT, amount: "1", account: PLAYER } }))).toMatchObject({
+      kind: "accept",
+      request: { params: { to: MERCHANT, amount: "1", account: PLAYER } },
+    });
+    expect(gate(request({ method: "pay", params: { to: MERCHANT, amount: "1", account: "0x1234" } }))).toMatchObject({ kind: "reject", code: "request" });
   });
   it("refuses malformed requests", () => {
     const bad = [

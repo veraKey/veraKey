@@ -11,6 +11,7 @@ import {
   accountAddressOf,
   appIdFromOrigin,
   computeNullifier,
+  findPayment,
   hexToBytes,
   signInChallenge,
   toFieldHex,
@@ -177,5 +178,8 @@ describe("sign in with VeraKey", () => {
     expect((await check({ amount: USDG(2) })).valid).toBe(false);
     expect((await check({ to: devAccount.address })).valid).toBe(false);
     expect((await check({ account: merchant })).valid).toBe(false);
+    // A site whose popup closed mid-payment finds it by the account's action nonce.
+    expect(await findPayment({ publicClient: publicClient as never, account, nonce: 0n, timeoutMs: 0 })).toBe(hash);
+    expect(await findPayment({ publicClient: publicClient as never, account, nonce: 1n, timeoutMs: 0 })).toBeNull();
   });
 });

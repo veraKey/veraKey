@@ -21,13 +21,21 @@ export type ConnectErrorCode =
 
 export type ConnectRequest =
   | { id: string; method: "signIn"; params: { nonce: Hex } }
-  | { id: string; method: "pay"; params: { to: Address; amount: string } };
+  | { id: string; method: "pay"; params: { to: Address; amount: string; account?: Address } };
+
+/** A payment the popup was sending when the request ended: find it with `findPayment` before asking again. */
+export interface PendingPayment {
+  account: Address;
+  /** The account's action nonce the payment uses; its `Paid` event is indexed by it. */
+  nonce: bigint;
+}
 
 type Envelope = { protocol: typeof CONNECT_PROTOCOL; version: typeof CONNECT_VERSION };
 
 export type PopupMessage = Envelope &
   (
     | { type: "ready" }
+    | { type: "progress"; id: string; stage: "sending"; account: Address; nonce: string }
     | { type: "progress"; id: string; stage: "submitted"; hash: Hex }
     | { type: "result"; id: string; result: SignInResult | PaymentResult }
     | { type: "error"; id: string; code: ConnectErrorCode; message: string; revert?: string }
@@ -63,9 +71,11 @@ function parseRequest(data: Record<string, unknown>): ConnectRequest | null {
     return typeof nonce === "string" && isHex(nonce) && nonce.length === 66 ? { id, method, params: { nonce } } : null;
   }
   if (method === "pay") {
-    const { to, amount } = params;
+    const { to, amount, account } = params;
     if (typeof to !== "string" || !isAddress(to) || typeof amount !== "string" || !/^[1-9][0-9]{0,38}$/.test(amount)) return null;
-    return BigInt(amount) < MAX_AMOUNT ? { id, method, params: { to, amount } } : null;
+    if (account !== undefined && (typeof account !== "string" || !isAddress(account))) return null;
+    if (BigInt(amount) >= MAX_AMOUNT) return null;
+    return { id, method, params: account === undefined ? { to, amount } : { to, amount, account } };
   }
   return null;
 }
@@ -95,15 +105,19 @@ export function acceptRequest(
 }
 
 export class VeraKeyConnectError extends Error {
-  constructor(
-    readonly code: ConnectErrorCode,
-    message: string,
-    readonly revert?: string,
-    /** Set when the popup had already sent the payment: verify it before asking again. */
-    readonly hash?: Hex
-  ) {
+  /** The contract error, when the account refused. */
+  readonly revert?: string;
+  /** Set when the popup had already sent the payment: verify it before asking again. */
+  readonly hash?: Hex;
+  /** Set when the request ended while the payment was being sent: find it with `findPayment` before asking again. */
+  readonly pending?: PendingPayment;
+
+  constructor(readonly code: ConnectErrorCode, message: string, details: { revert?: string; hash?: Hex; pending?: PendingPayment } = {}) {
     super(message);
     this.name = "VeraKeyConnectError";
+    this.revert = details.revert;
+    this.hash = details.hash;
+    this.pending = details.pending;
   }
 }
 
@@ -139,9 +153,13 @@ export class VeraKeyConnect {
     return this.request("signIn", async () => ({ nonce: typeof nonce === "function" ? await nonce() : nonce })) as Promise<SignInResult>;
   }
 
-  /** Asks the player to pay `amount` USDG base units to `to`; check it with `verifyPayment`. Call it from a click. */
-  pay(params: { to: Address; amount: bigint }): Promise<PaymentResult> {
-    return this.request("pay", async () => ({ to: params.to, amount: params.amount.toString() })) as Promise<PaymentResult>;
+  /**
+   * Asks the player to pay `amount` USDG base units to `to`; check it with `verifyPayment`. Call it from a click.
+   * `account`, the signed-in player's account, makes the popup refuse to pay from any other.
+   */
+  pay(params: { to: Address; amount: bigint; account?: Address }): Promise<PaymentResult> {
+    const { to, amount, account } = params;
+    return this.request("pay", async () => ({ to, amount: amount.toString(), ...(account ? { account } : {}) })) as Promise<PaymentResult>;
   }
 
   private request(
@@ -160,6 +178,7 @@ export class VeraKeyConnect {
     return new Promise((resolve, reject) => {
       let ready = false;
       let sent: Hex | undefined;
+      let sending: PendingPayment | undefined;
       let readyTimer: ReturnType<typeof setTimeout> | undefined;
       let closedPoll: ReturnType<typeof setInterval> | undefined;
       const settle = (done: () => void) => {
@@ -169,8 +188,11 @@ export class VeraKeyConnect {
         this.pending = false;
         done();
       };
+      // Without a hash, a payment the popup was sending may still land: the site gets what it needs to find it.
       const fail = (code: ConnectErrorCode, message: string, revert?: string) =>
-        settle(() => reject(new VeraKeyConnectError(code, message, revert, sent)));
+        settle(() =>
+          reject(new VeraKeyConnectError(code, message, { revert, hash: sent, pending: sent || !["closed", "relay"].includes(code) ? undefined : sending }))
+        );
       const onMessage = (event: MessageEvent) => {
         if (event.origin !== this.origin || event.source !== popup || !isEnvelope(event.data)) return;
         const message = event.data as PopupMessage;
@@ -184,7 +206,12 @@ export class VeraKeyConnect {
           return;
         }
         if (message.id !== id) return;
-        if (message.type === "progress") sent = message.hash;
+        if (message.type === "progress") {
+          if (message.stage === "submitted" && isHex(message.hash)) sent = message.hash;
+          if (message.stage === "sending" && isAddress(message.account) && /^[0-9]{1,78}$/.test(message.nonce)) {
+            sending = { account: message.account, nonce: BigInt(message.nonce) };
+          }
+        }
         else if (message.type === "result") settle(() => resolve(message.result));
         else if (message.type === "error") fail(message.code, message.message, message.revert);
       };
@@ -197,7 +224,10 @@ export class VeraKeyConnect {
       }, READY_TIMEOUT_MS);
       closedPoll = setInterval(() => {
         if (popup.closed) {
-          fail("closed", sent ? "The VeraKey window closed after the payment was sent: verify it before asking again." : "The VeraKey window was closed.");
+          fail("closed",
+            sent ? "The VeraKey window closed after the payment was sent: verify it before asking again."
+              : sending ? "The VeraKey window closed while the payment was being sent: find it with findPayment before asking again."
+                : "The VeraKey window was closed.");
         }
       }, CLOSED_POLL_MS);
     });

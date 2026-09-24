@@ -10,6 +10,7 @@ import {
   appIdFromOrigin,
   normalizeOrigin,
   signInChallenge,
+  findPayment,
   verifyPayment,
   verifySignIn,
   type SignInResult,
@@ -261,8 +262,39 @@ describe("verifyPayment", () => {
       "To this recipient, for this amount",
     ]);
   });
+  it("waits for a payment that is sent but not yet in a block", async () => {
+    const log = paidLog(ACCOUNT, MERCHANT, 1_000_000n, 20_000n);
+    const pending = {
+      getTransactionReceipt: async () => {
+        throw new Error("not found");
+      },
+      getTransaction: async () => ({ hash: HASH }),
+      waitForTransactionReceipt: async () => ({ status: "success", logs: [log] }),
+    } as unknown as PublicClient;
+    expect(failed(await verifyPayment(HASH, { ...expected, publicClient: pending }))).toEqual([]);
+  });
   it("refuses a reverted or unknown transaction", async () => {
     expect(failed(await verifyPayment(HASH, { ...expected, publicClient: receipts("reverted") }))).toEqual(["Transaction succeeded"]);
     expect(failed(await verifyPayment(HASH, { ...expected, publicClient: receipts(null) }))).toEqual(["Transaction succeeded"]);
+  });
+});
+
+describe("findPayment", () => {
+  const FOUND: Hex = `0x${"cd".repeat(32)}`;
+  it("finds a payment by the paying account and its action nonce", async () => {
+    const queries: unknown[] = [];
+    const chain = {
+      getBlockNumber: async () => 50_000n,
+      getContractEvents: async (query: unknown) => {
+        queries.push(query);
+        return [{ transactionHash: FOUND }];
+      },
+    } as unknown as PublicClient;
+    expect(await findPayment({ publicClient: chain, account: ACCOUNT, nonce: 7n, timeoutMs: 0 })).toBe(FOUND);
+    expect(queries[0]).toMatchObject({ address: ACCOUNT, eventName: "Paid", args: { nonce: 7n }, fromBlock: 40_000n, toBlock: 50_000n });
+  });
+  it("returns null when the account made no payment with that nonce", async () => {
+    const chain = { getBlockNumber: async () => 5n, getContractEvents: async () => [] } as unknown as PublicClient;
+    expect(await findPayment({ publicClient: chain, account: ACCOUNT, nonce: 7n, timeoutMs: 0 })).toBeNull();
   });
 });

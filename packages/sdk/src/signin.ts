@@ -259,17 +259,27 @@ async function checkSignIn(
   return { valid, checks, playerId: valid ? s.nullifier : null, account: valid ? result.account : null };
 }
 
-/** Checks that transaction `hash` is a successful payment of `amount` from `account` to `to`. */
+/** Runs an RPC call, turning any failure (including a malformed argument) into null. */
+const attempt = <T>(call: () => Promise<T>): Promise<T | null> => Promise.resolve().then(call).catch(() => null);
+
+/**
+ * Checks that transaction `hash` is a successful payment of `amount` from `account` to `to`. A transaction that is
+ * sent but not yet in a block is waited for, up to `timeoutMs` (default 30 s).
+ */
 export async function verifyPayment(
   hash: Hex,
-  options: { publicClient: PublicClient; account: Address; to: Address; amount: bigint }
+  options: { publicClient: PublicClient; account: Address; to: Address; amount: bigint; timeoutMs?: number }
 ): Promise<{ valid: boolean; checks: SignInCheck[]; fee: bigint | null }> {
   const checks: SignInCheck[] = [];
   const check = (name: string, ok: boolean, detail?: string) => {
     checks.push({ name, ok, detail });
     return ok;
   };
-  const receipt = await options.publicClient.getTransactionReceipt({ hash }).catch(() => null);
+  const client = options.publicClient;
+  let receipt = await attempt(() => client.getTransactionReceipt({ hash }));
+  if (!receipt && (await attempt(() => client.getTransaction({ hash })))) {
+    receipt = await attempt(() => client.waitForTransactionReceipt({ hash, timeout: options.timeoutMs ?? 30_000 }));
+  }
   if (!check("Transaction succeeded", receipt?.status === "success", receipt ? receipt.status : "not found")) {
     return { valid: false, checks, fee: null };
   }
@@ -281,4 +291,34 @@ export async function verifyPayment(
   check("To this recipient, for this amount", match !== undefined);
   const valid = checks.every(c => c.ok);
   return { valid, checks, fee: valid && match ? match.args.fee : null };
+}
+
+/**
+ * Finds the payment `account` made with action `nonce` (its `Paid` event), for a payment whose hash never reached
+ * the site: `VeraKeyConnectError.pending` says the popup closed while it was being sent. Waits up to `timeoutMs`
+ * (default 30 s) for it to land, and returns its transaction hash, or null. Pass `fromBlock` (a block from before the
+ * payment) when your RPC limits log queries; the default looks back 10,000 blocks.
+ */
+export async function findPayment(options: {
+  publicClient: PublicClient;
+  account: Address;
+  nonce: bigint;
+  fromBlock?: bigint;
+  timeoutMs?: number;
+}): Promise<Hex | null> {
+  const deadline = Date.now() + (options.timeoutMs ?? 30_000);
+  for (;;) {
+    const latest = await options.publicClient.getBlockNumber();
+    const logs = await options.publicClient.getContractEvents({
+      address: options.account,
+      abi: veraKeyAccountAbi,
+      eventName: "Paid",
+      args: { nonce: options.nonce },
+      fromBlock: options.fromBlock ?? (latest > 10_000n ? latest - 10_000n : 0n),
+      toBlock: latest,
+    });
+    if (logs[0]) return logs[0].transactionHash;
+    if (Date.now() >= deadline) return null;
+    await new Promise(resolve => setTimeout(resolve, 2_000));
+  }
 }
