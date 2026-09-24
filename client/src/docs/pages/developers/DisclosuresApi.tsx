@@ -73,7 +73,7 @@ verdict.accounts; // { a, b }: address, deployed, ownedByNullifier
       <Table
         head={["Option", "Meaning"]}
         rows={[
-          [<code key="1">audience</code>, "Required. A disclosure made for anyone else fails, so a forwarded file is useless to its new holder."],
+          [<code key="1">audience</code>, "Required. A disclosure made for anyone else fails, so nobody can hand you someone else's disclosure as if it were made for you. It does not keep the file private: the link it reveals is permanent for anyone who holds it."],
           [<code key="2">nonce</code>, "Optional. When given, the statement must carry it."],
           [<code key="3">maxTtlSeconds</code>, "Refuse disclosures valid for longer than this from now. Default MAX_DISCLOSURE_TTL_SECONDS (7 days)."],
           [<code key="4">linkVerifier / linkProver</code>, "How the proof is checked: on-chain with eth_call, locally with bb.js, or both. With neither, the proof check fails."],

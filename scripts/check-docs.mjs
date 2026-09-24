@@ -92,6 +92,19 @@ try {
   if (!styles?.token) fail("the --vk-* design tokens are not defined at the document root");
   if (styles?.openApp !== "rgb(201, 255, 91)") fail(`"Open app" is not lime (${styles?.openApp})`);
   if (styles?.list !== "disc") fail(`article lists have no bullets (${styles?.list})`);
+  // Small labels (sidebar groups, outline title, pager, last updated, code captions) stay readable: WCAG AA asks for 4.5:1.
+  const contrast = await evaluate(`(() => {
+    const rgb = c => (c.match(/[\\d.]+/g) ?? []).slice(0, 3).map(Number);
+    const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+    const bg = lum(rgb(getComputedStyle(document.querySelector(".dx-root")).backgroundColor));
+    return [".dx-nav-group p", ".dx-toc p", ".dx-pager small", ".dx-updated", ".dx-code figcaption"].map(selector => {
+      const element = document.querySelector(selector);
+      if (!element) return [selector, null];
+      const fg = lum(rgb(getComputedStyle(element).color));
+      return [selector, Math.round(((Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05)) * 100) / 100];
+    });
+  })()`);
+  for (const [selector, ratio] of contrast ?? []) if (ratio !== null && ratio < 4.5) fail(`${selector}: contrast ${ratio}:1 is below 4.5:1`);
   const ids = new Map();
   const links = [];
   for (const page of pages) {
@@ -129,7 +142,16 @@ try {
     else if (hash && !ids.get(page).has(decodeURIComponent(hash))) fail(`${from}: link to ${href}: no such anchor`);
   }
 
-  // 3. Search: typing finds the protection guide, Enter opens the selected result.
+  // 3. Search. Realistic queries select the page a reader means, and nonsense finds nothing.
+  const typeQuery = query => evaluate(`(() => { const i = document.querySelector("[cmdk-input]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(i, ${JSON.stringify(query)}); i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+  for (const [query, expected] of [["Relayer API", "/docs/build/relayer-api"], ["glossary", "/docs/reference/glossary"], ["PerTxCapExceeded", "/docs/reference/errors#account-errors"], ["zzzqqq", null]]) {
+    if (expected && !pages.includes(expected.split("#")[0])) continue;
+    await typeQuery(query);
+    await sleep(300);
+    const got = (await evaluate(`document.querySelector("[cmdk-item][data-selected=true]")?.dataset.href ?? null`)) ?? null;
+    if (got !== expected) fail(`search "${query}": selects ${got}, expected ${expected}`);
+  }
+  // Typing finds the protection guide, and Enter opens the selected result.
   await evaluate(`(() => { const i = document.querySelector("[cmdk-input]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(i, "freeze"); i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
   await sleep(300);
   await shot("desktop-search");
@@ -153,7 +175,8 @@ try {
     if (y < 0 || y > 200) fail(`deep link ${deep}: section at ${y}px`);
   }
 
-  // 5. Unknown pages show the docs 404.
+  // 5. A malformed #fragment still renders its page, and unknown pages show the docs 404.
+  if (!(await open(`${BASE}/docs/guides/pay#50%`))) fail("/docs/guides/pay#50%: did not render");
   await open(`${BASE}/docs/does-not-exist`);
   if (!(await evaluate(`!!document.querySelector(".dx-notfound")`))) fail("/docs/does-not-exist: no docs 404");
 

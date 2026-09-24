@@ -1,13 +1,23 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { groupedEntries, searchEntries } from "./search";
+import { groupedEntries, rankEntries, searchEntries, type SearchEntry } from "./search";
+
+/** Results shown for a query; the ranking puts the useful ones first. */
+const MAX_RESULTS = 40;
 
 export function DocsSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [location, navigate] = useLocation();
-  const groups = useMemo(() => groupedEntries(searchEntries()), []);
+  const [query, setQuery] = useState("");
+  const entries = useMemo(() => searchEntries(), []);
+  const groups = useMemo(() => groupedEntries(entries), [entries]);
+  const results = useMemo(() => rankEntries(query, entries).slice(0, MAX_RESULTS), [query, entries]);
+  const setOpen = (next: boolean) => {
+    if (!next) setQuery("");
+    onOpenChange(next);
+  };
   const go = (href: string) => {
-    onOpenChange(false);
+    setOpen(false);
     const [path, hash] = href.split("#");
     if (path === location && hash) {
       history.replaceState(null, "", href);
@@ -16,21 +26,31 @@ export function DocsSearch({ open, onOpenChange }: { open: boolean; onOpenChange
       navigate(href);
     }
   };
+  const item = (entry: SearchEntry) => (
+    <CommandItem key={entry.id} value={entry.id} onSelect={() => go(entry.href)} data-href={entry.href}>
+      <span className="dx-search-title">{entry.title}</span>
+      <span className="dx-search-sub">{entry.subtitle}</span>
+    </CommandItem>
+  );
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange} title="Search the docs" description="Find a page or a section." className="dx-search">
-      <CommandInput placeholder="Search the docs…" />
+    <CommandDialog
+      open={open}
+      onOpenChange={setOpen}
+      shouldFilter={false}
+      title="Search the docs"
+      description="Find a page or a section."
+      className="dx-search"
+    >
+      <CommandInput placeholder="Search the docs…" value={query} onValueChange={setQuery} />
       <CommandList>
         <CommandEmpty>No results.</CommandEmpty>
-        {groups.map(({ group, entries }) => (
-          <CommandGroup key={group} heading={group}>
-            {entries.map(entry => (
-              <CommandItem key={entry.id} value={entry.id} keywords={[entry.title, entry.subtitle, ...entry.keywords]} onSelect={() => go(entry.href)} data-href={entry.href}>
-                <span className="dx-search-title">{entry.title}</span>
-                <span className="dx-search-sub">{entry.subtitle}</span>
-              </CommandItem>
+        {query.trim()
+          ? results.length > 0 && <CommandGroup heading="Best matches">{results.map(item)}</CommandGroup>
+          : groups.map(({ group, entries: inGroup }) => (
+              <CommandGroup key={group} heading={group}>
+                {inGroup.map(item)}
+              </CommandGroup>
             ))}
-          </CommandGroup>
-        ))}
       </CommandList>
     </CommandDialog>
   );

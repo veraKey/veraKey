@@ -1,7 +1,7 @@
 import { formatUsdg } from "@/lib/format";
 import { useVeraKey } from "@/state/VeraKeyProvider";
 import sepolia from "../../../../../deployments/sepolia.json";
-import { A, Address, Callout, Code, H2, Table } from "../../components";
+import { A, Address, Callout, Code, H2, Repository, Table } from "../../components";
 
 const RPC = sepolia.rpcUrl;
 
@@ -62,7 +62,7 @@ export default function DeploymentsPage() {
       <H2>Arbitrum Sepolia</H2>
       <p>
         Chain {sepolia.chainId}, deployed on {sepolia.deployedAt.slice(0, 10)} for the origin{" "}
-        <code>{sepolia.origin}</code>. The file <code>deployments/sepolia.json</code> in the repository holds the same values.
+        <code>{sepolia.origin}</code>. The file <code>deployments/sepolia.json</code> in <Repository /> holds the same values.
       </p>
       <Table
         stack

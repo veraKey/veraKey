@@ -1,0 +1,124 @@
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
+import { Router } from "wouter";
+import { PAGES } from "./registry";
+import { slugify } from "./slug";
+
+// Deployments reads the live configuration; these tests render it without one.
+vi.mock("@/state/VeraKeyProvider", () => ({ useVeraKey: () => ({ config: null, configError: null }) }));
+
+const ENTITIES: Record<string, string> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#x27;": "'", "&#39;": "'", "&nbsp;": " " };
+const decode = (text: string) => text.replace(/&(?:amp|lt|gt|quot|#x27|#39|nbsp);/g, entity => ENTITIES[entity]);
+const plain = (html: string) => decode(html.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+/** Text as displayed, where highlighted code tokens sit side by side. */
+const displayed = (html: string) => decode(html.replace(/<[^>]+>/g, ""));
+
+async function render(path: string): Promise<string> {
+  const page = PAGES.find(p => p.path === path);
+  if (!page) throw new Error(`no page ${path}`);
+  const { default: Page } = await page.load();
+  return renderToStaticMarkup(<Router ssrPath={path}><Page /></Router>);
+}
+
+function headings(html: string, level: 2 | 3): { id: string; title: string }[] {
+  return [...html.matchAll(new RegExp(`<h${level}\\b([^>]*)>`, "g"))].map(([, attrs]) => ({
+    id: decode(/\bid="([^"]*)"/.exec(attrs)?.[1] ?? ""),
+    title: decode(/\bdata-title="([^"]*)"/.exec(attrs)?.[1] ?? ""),
+  }));
+}
+
+/** The plain text under each h2, keyed by the heading. */
+function sections(html: string): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const part of html.split(/(?=<h2\b)/).slice(1)) {
+    const title = decode(/\bdata-title="([^"]*)"/.exec(part)?.[1] ?? "");
+    map.set(title, plain(part));
+  }
+  return map;
+}
+
+describe("the registry matches the pages", () => {
+  it.each(PAGES.map(page => [page.path]))("%s lists its h2 and h3 headings", async path => {
+    const page = PAGES.find(p => p.path === path)!;
+    const html = await render(path);
+    const h2 = headings(html, 2);
+    const h3 = headings(html, 3);
+    expect(page.sections).toEqual(h2.map(h => h.title));
+    expect(page.subsections ?? []).toEqual(h3.map(h => h.title));
+    // Search links to slugify(title), so every heading's id must be exactly that.
+    for (const heading of [...h2, ...h3]) expect(heading.id).toBe(slugify(heading.title));
+    // Every search term filed under a heading appears on the page.
+    const text = plain(html);
+    for (const [heading, terms] of Object.entries(page.headingKeywords ?? {})) {
+      expect([...page.sections, ...(page.subsections ?? [])]).toContain(heading);
+      for (const term of terms) expect(text, `${path}: ${term}`).toContain(term);
+    }
+  });
+});
+
+describe("what the docs tell people", () => {
+  it("the quickstart deploys and funds the account before it pays", async () => {
+    const text = displayed(await render("/docs/build/quickstart"));
+    const deploy = text.indexOf("ensureAccount(");
+    const fund = text.indexOf("requestDemoFunds(");
+    const pay = text.indexOf("vera.pay(");
+    expect(deploy).toBeGreaterThan(-1);
+    expect(fund).toBeGreaterThan(deploy);
+    expect(pay).toBeGreaterThan(fund);
+  });
+
+  it("a guardian whose recovery nobody cancels takes over the account", async () => {
+    const recovery = plain(await render("/docs/guides/recovery"));
+    expect(recovery).not.toContain("Move funds, or make payments");
+    expect(recovery).toMatch(/nobody cancels/i);
+    const security = await render("/docs/security");
+    expect(plain(security)).not.toMatch(/never hold the account/i);
+    expect(sections(security).get("What VeraKey protects")).toMatch(/guardian/i);
+  });
+
+  it("a disclosure reveals the link to anyone who gets the file, for good", async () => {
+    for (const path of ["/docs/guides/disclosures", "/docs/build/disclosures", "/docs/reference/glossary", "/docs/security"]) {
+      expect(plain(await render(path)), path).not.toMatch(/only to them|useless to its new holder|It fails under any other audience name/i);
+    }
+    expect(plain(await render("/docs/guides/disclosures"))).toMatch(/permanent/i);
+    expect(plain(await render("/docs/build/disclosures"))).toMatch(/permanent/i);
+  });
+
+  it("says the repository is not public yet wherever it mentions it", async () => {
+    for (const page of PAGES) {
+      const text = plain(await render(page.path));
+      if (/repository/i.test(text)) expect(text, page.path).toMatch(/not public yet|https:\/\/github\.com\//);
+    }
+  });
+
+  it("says Set only schedules a guardian, and every scheduled change waits for Apply", async () => {
+    expect(plain(await render("/docs/guides/protect"))).not.toMatch(/does it for you/i);
+    const guardian = sections(await render("/docs/guides/recovery")).get("Name a guardian") ?? "";
+    expect(guardian).toMatch(/change delay/i);
+    expect(guardian).toMatch(/Apply/);
+  });
+
+  it("tells someone recovering an account what they need and what the app cannot do yet", async () => {
+    const recover = sections(await render("/docs/guides/recovery")).get("Recover an account") ?? "";
+    expect(recover).toMatch(/64 hex/i);
+    expect(recover).toMatch(/frozen/i);
+    expect(recover).toMatch(/cannot yet/i);
+  });
+
+  it("keeps the relayer key off the command line", async () => {
+    const text = displayed(await render("/docs/build/deploy"));
+    expect(text).not.toMatch(/-e RELAYER_PRIVATE_KEY=/);
+    expect(text).toContain("--env-file");
+  });
+
+  it("tells developers that the session they get back holds the PRF secret", async () => {
+    const text = plain(await render("/docs/build/sdk"));
+    expect(text).not.toMatch(/nothing else ever holds it/i);
+    expect(text).toMatch(/never persist/i);
+  });
+
+  it("says what an app is", async () => {
+    expect(plain(await render("/docs"))).not.toMatch(/every app you use/i);
+    expect(await render("/docs/reference/glossary")).toMatch(/<dt>App<\/dt>/);
+  });
+});

@@ -1,5 +1,5 @@
 import { BookOpen, CreditCard, Server, ShieldCheck } from "lucide-react";
-import { A, Callout, Card, Cards, Code, H2 } from "../../components";
+import { A, Callout, Card, Cards, Code, H2, Repository } from "../../components";
 
 export default function QuickstartPage() {
   return (
@@ -20,8 +20,8 @@ export default function QuickstartPage() {
 
       <H2>1. Get the SDK</H2>
       <Callout kind="note" title="Not on npm yet">
-        <code>@verakey/sdk</code> is not published to npm. It lives in <code>packages/sdk</code> of the VeraKey repository and
-        is used as a workspace package.
+        <code>@verakey/sdk</code> is not published to npm. It lives in <code>packages/sdk</code> of <Repository />, and is
+        used as a workspace package.
       </Callout>
       <p>Inside the VeraKey workspace, depend on the SDK and install:</p>
       <Code lang="json" title="package.json">{`
@@ -91,7 +91,19 @@ const account = await vera.account(APP_ID);
 console.log(account.address, account.balance, account.deployed);
 `}</Code>
 
-      <H2>4. Make a payment</H2>
+      <H2>4. Fund the account</H2>
+      <p>
+        Every action pays the relayer's fee in USDG from the account, so a new account needs USDG before its first
+        payment. Its address is fixed before it is deployed, so it can receive USDG from any wallet right away. On a
+        testnet deployment, deploy it and ask the relayer's faucet instead; the faucet funds only deployed accounts, once
+        each:
+      </p>
+      <Code lang="ts">{`
+await vera.ensureAccount(APP_ID);             // deploys the account through the relayer, if needed
+await vera.requestDemoFunds(account.address); // testnets only: demo USDG from the relayer's faucet
+`}</Code>
+
+      <H2>5. Make a payment</H2>
       <Code lang="ts">{`
 const receipt = await vera.pay(APP_ID, merchant, 2_000_000n, state => {
   console.log(state.status); // authenticating → proving → relaying → confirming → verified
@@ -99,11 +111,11 @@ const receipt = await vera.pay(APP_ID, merchant, 2_000_000n, state => {
 `}</Code>
       <p>
         Amounts are USDG base units (6 decimals): <code>2_000_000n</code> is 2 USDG. <code>pay</code> deploys the account
-        first if needed. On a testnet deployment, <code>vera.requestDemoFunds(account.address)</code> asks the relayer's
-        faucet for demo USDG.
+        first if needed. Without enough USDG, it rejects: with the <code>funds</code> stage before the passkey prompt when
+        the fee alone is not covered, or later with <code>TokenTransferFailed</code> when the amount is not.
       </p>
 
-      <H2>5. Handle the result</H2>
+      <H2>6. Handle the result</H2>
       <p>
         The listener receives every <A href="/docs/build/sdk#the-proof-state-machine">state</A>. If anything fails, it
         receives a <code>rejected</code> state, and the promise rejects with a <code>VeraKeyError</code> whose{" "}

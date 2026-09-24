@@ -92,12 +92,12 @@ const INVARIANTS: [string, ReactNode, ReactNode][] = [
     </>,
   ],
   [
-    "A guardian can delay the owners, but never hold the account.",
+    "A guardian can delay the owners, and takes over only through a recovery nobody cancels.",
     <>
       The guardian can freeze, veto scheduled changes and start a recovery. It cannot veto a change to the guardian, which
       waits the change delay plus the recovery delay, so a recovery started in time still finishes first. A recovery waits
       the recovery delay, any owner can cancel it, and executing it bumps the owner epoch, which voids every previous owner
-      and scheduled change.
+      and scheduled change. A recovery nobody cancels makes the guardian's chosen nullifier the only owner.
     </>,
     <>
       e2e: <code>the_guardian_cannot_veto_a_change_to_the_guardian_which_waits_longer</code>,{" "}
@@ -127,12 +127,12 @@ const INVARIANTS: [string, ReactNode, ReactNode][] = [
     <>e2e: <code>frontrun_with_other_verifier_gets_other_address</code></>,
   ],
   [
-    "Disclosures are consent, for one audience, for a while.",
+    "Disclosures are made by consent, for one audience, and expire for honest verifiers.",
     <>
       The link circuit proves that one hidden passkey owns both nullifiers and signed a statement naming the chain, the
       factory, both apps and nullifiers, the audience, a nonce and an expiry. <code>verifyDisclosure</code> takes the
       verifier's own audience name, checks the nonce it asked for, refuses disclosures valid for more than 7 days, and
-      checks the client data and the proof.
+      checks the client data and the proof. The link a disclosure reveals is permanent: whoever holds the file can show it.
     </>,
     <>e2e: linkable by consent (another audience, edited audience, missing nonce, long-lived, expired, a nullifier the passkey does not own, tampered proof, another origin, another deployment); nargo: link</>,
   ],
@@ -157,7 +157,7 @@ export default function SecurityModelPage() {
 
       <H2>What VeraKey protects</H2>
       <ul>
-        <li><strong>Your money.</strong> Only a fresh approval with your passkey moves USDG, and only for the exact action you approved.</li>
+        <li><strong>Your money.</strong> Only a fresh approval with your passkey moves USDG, and only for the exact action you approved. The one exception is a guardian recovery that no owner cancels in time: it hands the account to the guardian's chosen passkey.</li>
         <li><strong>Your passkey.</strong> Its public key, its signatures and its PRF secret never reach the chain, the relayer or other apps.</li>
         <li><strong>Your separate identities.</strong> Your accounts in different apps cannot be linked on-chain, unless you prove the link yourself.</li>
         <li><strong>You, from a bad approval.</strong> Even an approved action stays within the caps, the new-recipient cap, the fee limit and the timelocks.</li>
@@ -222,8 +222,8 @@ export default function SecurityModelPage() {
         </li>
         <li><strong>A guardian reveals itself</strong> for one account when it acts.</li>
         <li>
-          <strong>A disclosure can be forwarded.</strong> An honest verifier who checks it under its own name sees it fail,
-          but the forwarded file still shows its contents.
+          <strong>A disclosure is permanent.</strong> Whoever holds the file learns that the two accounts share an owner
+          and can check the proof. Only an honest verifier checking under its own name sees a forwarded one fail.
         </li>
       </ul>
 
@@ -250,10 +250,10 @@ export default function SecurityModelPage() {
           ["A thief with your unlocked passkey", "Approve anything you can", "Caps (2), the new-recipient cap (4), timelocks (6); you or the guardian can freeze and cancel (5, 10)"],
           ["A tampered page on the VeraKey origin", "Ask you to approve something else", "A fresh approval per action (1), the caps (2, 4), and the payment sheet when required (11)"],
           ["An address-poisoning attacker", "Get you to pay a look-alike address", "The first payment to a new recipient is capped (4)"],
-          ["A malicious guardian", "Freeze, veto changes, start a recovery", "It cannot veto changes to the guardian, and owners can cancel its recovery (10)"],
+          ["A malicious guardian", "Freeze, veto changes, start a recovery, and take the account over if nobody cancels it in time", "Owners see and cancel the recovery during the recovery delay; it cannot veto changes to the guardian (10)"],
           ["The relayer", "Refuse to relay, see IP and timing", "Anyone can submit the calldata instead; it never sees the key"],
           ["An on-chain observer", "See each account's activity", "Accounts in different apps share nothing on-chain (8, 9)"],
-          ["Someone forwarding a disclosure", "Show it to another verifier", "It fails under any other audience name (13)"],
+          ["Anyone a disclosure is forwarded to", "Learn that the two accounts share an owner, and check the proof", "Nothing: the link is permanent. An honest verifier refuses a disclosure made for someone else (13)"],
         ]}
       />
       <p>The numbers refer to the invariants above.</p>

@@ -1,4 +1,5 @@
-import { A, Badge, Callout, H2, Table } from "../../components";
+import { A, Badge, Callout, H2, Repository, Table } from "../../components";
+import { REPOSITORY_URL } from "../../site";
 
 export default function ReviewPage() {
   return (
@@ -80,6 +81,11 @@ export default function ReviewPage() {
           unfreeze while the owner or the guardian keeps cancelling within the change delay.
         </li>
         <li>
+          <strong>A guardian can take over.</strong> A recovery that no owner cancels within the recovery delay makes the
+          guardian's chosen passkey the only owner. The Recovery page shows <strong>Recovery in progress</strong>, but
+          nothing notifies you, so name only a guardian you would trust with the account.
+        </li>
+        <li>
           <strong>Fees while frozen.</strong> A thief who can make the passkey sign can still spend the account's funds on
           fees: up to <code>maxFee</code> per approval, within the daily cap, paid only to the relayer. That is griefing, not
           theft.
@@ -137,9 +143,15 @@ export default function ReviewPage() {
 
       <H2>Report a vulnerability</H2>
       <p>
-        Please report vulnerabilities privately, through a security advisory on the VeraKey repository, and not in a public
+        Please report vulnerabilities privately, through a security advisory on <Repository />, and never in a public
         issue.
       </p>
+      {!REPOSITORY_URL && (
+        <Callout kind="note">
+          Until the repository is public there is no public reporting channel. VeraKey runs only on Arbitrum Sepolia,
+          with test funds.
+        </Callout>
+      )}
       <p>A useful report includes:</p>
       <ul>
         <li>the component: a circuit, a contract, the SDK, the relayer or the app;</li>

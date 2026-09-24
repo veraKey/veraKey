@@ -49,7 +49,12 @@ export default function SdkGuidePage() {
       />
 
       <H2>Sessions</H2>
-      <p>A session is an unlocked passkey. It holds the PRF secret in memory, and nothing else ever holds it.</p>
+      <p>
+        A session is an unlocked passkey, and it holds the PRF secret in memory. <code>register</code> and{" "}
+        <code>unlock</code> return that <code>Session</code> to your code, so treat it like a key: keep it in memory, never
+        persist, log or send it, and call <code>vera.lock()</code> when you are done. With the PRF secret and the public key,
+        anyone can link your user's accounts across apps.
+      </p>
       <ul>
         <li>
           <code>register(label, {"{ userName?, activate?, payment? }"})</code> creates a passkey and returns{" "}

@@ -5,6 +5,7 @@ import { BrandMark } from "@/components/BrandMark";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { DOCS_UPDATED, neighbors, pagesByGroup, type DocPage } from "./registry";
 import { DocsSearch } from "./Search";
+import { fragmentId } from "./slug";
 
 interface TocItem {
   id: string;
@@ -59,7 +60,7 @@ function useActiveHeading(ids: string[]): string | null {
 /** On a new page: scroll to the URL's #hash as soon as the lazy content renders it, else to the top. */
 function useScrollOnNavigate(article: RefObject<HTMLElement | null>, key: string) {
   useEffect(() => {
-    const hash = decodeURIComponent(window.location.hash.slice(1));
+    const hash = fragmentId(window.location.hash);
     if (!hash) {
       window.scrollTo(0, 0);
       return;

@@ -73,11 +73,22 @@ scripts/deploy.sh sepolia
 `}</Code>
 
       <H2>Serve the app</H2>
+      <p>
+        Put the settings in a file that only you can read, written with an editor, then run <code>chmod 600 verakey.env</code>:
+      </p>
+      <Code lang="text" title="verakey.env">{`
+VERAKEY_NETWORK=sepolia
+RELAYER_PRIVATE_KEY=0x…
+`}</Code>
       <Code lang="bash">{`
 docker build -t verakey .
 docker run -d --restart unless-stopped -p 127.0.0.1:3090:3090 \\
-  -e VERAKEY_NETWORK=sepolia -e RELAYER_PRIVATE_KEY=0x… -v verakey-data:/data verakey
+  --env-file verakey.env -v verakey-data:/data verakey
 `}</Code>
+      <p>
+        Do not pass the key with <code>-e</code>: it would stay in your shell history. Anyone who can run Docker on the
+        host can still read it with <code>docker inspect</code>, so limit who can.
+      </p>
       <p>
         Put the container behind exactly one TLS-terminating proxy, such as a hosting provider's router, Caddy, nginx or
         a cloudflared named tunnel routed to <code>http://localhost:3090</code>. Bind the port to loopback, as above: the

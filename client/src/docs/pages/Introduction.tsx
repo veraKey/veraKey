@@ -7,7 +7,7 @@ export default function Introduction() {
       <H2>What VeraKey is</H2>
       <p>
         VeraKey is an account layer for passkey wallets on Arbitrum. You enroll one passkey, from iCloud Keychain or
-        Google Password Manager, and every app you use gets its own USDG smart account. Each approval, such as a
+        Google Password Manager, and each app built on VeraKey gives you a separate USDG smart account. Each approval, such as a
         payment, is proven in your browser with a zero-knowledge proof: the chain learns that your passkey approved
         exactly this action, but it never receives your passkey's public key or signature.
       </p>

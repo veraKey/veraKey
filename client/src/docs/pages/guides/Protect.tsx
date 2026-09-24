@@ -72,8 +72,8 @@ export default function ProtectGuide() {
       </p>
       <ul>
         <li>
-          <strong>Apply</strong> appears when the countdown ends. Anyone may apply a change whose delay has passed; the app
-          does it for you.
+          <strong>Apply</strong> appears when the countdown ends. A scheduled change does nothing until someone applies it,
+          so select <strong>Apply</strong>. Applying needs no passkey approval, and anyone may do it.
         </li>
         <li>
           The <strong>×</strong> button cancels a change with a passkey approval.

@@ -1,4 +1,4 @@
-import { A, Code, Flow, H2, Lanes, Table } from "../../components";
+import { A, Code, Flow, H2, Lanes, Repository, Table } from "../../components";
 
 export default function OverviewPage() {
   return (
@@ -76,6 +76,9 @@ export default function OverviewPage() {
       </p>
 
       <H2>Repository layout</H2>
+      <p>
+        The source is in <Repository />:
+      </p>
       <Code lang="text">{`
 circuits/webauthn        Noir authorization circuit + tests
 circuits/link            Noir consent-to-link circuit + tests

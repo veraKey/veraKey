@@ -1,3 +1,5 @@
+/* Small labels: 5.3:1 on --vk-bg, above WCAG AA for small text (the brand --vk-faint is 3.8:1). */
+:root { --dx-meta: #788c8a; }
 /* VeraKey docs: a three-column documentation shell in the app's dark brand (tokens from app.css). */
 .dx-root { min-height: 100vh; background: var(--vk-bg); color: var(--vk-ink); font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif; }
 .dx-skip { position: absolute; left: -9999px; top: 8px; z-index: 60; padding: 8px 12px; background: var(--vk-lime); color: #0d1117; }
@@ -21,7 +23,7 @@
 .dx-shell { display: grid; grid-template-columns: 260px minmax(0, 1fr) 220px; gap: 40px; max-width: 1440px; margin: 0 auto; padding: 0 24px; }
 .dx-side { position: sticky; top: 60px; align-self: start; height: calc(100vh - 60px); overflow-y: auto; padding: 28px 12px 40px 0; border-right: 1px solid var(--vk-line); }
 .dx-nav-group { margin-bottom: 22px; }
-.dx-nav-group p { margin: 0 0 8px; color: var(--vk-faint); font-size: 10px; font-weight: 650; letter-spacing: 0.16em; text-transform: uppercase; }
+.dx-nav-group p { margin: 0 0 8px; color: var(--dx-meta); font-size: 10px; font-weight: 650; letter-spacing: 0.16em; text-transform: uppercase; }
 .dx-nav-group ul, .dx-toc ul { margin: 0; padding: 0; list-style: none; }
 .dx-nav-group a { display: block; padding: 6px 10px; border-left: 2px solid transparent; color: var(--vk-muted); font-size: 13.5px; line-height: 1.35; text-decoration: none; }
 .dx-nav-group a:hover { color: var(--vk-ink); background: rgba(255, 255, 255, 0.02); }
@@ -55,7 +57,7 @@
 .dx-article code.dx-nowrap { white-space: nowrap; overflow-wrap: normal; }
 
 .dx-code { margin: 18px 0 22px; border: 1px solid var(--vk-line); background: #0a0f14; }
-.dx-code figcaption { display: flex; justify-content: space-between; align-items: center; padding: 7px 12px; border-bottom: 1px solid var(--vk-line); color: var(--vk-faint); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+.dx-code figcaption { display: flex; justify-content: space-between; align-items: center; padding: 7px 12px; border-bottom: 1px solid var(--vk-line); color: var(--dx-meta); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
 .dx-code button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: var(--vk-muted); font: inherit; cursor: pointer; }
 .dx-code button:hover { color: var(--vk-ink); }
 .dx-code pre { margin: 0; padding: 14px 16px; overflow-x: auto; color: #d6e2dd; font-family: var(--vk-mono); font-size: 13px; line-height: 1.65; }
@@ -123,12 +125,12 @@
 .dx-pager { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .dx-pager a { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border: 1px solid var(--vk-line); color: var(--vk-ink); text-decoration: none; }
 .dx-pager a:hover { border-color: var(--vk-line-strong); }
-.dx-pager small { display: inline-flex; align-items: center; gap: 4px; color: var(--vk-faint); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+.dx-pager small { display: inline-flex; align-items: center; gap: 4px; color: var(--dx-meta); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
 .dx-pager .dx-next { align-items: flex-end; text-align: right; }
-.dx-updated { display: flex; align-items: center; gap: 6px; margin: 18px 0 0; color: var(--vk-faint); font-size: 12px; }
+.dx-updated { display: flex; align-items: center; gap: 6px; margin: 18px 0 0; color: var(--dx-meta); font-size: 12px; }
 
 .dx-toc { position: sticky; top: 60px; align-self: start; max-height: calc(100vh - 60px); overflow-y: auto; padding: 40px 0; }
-.dx-toc p { margin: 0 0 10px; color: var(--vk-faint); font-size: 10px; font-weight: 650; letter-spacing: 0.16em; text-transform: uppercase; }
+.dx-toc p { margin: 0 0 10px; color: var(--dx-meta); font-size: 10px; font-weight: 650; letter-spacing: 0.16em; text-transform: uppercase; }
 .dx-toc a { display: block; padding: 4px 0 4px 10px; border-left: 1px solid var(--vk-line); color: var(--vk-muted); font-size: 12.5px; line-height: 1.4; text-decoration: none; }
 .dx-toc li.is-h3 a { padding-left: 22px; font-size: 12px; }
 .dx-toc li.is-active a { border-left-color: var(--vk-lime); color: var(--vk-ink); }

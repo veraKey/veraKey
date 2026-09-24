@@ -17,6 +17,10 @@ export interface DocPage {
   keywords: string[];
   /** The page's h2 headings, in order. Search links to them; scripts/check-docs.mjs checks they exist. */
   sections: string[];
+  /** The page's h3 headings, in order. Search links to them too. */
+  subsections?: string[];
+  /** Search terms that live under one heading, such as error or function names, keyed by that h2 or h3. */
+  headingKeywords?: Record<string, string[]>;
   load: () => Promise<{ default: ComponentType }>;
 }
 
@@ -26,7 +30,7 @@ export const PAGES: DocPage[] = [
     path: "/docs",
     title: "Introduction",
     group: "Get started",
-    description: "VeraKey gives every app its own USDG smart account behind one passkey, and proves each approval in zero knowledge, so no key links your accounts.",
+    description: "VeraKey gives you a separate USDG smart account in every app built on it, behind one passkey, and proves each approval in zero knowledge, so no key links your accounts.",
     keywords: ["overview", "what is verakey", "passkey", "privacy", "arbitrum", "usdg"],
     sections: ["What VeraKey is", "Who it is for", "What you can do", "Project status", "Where to go next"],
     load: () => import("./pages/Introduction"),
@@ -47,6 +51,7 @@ export const PAGES: DocPage[] = [
     description: "Follow one payment from Face ID to a settled USDG transfer: the action hash, the passkey signature, the in-browser proof, the relayer and the account's checks.",
     keywords: ["flow", "payment", "proof", "relayer", "walkthrough", "lifecycle"],
     sections: ["The journey of one payment", "Step by step", "What the chain sees", "What never leaves your device"],
+    subsections: ["1. The app builds the action hash", "2. Your passkey signs it", "3. Your browser proves the signature", "4. The relayer submits", "5. The account checks and pays"],
     load: () => import("./pages/HowItWorks"),
   },
   {
@@ -65,6 +70,7 @@ export const PAGES: DocPage[] = [
     description: "Create a VeraKey passkey, unlock it on your devices, and see the separate account each app gets.",
     keywords: ["register", "sign up", "passkey", "icloud keychain", "google password manager", "unlock", "prf"],
     sections: ["What you need", "Create your passkey", "Unlock on another device", "One account per app", "When an account is deployed"],
+    subsections: ["Open the app", "Create passkey", "See your accounts"],
     load: () => import("./pages/guides/CreateAccount"),
   },
   {
@@ -83,6 +89,7 @@ export const PAGES: DocPage[] = [
     description: "Pay in USDG with one passkey approval, see what happens behind it, and understand why an account may refuse a payment.",
     keywords: ["payment", "checkout", "fee", "receipt", "refused", "authenticated not authorized", "send"],
     sections: ["Make a payment", "What happens when you approve", "Fees", "Confirm in the payment sheet", "Your receipt", "When a payment is refused"],
+    subsections: ["Open Pay", "Enter the amount", "Approve with passkey"],
     load: () => import("./pages/guides/Pay"),
   },
   {
@@ -110,6 +117,7 @@ export const PAGES: DocPage[] = [
     description: "Show an auditor or an exchange that two of your accounts belong to one passkey, without revealing the key, only to them and only for a while.",
     keywords: ["disclosure", "linkable by consent", "compliance", "auditor", "exchange", "verify", "proof of ownership"],
     sections: ["When to use a disclosure", "Make a disclosure", "Share it", "Verify a disclosure", "What a disclosure reveals"],
+    subsections: ["Open Disclose", "Name the audience", "Add their nonce, if they gave you one", "Choose how long it is valid", "Approve disclosure with passkey"],
     load: () => import("./pages/guides/Disclosures"),
   },
   {
@@ -125,9 +133,9 @@ export const PAGES: DocPage[] = [
     path: "/docs/build/quickstart",
     title: "Quickstart",
     group: "Build",
-    description: "Add passkey accounts with private, gasless USDG payments to a web app in five steps.",
+    description: "Add passkey accounts with private, gasless USDG payments to a web app in six steps.",
     keywords: ["getting started", "install", "sdk", "tutorial", "integration", "first payment"],
-    sections: ["Before you begin", "1. Get the SDK", "2. Configure the client", "3. Register a passkey", "4. Make a payment", "5. Handle the result", "Next steps"],
+    sections: ["Before you begin", "1. Get the SDK", "2. Configure the client", "3. Register a passkey", "4. Fund the account", "5. Make a payment", "6. Handle the result", "Next steps"],
     load: () => import("./pages/developers/Quickstart"),
   },
   {
@@ -236,6 +244,7 @@ export const PAGES: DocPage[] = [
     description: "What VeraKey guarantees, what it assumes, and what it does not hide.",
     keywords: ["security", "threat model", "invariants", "trust assumptions", "privacy", "guarantees"],
     sections: ["What VeraKey protects", "Invariants", "Trust assumptions", "What still leaks", "Threat model"],
+    subsections: ["The VeraKey page code", "The relayer", "The USDG issuer", "The proof system", "Browsers"],
     load: () => import("./pages/security/SecurityModel"),
   },
   {
@@ -254,6 +263,20 @@ export const PAGES: DocPage[] = [
     description: "Every public method and type of the VeraKey SDK, with its signature.",
     keywords: ["api reference", "veraKeyclient", "methods", "types", "signatures"],
     sections: ["VeraKeyClient", "Types", "Action helpers", "WebAuthn helpers", "Disclosure helpers", "Validator helpers"],
+    subsections: ["VeraKeyConfig", "Passkeys and sessions", "Accounts", "Actions", "Payment sheet, guardians and disclosures", "Properties and lower-level classes"],
+    headingKeywords: {
+      "VeraKeyConfig": ["rpId", "relayerUrl", "relayerFee", "appIds", "loadProver", "paymentInstrument"],
+      "Passkeys and sessions": ["browserSupportsPrf", "register", "unlock", "authenticate", "lock", "shortCredentialId", "credentialIdOf"],
+      "Accounts": ["nullifier", "predictAddress", "ensureAccount", "requestDemoFunds", "pendingChanges", "scheduledPayload", "isPending"],
+      "Actions": ["pay", "scheduleChange", "restrict", "freeze", "cancelChange", "applyChange", "cancelRecovery", "executeRecovery", "authorize"],
+      "Payment sheet, guardians and disclosures": ["canConfirmPayments", "guardianSalt", "guardianCard", "createDisclosure"],
+      "Properties and lower-level classes": ["VeraKeyProver", "RelayerClient", "RelayerError", "publicClient"],
+      "Types": ["AccountState", "PendingChangeInfo", "TrackedChange", "GuardianCard", "ProofState", "RejectionStage", "VeraKeyError", "Session", "StoredPasskey"],
+      "Action helpers": ["hashAction", "encodeAction", "changeDataHash", "changePayload", "guardianCommitment", "expectedClientDataPrefix", "computeNullifier", "appIdFromName", "fieldToHex", "countPublicKeyOccurrences", "ActionKind", "ChangeKind", "MAX_DEADLINE_WINDOW"],
+      "WebAuthn helpers": ["createPasskey", "getAssertion", "getSpcAssertion", "spcAvailability", "formatSpcTotal", "webauthnDigest", "verifyPasskeySignature", "recoverPublicKeys", "publicKeyFromSpki", "derToLowS", "normalizeLowS", "prfSalt", "randomChallenge", "PrfUnsupportedError", "LocalPasskeyStore", "MemoryPasskeyStore"],
+      "Disclosure helpers": ["verifyDisclosure", "linkDisclosureChallenge", "VerifyDisclosureOptions", "LinkStatement", "DisclosurePackage", "DisclosureVerdict", "LinkProver"],
+      "Validator helpers": ["validatorInstallData", "validatorSignature", "validatorErc1271Challenge", "VALIDATOR_VERIFICATION_GAS"],
+    },
     load: () => import("./pages/reference/SdkReference"),
   },
   {
@@ -263,6 +286,14 @@ export const PAGES: DocPage[] = [
     description: "The functions, views, events and errors of the VeraKey account and factory, and the action and change kinds.",
     keywords: ["abi", "solidity interface", "functions", "events", "stylus", "account", "factory", "change kinds"],
     sections: ["Account functions", "Account views", "Account events", "Factory", "Change kinds", "Action kinds"],
+    headingKeywords: {
+      "Account functions": ["pay", "scheduleChange", "restrict", "applyChange", "cancelChange", "cancelRecovery", "guardianFreeze", "guardianCancelChange", "initiateRecovery", "guardianCancelRecovery", "executeRecovery", "initialize"],
+      "Account views": ["actionHash", "nonce", "policy", "protections", "fees", "pendingChangeIds", "pendingChange", "recovery", "isOwner", "ownerCount", "ownerEpoch", "isRecipientAllowed", "isKnownRecipient", "config", "origin", "appId", "initialized"],
+      "Account events": ["Initialized", "Paid", "ChangeScheduled", "ChangeApplied", "ChangeCancelled", "Restricted", "GuardianFroze", "RecoveryInitiated", "RecoveryExecuted", "RecoveryCancelled"],
+      "Factory": ["createAccount", "accountAddress", "configHash"],
+      "Change kinds": ["AddOwner", "RemoveOwner", "SetLimits", "SetRecipient", "SetAllowlist", "SetGuardian", "SetNewPayeeCap", "Freeze", "Unfreeze", "SetPaymentSheet"],
+      "Action kinds": ["ACTION_TYPEHASH", "Pay", "ScheduleChange", "CancelChange", "CancelRecovery", "Restrict"],
+    },
     load: () => import("./pages/reference/ContractReference"),
   },
   {
@@ -272,6 +303,14 @@ export const PAGES: DocPage[] = [
     description: "Every error the account, the relayer and the SDK can return: what it means and what to do.",
     keywords: ["errors", "revert", "troubleshooting", "invalidclientdata", "http status", "rejection"],
     sections: ["Account errors", "Client data error codes", "Relayer errors", "SDK rejection stages"],
+    subsections: ["Factory errors"],
+    headingKeywords: {
+      "Account errors": ["AccountFrozen", "AlreadyInitialized", "AlreadyOwner", "CannotVetoGuardianChange", "ChangeNotReady", "DailyCapExceeded", "DeadlineExpired", "DeadlineTooFar", "FeeTooHigh", "InvalidAmount", "InvalidChange", "InvalidClientData", "InvalidConfig", "InvalidProof", "InvalidRecipient", "LastOwner", "NewPayeeCapExceeded", "NoRecovery", "NotGuardian", "NotInitialized", "NotOwner", "NotRestrictive", "PaymentSheetRequired", "PerTxCapExceeded", "RecipientNotAllowed", "RecoveryNotReady", "TokenTransferFailed", "TooManyPendingChanges", "UnknownChange"],
+      "Factory errors": ["InvalidIdentifier", "DeploymentFailed", "InitializationFailed"],
+      "Client data error codes": ["TooLong", "NotAnAssertion", "ChallengeMismatch", "OriginMismatch", "Malformed", "CrossOrigin", "PaymentMismatch", "RpIdMismatch"],
+      "Relayer errors": ["400", "402", "404", "409", "413", "422", "429", "500", "502", "503", "rate limit"],
+      "SDK rejection stages": ["VeraKeyError", "funds", "authentication", "device", "proof", "policy", "relay"],
+    },
     load: () => import("./pages/reference/Errors"),
   },
   {
@@ -290,6 +329,9 @@ export const PAGES: DocPage[] = [
     description: "Short definitions of the terms used across the VeraKey docs.",
     keywords: ["glossary", "terms", "definitions", "dictionary"],
     sections: ["Terms"],
+    headingKeywords: {
+      "Terms": ["Account", "Action hash", "Allowlist", "App", "appId", "Authenticator data", "Barretenberg", "Change delay", "clientDataJSON", "configHash", "CRS", "Daily cap", "Disclosure", "EIP-1167", "ERC-1271", "ERC-7579", "Fee recipient", "Guardian", "Guardian card", "maxFee", "New-recipient cap", "Nonce", "Nullifier", "Origin", "Owner epoch", "Passkey", "Payment sheet", "Per-payment cap", "PRF", "Proof", "Public inputs", "Recovery", "Recovery delay", "Relayer", "restrict", "rpId", "rpIdHash", "Scheduled change", "Stylus", "Timelock", "UltraHonk", "USDG", "User verification", "Verifier"],
+    },
     load: () => import("./pages/reference/Glossary"),
   },
   {

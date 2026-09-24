@@ -7,7 +7,8 @@ export default function DisclosuresGuide() {
       <p>
         Your accounts in different apps share nothing on-chain. Sometimes you need someone to know that two of them are
         yours: an auditor checking your records, an exchange confirming where funds came from, or a lender. A disclosure
-        proves it to them, and only to them, without revealing your passkey and without putting anything on-chain.
+        proves it to them without revealing your passkey and without putting anything on-chain. Whoever holds the file
+        can show it to anyone, for good, so share one only with someone you trust with that fact.
       </p>
 
       <H2>Make a disclosure</H2>
@@ -29,7 +30,7 @@ export default function DisclosuresGuide() {
           </p>
         </Step>
         <Step title="Choose how long it is valid">
-          <p>1 hour, 1 day or 7 days. After that, verification fails.</p>
+          <p>1 hour, 1 day or 7 days. After that, an honest verifier refuses it; what it revealed stays known.</p>
         </Step>
         <Step title="Approve disclosure with passkey">
           <p>
@@ -72,10 +73,11 @@ export default function DisclosuresGuide() {
       <H2>What a disclosure reveals</H2>
       <ul>
         <li>That the two accounts in the statement have the same owner. Not your passkey, not your name.</li>
-        <li>It cannot move funds, and it stops being accepted after it expires.</li>
+        <li>It cannot move funds.</li>
         <li>
-          If the audience forwards it, anyone else who verifies it under their own name sees it fail, but they can still
-          read the file's contents.
+          The link it reveals is permanent. The expiry, the audience and the nonce protect verifiers from replays, not your
+          privacy: anyone who obtains the file learns that the two accounts share an owner and can check the proof. Only an
+          honest verifier checking under its own name sees a forwarded disclosure fail.
         </li>
       </ul>
       <Callout kind="note">

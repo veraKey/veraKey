@@ -1,4 +1,4 @@
-import { Callout, H2, Table } from "../../components";
+import { Callout, H2, Repository, Table } from "../../components";
 
 export default function GasPage() {
   return (
@@ -79,7 +79,7 @@ export default function GasPage() {
         <li>A clone with immutable arguments would remove most of <code>createAccount</code>'s storage writes.</li>
       </ul>
       <Callout kind="note">
-        The full analysis, with the call trace, is in <code>docs/GAS.md</code> in the repository.
+        The full analysis, with the call trace, is in <code>docs/GAS.md</code> in <Repository />.
       </Callout>
     </>
   );
