@@ -1,7 +1,7 @@
 import { formatUsdg } from "@/lib/format";
 import { useVeraKey } from "@/state/VeraKeyProvider";
 import sepolia from "../../../../../deployments/sepolia.json";
-import { A, Address, Callout, Code, H2, Repository, Table } from "../../components";
+import { A, Address, Callout, Code, H2, Table } from "../../components";
 
 const RPC = sepolia.rpcUrl;
 
@@ -62,7 +62,7 @@ export default function DeploymentsPage() {
       <H2>Arbitrum Sepolia</H2>
       <p>
         Chain {sepolia.chainId}, deployed on {sepolia.deployedAt.slice(0, 10)} for the origin{" "}
-        <code>{sepolia.origin}</code>. The file <code>deployments/sepolia.json</code> in <Repository /> holds the same values.
+        <code>{sepolia.origin}</code>.
       </p>
       <Table
         stack
@@ -116,9 +116,8 @@ export default function DeploymentsPage() {
         ))}
       </ul>
       <p>
-        Sourcify does not verify Stylus programs. The factory and the account build from <code>contracts/stylus</code> with
-        the pinned toolchain: Rust 1.91.0 with <code>wasm32-unknown-unknown</code>, and cargo-stylus 0.10.9. To check what an
-        address runs, read it from the chain with Foundry's <code>cast</code>:
+        Sourcify does not verify Stylus programs. To check what an address runs, read it from the chain, for example with
+        Foundry's <code>cast</code>:
       </p>
       <Code lang="bash" title="Read-only checks">{`
 RPC=${RPC}

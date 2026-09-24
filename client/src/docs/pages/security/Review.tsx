@@ -1,5 +1,4 @@
-import { A, Badge, Callout, H2, Repository, Table } from "../../components";
-import { REPOSITORY_URL } from "../../site";
+import { A, Badge, Callout, Contact, H2, Table } from "../../components";
 
 export default function ReviewPage() {
   return (
@@ -13,21 +12,21 @@ export default function ReviewPage() {
       <Callout kind="warning">Do not use VeraKey with real funds until it has been audited.</Callout>
       <p>What is tested instead:</p>
       <ul>
-        <li>18 circuit tests (<code>nargo test</code>: 11 for the authorization circuit, 7 for the link circuit);</li>
-        <li>39 Rust unit tests and 9 property tests of 2,000 cases each (<code>contracts/stylus/core</code>);</li>
-        <li>36 Foundry tests for the ERC-7579 validator, with real proofs;</li>
+        <li>18 circuit tests: 11 for the authorization circuit, 7 for the link circuit;</li>
+        <li>39 unit tests and 9 property tests of 2,000 cases each for the account's logic;</li>
+        <li>36 tests for the ERC-7579 validator, with real proofs;</li>
         <li>
-          61 end-to-end tests that deploy the real contracts to a nitro devnode and use real proofs: 44 for the account, 10 for
+          61 end-to-end tests that deploy the real contracts to a local Arbitrum Nitro node and use real proofs: 44 for the account, 10 for
           disclosures and 7 that drive the relayer over HTTP;
         </li>
         <li>
-          a browser workflow (<code>scripts/browser-e2e.mjs</code>) that drives the app in headless Chrome with a virtual
+          an automated browser workflow that drives the app in headless Chrome with a virtual
           passkey, on desktop, on mobile and through the payment sheet.
         </li>
       </ul>
       <p>
-        CI rebuilds the circuits, the verifiers and the contracts from source, and runs everything above except the browser
-        workflow on every push.
+        Every change rebuilds the circuits, the verifiers and the contracts, and runs all of these tests except the browser
+        workflow.
       </p>
 
       <H2>Internal review</H2>
@@ -122,7 +121,7 @@ export default function ReviewPage() {
       <Table
         head={["Component", "Version", "Note"]}
         rows={[
-          ["Noir (nargo, noir_js)", "1.0.0-beta.25", "Circuits and witness generation"],
+          ["Noir", "1.0.0-beta.25", "The circuits and witness generation"],
           ["Barretenberg (bb, bb.js)", "5.2.0", "UltraHonk proving and the generated verifiers"],
           ["stylus-sdk", "0.9.0 (pinned)", "The Stylus account and factory"],
           ["openzeppelin-stylus", "0.3.0 (pinned)", "SafeErc20 for USDG transfers"],
@@ -131,27 +130,20 @@ export default function ReviewPage() {
       />
       <p>
         <code>ruint</code> 1.16.0 has two advisories: RUSTSEC-2026-0220 (shift operations with incorrect overflow flags) and
-        RUSTSEC-2025-0137 (an unsound <code>reciprocal_mg10</code>). The workspace pins 1.16.0 because stylus-sdk 0.9.0 fails
+        RUSTSEC-2025-0137 (an unsound <code>reciprocal_mg10</code>). VeraKey pins 1.16.0 because stylus-sdk 0.9.0 fails
         const evaluation with ruint 1.17 or later. VeraKey's code uses no <code>Uint</code> shifts and no <code>U256</code>{" "}
         division; the shifts it does use are on <code>u8</code> and <code>u32</code>. The fix is the migration to stylus-sdk
         0.10, on the roadmap.
       </p>
       <p>
-        <code>cargo audit</code> also lists four unmaintained proc-macro crates, used at build time only.{" "}
-        <code>pnpm audit --prod</code> reported no known vulnerabilities on 2026-09-24.
+        A dependency audit also lists four unmaintained Rust macro crates, used only when building. The JavaScript
+        dependencies had no known vulnerabilities on 2026-09-24.
       </p>
 
       <H2>Report a vulnerability</H2>
       <p>
-        Please report vulnerabilities privately, through a security advisory on <Repository />, and never in a public
-        issue.
+        Please report vulnerabilities privately to <Contact />, and do not disclose them publicly before they are fixed.
       </p>
-      {!REPOSITORY_URL && (
-        <Callout kind="note">
-          Until the repository is public there is no public reporting channel. VeraKey runs only on Arbitrum Sepolia,
-          with test funds.
-        </Callout>
-      )}
       <p>A useful report includes:</p>
       <ul>
         <li>the component: a circuit, a contract, the SDK, the relayer or the app;</li>

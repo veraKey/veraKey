@@ -4,7 +4,7 @@
 //   - every internal link and #anchor resolves, including search's section deep links;
 //   - search opens with Ctrl+K, finds a section and opens it with Enter;
 //   - deep links land on their section;
-//   - unknown pages show the docs 404;
+//   - unknown pages show the docs 404, and developer pages show the developer-preview notice;
 //   - Deployments works without /api/config.
 //   - the docs never load the prover (bb.js, Noir, the CRS or WebAssembly).
 //
@@ -179,6 +179,14 @@ try {
   if (!(await open(`${BASE}/docs/guides/pay#50%`))) fail("/docs/guides/pay#50%: did not render");
   await open(`${BASE}/docs/does-not-exist`);
   if (!(await evaluate(`!!document.querySelector(".dx-notfound")`))) fail("/docs/does-not-exist: no docs 404");
+
+  // Developer pages carry the developer-preview notice; pages for people who use VeraKey do not.
+  if (pages.includes("/docs/build/quickstart")) {
+    await open(`${BASE}/docs/build/quickstart`);
+    if (!(await evaluate(`!!document.querySelector(".dx-page-head .dx-preview")`))) fail("/docs/build/quickstart: no developer-preview notice");
+  }
+  await open(`${BASE}/docs/guides/pay`);
+  if (await evaluate(`!!document.querySelector(".dx-preview")`)) fail("/docs/guides/pay: shows the developer-preview notice");
 
   // 6. Deployments without /api/config still lists the Arbitrum Sepolia contracts.
   if (pages.includes("/docs/reference/deployments")) {

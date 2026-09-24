@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Link } from "wouter";
 import { tokenize, type Lang } from "./highlight";
 import { slugify } from "./slug";
-import { REPOSITORY_URL } from "./site";
+import { CONTACT, contactHref } from "./site";
 import { textOf } from "./text";
 
 function Heading({ level, id, children }: { level: 2 | 3; id?: string; children: ReactNode }) {
@@ -168,9 +168,21 @@ export const Badge = ({ children, tone = "neutral" }: { children: ReactNode; ton
 );
 
 /** A contract or account address, linked to Arbiscan (Arbitrum Sepolia). */
-/** "the VeraKey repository": a link once it is public, and said to be not public yet until then. */
-export function Repository() {
-  return REPOSITORY_URL ? <A href={REPOSITORY_URL}>the VeraKey repository</A> : <>the VeraKey repository, which is not public yet</>;
+/** "the VeraKey team", linked to CONTACT once it is set. */
+export function Contact() {
+  return CONTACT ? <A href={contactHref(CONTACT)}>the VeraKey team</A> : <>the VeraKey team</>;
+}
+
+/** Shown on developer pages while the SDK and developer access are not open yet. */
+export function PreviewNotice() {
+  return (
+    <div className="dx-preview">
+      <Callout kind="note" title="Developer preview">
+        The VeraKey SDK and developer access open after the testnet preview. These pages show how an integration works;
+        details may still change before then.{CONTACT && <> To hear when access opens, contact <Contact />.</>}
+      </Callout>
+    </div>
+  );
 }
 
 /** An address linked to its explorer page; plain text on a network without an explorer (`explorer={null}`). */

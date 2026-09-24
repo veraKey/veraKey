@@ -8,11 +8,10 @@ export default function ChangelogPage() {
       <H2>2026-09-24</H2>
       <ul>
         <li>
-          <strong>Documentation.</strong> This site: 31 pages for people who use VeraKey and developers who build on it, with
+          <strong>Documentation.</strong> This site: 30 pages for people who use VeraKey and developers who build on it, with
           search, an outline on every page and examples you can copy.
         </li>
         <li>The landing page and the docs compare the same payment before and after, and state what the validator tests cover.</li>
-        <li>The README compares like with like, states what the validator tests cover and describes the browser workflow.</li>
         <li>
           <strong>Redeployed to Arbitrum Sepolia</strong> with the new verifiers and protections, so account addresses
           changed. The protections, disclosures and the validator are documented. See{" "}
@@ -56,10 +55,7 @@ export default function ChangelogPage() {
       <ul>
         <li>The demo focuses on one app, Pay.</li>
         <li>An account without funds gets an explanation instead of a bare revert.</li>
-        <li>The README lists the live app and the Arbitrum Sepolia contract addresses.</li>
         <li><strong>First deployment to Arbitrum Sepolia</strong>, for https://verakey.mdloglabs.org.</li>
-        <li>The server can listen on loopback only, behind a tunnel.</li>
-        <li>A Railway service configuration.</li>
         <li>
           <strong>First release:</strong> zero-knowledge passkey accounts with USDG payments on Arbitrum.
         </li>

@@ -84,11 +84,27 @@ describe("what the docs tell people", () => {
     expect(plain(await render("/docs/build/disclosures"))).toMatch(/permanent/i);
   });
 
-  it("says the repository is not public yet wherever it mentions it", async () => {
+  it("presents VeraKey as a hosted product: no repository, open source, self-hosting or build tooling", async () => {
+    const SELF_HOSTED = [
+      /repositor/i, /open[- ]source/i, /github/i, /git clone/i, /\bp?npm\b/i, /workspace/i, /docker/i, /railway/i,
+      /cloudflared|tunnel/i, /self-host/i, /\.env\b/, /environment variable/i, /\bREADME\b/, /\bCI\b/,
+      /\b(nargo|cargo|forge)\b/, /\b(packages|scripts|server|circuits|deployments)\//, /contracts\/(stylus|evm)/,
+      /devnode/i, /public issue/i,
+    ];
+    const found: string[] = [];
     for (const page of PAGES) {
-      const text = plain(await render(page.path));
-      if (/repository/i.test(text)) expect(text, page.path).toMatch(/not public yet|https:\/\/github\.com\//);
+      const text = displayed(await render(page.path));
+      for (const pattern of SELF_HOSTED) {
+        const match = text.match(pattern);
+        if (match) found.push(`${page.path}: "${text.slice(Math.max(0, (match.index ?? 0) - 30), (match.index ?? 0) + 40)}"`);
+      }
     }
+    expect(found).toEqual([]);
+  });
+
+  it("marks exactly the developer pages as a preview", () => {
+    const preview = PAGES.filter(page => page.preview).map(page => page.path);
+    expect(preview).toEqual([...PAGES.filter(page => page.group === "Build").map(page => page.path), "/docs/reference/sdk"]);
   });
 
   it("says Set only schedules a guardian, and every scheduled change waits for Apply", async () => {
@@ -103,12 +119,6 @@ describe("what the docs tell people", () => {
     expect(recover).toMatch(/64 hex/i);
     expect(recover).toMatch(/frozen/i);
     expect(recover).toMatch(/cannot yet/i);
-  });
-
-  it("keeps the relayer key off the command line", async () => {
-    const text = displayed(await render("/docs/build/deploy"));
-    expect(text).not.toMatch(/-e RELAYER_PRIVATE_KEY=/);
-    expect(text).toContain("--env-file");
   });
 
   it("tells developers that the session they get back holds the PRF secret", async () => {

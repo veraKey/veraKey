@@ -78,7 +78,7 @@ const INVARIANTS: [string, ReactNode, ReactNode][] = [
       secret are never in calldata, storage or events, and the app checks every transaction it sends for the public key
       (<code>publicKeyOccurrences</code>).
     </>,
-    <>e2e: <code>pubkey_absent_from_calldata</code>; nargo</>,
+    <>e2e: <code>pubkey_absent_from_calldata</code>; circuit tests</>,
   ],
   [
     "Accounts in different apps share nothing on-chain, unless their owner discloses the link.",
@@ -134,7 +134,7 @@ const INVARIANTS: [string, ReactNode, ReactNode][] = [
       verifier's own audience name, checks the nonce it asked for, refuses disclosures valid for more than 7 days, and
       checks the client data and the proof. The link a disclosure reveals is permanent: whoever holds the file can show it.
     </>,
-    <>e2e: linkable by consent (another audience, edited audience, missing nonce, long-lived, expired, a nullifier the passkey does not own, tampered proof, another origin, another deployment); nargo: link</>,
+    <>e2e: linkable by consent (another audience, edited audience, missing nonce, long-lived, expired, a nullifier the passkey does not own, tampered proof, another origin, another deployment); circuit tests: link</>,
   ],
   [
     "ERC-7579 signatures are bound to one operation, chain and account.",
@@ -143,7 +143,7 @@ const INVARIANTS: [string, ReactNode, ReactNode][] = [
       so they cannot be replayed to another account that installed the same nullifier. Malformed signatures and failed
       proofs return failure; they never revert.
     </>,
-    <>forge: 36 tests with real proofs</>,
+    <>validator: 36 tests with real proofs</>,
   ],
 ];
 
@@ -169,10 +169,10 @@ export default function SecurityModelPage() {
 
       <H2>Invariants</H2>
       <p>
-        These must always hold. Each names how it is enforced and the tests that exercise it: <code>e2e</code> is{" "}
-        <code>packages/sdk/test/e2e</code> (real contracts on a nitro devnode, real proofs), <code>prop</code> is{" "}
-        <code>contracts/stylus/core/tests/properties.rs</code> (2,000 cases each), <code>nargo</code> is the circuit tests,
-        and <code>forge</code> is <code>contracts/evm/test</code>.
+        These must always hold. Each names how it is enforced and the tests that exercise it: <code>e2e</code> tests deploy
+        the real contracts to a local Arbitrum Nitro node and use real proofs, <code>prop</code> tests check the account's
+        logic on 2,000 random cases each, the circuit tests check the circuits' constraints, and the validator tests use
+        real proofs.
       </p>
       <Table
         stack
@@ -185,7 +185,7 @@ export default function SecurityModelPage() {
       <p>
         Every app uses VeraKey's rpId, so the page served from the VeraKey origin sees the key, the PRF secret and the
         signature in your browser. It proves only in the browser, runs under a strict CSP with no third-party scripts, loads
-        a self-hosted CRS, and is open source. A malicious page would still need a fresh passkey approval for every action,
+        its proving files from VeraKey's own origin. A malicious page would still need a fresh passkey approval for every action,
         could not exceed the caps, the new-recipient cap, the fee limit or the timelocks, and, with the payment sheet
         required, could not pay without the browser itself showing the payee and the total.
       </p>
@@ -195,8 +195,7 @@ export default function SecurityModelPage() {
         instead (a third party is not paid the fee). It relays only for accounts whose code is the EIP-1167 clone of this
         deployment's implementation, caps each transaction at 2.5M gas and limits new accounts per visitor, so look-alike
         contracts cannot drain its gas. It sees request metadata (IP, timing): its rate-limit keys are a daily-rotated HMAC of
-        the IP kept in memory, and it can add a random delay before broadcasting. Run it behind exactly one proxy with its
-        port bound to loopback, because it trusts one <code>X-Forwarded-For</code> hop.
+        the IP kept in memory, and it can add a random delay before broadcasting.
       </p>
       <H3>The USDG issuer</H3>
       <p>Paxos can freeze any single account. This is by design: VeraKey is unlinkable, not anonymous.</p>

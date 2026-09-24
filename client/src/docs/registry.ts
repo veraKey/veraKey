@@ -21,6 +21,8 @@ export interface DocPage {
   subsections?: string[];
   /** Search terms that live under one heading, such as error or function names, keyed by that h2 or h3. */
   headingKeywords?: Record<string, string[]>;
+  /** A developer page: shown with a notice that developer access opens after the testnet preview. */
+  preview?: boolean;
   load: () => Promise<{ default: ComponentType }>;
 }
 
@@ -133,6 +135,7 @@ export const PAGES: DocPage[] = [
     path: "/docs/build/quickstart",
     title: "Quickstart",
     group: "Build",
+    preview: true,
     description: "Add passkey accounts with private, gasless USDG payments to a web app in six steps.",
     keywords: ["getting started", "install", "sdk", "tutorial", "integration", "first payment"],
     sections: ["Before you begin", "1. Get the SDK", "2. Configure the client", "3. Register a passkey", "4. Fund the account", "5. Make a payment", "6. Handle the result", "Next steps"],
@@ -142,6 +145,7 @@ export const PAGES: DocPage[] = [
     path: "/docs/build/sdk",
     title: "SDK guide",
     group: "Build",
+    preview: true,
     description: "How the VeraKey SDK is organised: modules, configuration, sessions, accounts, the proof state machine, errors and proving performance.",
     keywords: ["sdk", "client", "session", "proofstate", "verakeyerror", "prover", "modules", "configuration"],
     sections: ["Modules", "Configuration", "Sessions", "Accounts", "The proof state machine", "Errors", "Proving performance"],
@@ -151,6 +155,7 @@ export const PAGES: DocPage[] = [
     path: "/docs/build/policy",
     title: "Payments and policy",
     group: "Build",
+    preview: true,
     description: "Pay, tighten an account's policy at once, schedule loosening changes, and read the policy with the SDK.",
     keywords: ["pay", "restrict", "schedulechange", "applychange", "cancelchange", "changepayload", "freeze", "pendingchanges"],
     sections: ["Paying", "Tightening at once", "Scheduling a change", "Applying and cancelling", "Change payloads", "Reading the policy"],
@@ -160,6 +165,7 @@ export const PAGES: DocPage[] = [
     path: "/docs/build/payment-sheet",
     title: "Payment sheet",
     group: "Build",
+    preview: true,
     description: "Use the browser's Secure Payment Confirmation sheet so the browser, not your page, shows the payee and the total of every payment.",
     keywords: ["spc", "secure payment confirmation", "payment sheet", "paymentrequest", "chrome", "payee", "total"],
     sections: ["Browser support", "Enroll a passkey", "Pay through the sheet", "Require the sheet", "What the account checks"],
@@ -169,6 +175,7 @@ export const PAGES: DocPage[] = [
     path: "/docs/build/disclosures",
     title: "Disclosures",
     group: "Build",
+    preview: true,
     description: "Create and verify consent-to-link disclosures with the SDK: the statement, the package format and every check.",
     keywords: ["createdisclosure", "verifydisclosure", "linkstatement", "link circuit", "linkhonkverifier", "audience", "nonce"],
     sections: ["Create a disclosure", "The package format", "Verify a disclosure", "The checks", "On-chain or local verification"],
@@ -178,6 +185,7 @@ export const PAGES: DocPage[] = [
     path: "/docs/build/erc-7579",
     title: "ERC-7579 validator",
     group: "Build",
+    preview: true,
     description: "Bring VeraKey proofs to modular smart accounts with the VeraKeyValidator module: installation, user operation and ERC-1271 signatures, and gas.",
     keywords: ["erc-7579", "validator", "module", "kernel", "nexus", "erc-4337", "user operation", "erc-1271"],
     sections: ["What the module does", "Install it", "Sign a user operation", "ERC-1271 signatures", "Gas", "Limits"],
@@ -187,19 +195,11 @@ export const PAGES: DocPage[] = [
     path: "/docs/build/relayer-api",
     title: "Relayer API",
     group: "Build",
+    preview: true,
     description: "The HTTP API of the VeraKey relayer: configuration, account creation, gasless relaying, the demo faucet and the RPC proxy.",
     keywords: ["relayer", "api", "http", "endpoints", "rest", "rate limits", "gasless", "faucet", "rpc"],
     sections: ["Overview", "GET /api/config", "GET /api/health", "POST /api/accounts", "POST /api/relay", "POST /api/faucet", "POST /api/rpc", "Errors", "Rate limits"],
     load: () => import("./pages/developers/RelayerApi"),
-  },
-  {
-    path: "/docs/build/deploy",
-    title: "Run locally and deploy",
-    group: "Build",
-    description: "Build and test VeraKey from source, run it against a local Arbitrum devnode, and deploy your own instance to Arbitrum Sepolia.",
-    keywords: ["deploy", "local", "devnode", "docker", "sepolia", "environment variables", "self-host", "cloudflared", "railway"],
-    sections: ["Toolchain", "Build and test", "Run a local devnode", "Deploy to Arbitrum Sepolia", "Serve the app", "Environment variables"],
-    load: () => import("./pages/developers/Deploy"),
   },
   {
     path: "/docs/architecture",
@@ -207,7 +207,7 @@ export const PAGES: DocPage[] = [
     group: "Architecture",
     description: "The components of VeraKey, how a payment flows between them, and where the trust boundaries are.",
     keywords: ["architecture", "components", "diagram", "data flow", "trust boundaries", "overview"],
-    sections: ["Components", "A payment end to end", "Trust boundaries", "Repository layout"],
+    sections: ["Components", "A payment end to end", "Trust boundaries"],
     load: () => import("./pages/architecture/Overview"),
   },
   {
@@ -260,6 +260,7 @@ export const PAGES: DocPage[] = [
     path: "/docs/reference/sdk",
     title: "SDK reference",
     group: "Reference",
+    preview: true,
     description: "Every public method and type of the VeraKey SDK, with its signature.",
     keywords: ["api reference", "veraKeyclient", "methods", "types", "signatures"],
     sections: ["VeraKeyClient", "Types", "Action helpers", "WebAuthn helpers", "Disclosure helpers", "Validator helpers"],

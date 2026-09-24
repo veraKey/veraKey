@@ -52,7 +52,7 @@ export default function ErrorsPage() {
 
       <H2>Account errors</H2>
       <p>
-        The custom errors of <code>VeraKeyAccount</code>, as declared in <code>IVeraKeyAccount.sol</code>. The SDK treats
+        The custom errors of <code>VeraKeyAccount</code>, as declared in its <code>IVeraKeyAccount</code> interface. The SDK treats
         the ones in <code>POLICY_REVERTS</code> as the <code>policy</code> stage.
       </p>
       <Table

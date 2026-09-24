@@ -8,8 +8,8 @@ export default function ContractReferencePage() {
   return (
     <>
       <p>
-        The interfaces are generated from the Stylus programs: <code>contracts/evm/src/interfaces/IVeraKeyAccount.sol</code>{" "}
-        and <code>IVeraKeyFactory.sol</code>. Their errors are in the <A href="/docs/reference/errors">errors reference</A>,
+        The Solidity interfaces <code>IVeraKeyAccount</code> and <code>IVeraKeyFactory</code> are generated from the Stylus
+        programs. Their errors are in the <A href="/docs/reference/errors">errors reference</A>,
         and their addresses in <A href="/docs/reference/deployments">Deployments</A>.
       </p>
 

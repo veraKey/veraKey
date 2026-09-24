@@ -45,7 +45,7 @@ describe("search ranking", () => {
     ["threat model", "/docs/security#threat-model"],
     ["validator", "/docs/build/erc-7579"],
     ["glossary", "/docs/reference/glossary"],
-    ["deploy", "/docs/build/deploy"],
+    ["deployments", "/docs/reference/deployments"],
     ["scheduled changes", "/docs/guides/protect#scheduled-changes"],
     ["how it works", "/docs/how-it-works"],
     ["PerTxCapExceeded", "/docs/reference/errors#account-errors"],

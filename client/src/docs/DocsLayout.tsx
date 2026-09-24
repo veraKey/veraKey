@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from "rea
 import { Link, useLocation } from "wouter";
 import { BrandMark } from "@/components/BrandMark";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { PreviewNotice } from "./components";
 import { DOCS_UPDATED, neighbors, pagesByGroup, type DocPage } from "./registry";
 import { DocsSearch } from "./Search";
 import { fragmentId } from "./slug";
@@ -182,6 +183,7 @@ export function DocsLayout({ page, children }: { page?: DocPage; children: React
                 <p className="dx-crumb">{page.group}</p>
                 <h1>{page.title}</h1>
                 <p className="dx-lead">{page.description}</p>
+                {page.preview && <PreviewNotice />}
               </header>
             )}
             {children}

@@ -1,16 +1,15 @@
 import { BookOpen, CreditCard, Server, ShieldCheck } from "lucide-react";
-import { A, Callout, Card, Cards, Code, H2, Repository } from "../../components";
+import { A, Callout, Card, Cards, Code, H2 } from "../../components";
 
 export default function QuickstartPage() {
   return (
     <>
       <H2>Before you begin</H2>
       <ul>
-        <li>Node 22 and pnpm 10.</li>
         <li>An app served over https, or from <code>http://localhost</code> while you develop: passkeys need a secure context.</li>
         <li>
-          A VeraKey deployment bound to your app's origin. The factory binds every account to one origin and one WebAuthn
-          rpId, so each domain needs its own deployment and relayer. See <A href="/docs/build/deploy">Run locally and deploy</A>.
+          A VeraKey deployment for your app's domain. Every account is bound to one origin and one WebAuthn rpId, so each
+          domain has its own deployment and relayer.
         </li>
         <li>
           For fast proving, serve your pages with cross-origin isolation, so the prover can use every CPU core:
@@ -19,25 +18,13 @@ export default function QuickstartPage() {
       </ul>
 
       <H2>1. Get the SDK</H2>
-      <Callout kind="note" title="Not on npm yet">
-        <code>@verakey/sdk</code> is not published to npm. It lives in <code>packages/sdk</code> of <Repository />, and is
-        used as a workspace package.
-      </Callout>
-      <p>Inside the VeraKey workspace, depend on the SDK and install:</p>
-      <Code lang="json" title="package.json">{`
-{
-  "dependencies": {
-    "@verakey/sdk": "workspace:*"
-  }
-}
-`}</Code>
-      <Code lang="bash">{`
-pnpm install
-`}</Code>
       <p>
-        The prover downloads a common reference string (CRS). VeraKey serves it from its own origin: copy{" "}
-        <code>client/public/crs/</code> into your public folder. The workspace applies a small patch to bb.js
-        (<code>patches/@aztec__bb.js@5.2.0.patch</code>) that lets you point it at that folder.
+        The SDK is the <code>@verakey/sdk</code> package for the browser. It becomes available with developer access,
+        after the testnet preview. Its modules load separately, so an app downloads the prover only when it proves.
+      </p>
+      <p>
+        The prover needs a common reference string (CRS). Serve it from your app's own origin, so no third party sees
+        when your users prove; the client below points the prover at it.
       </p>
 
       <H2>2. Configure the client</H2>

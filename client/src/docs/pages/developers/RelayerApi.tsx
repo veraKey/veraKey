@@ -5,7 +5,7 @@ export default function RelayerApiPage() {
     <>
       <H2>Overview</H2>
       <p>
-        The relayer (<code>server/</code>) serves the app and a JSON API under <code>/api</code>. It never sees a passkey, a
+        The VeraKey relayer serves the app and a JSON API under <code>/api</code>. It never sees a passkey, a
         signature or a PRF secret: it receives finished proofs and public call data, simulates them, and submits only what
         would succeed. It pays the gas; accounts pay it back in USDG.
       </p>
@@ -98,8 +98,8 @@ export default function RelayerApiPage() {
         <li>it needs at most 2.5 million gas.</li>
       </ol>
       <p>
-        Nothing that fails a check is ever broadcast. An optional random delay (<code>RELAY_JITTER_MAX_MS</code>) can
-        separate arrival and submission times.
+        Nothing that fails a check is ever broadcast. An optional random delay can separate arrival and
+        submission times.
       </p>
 
       <H2>POST /api/faucet</H2>
@@ -147,19 +147,18 @@ eth_feeHistory eth_getLogs net_version
 
       <H2>Rate limits</H2>
       <Table
-        head={["Limit", "Default", "Setting"]}
+        head={["Limit", "Value"]}
         rows={[
-          ["API requests per visitor (not /api/rpc)", "30 per minute", <code key="1">API_REQUESTS_PER_IP_PER_MINUTE</code>],
-          ["RPC requests per visitor", "900 per minute", "fixed"],
-          ["Requests per account (relay) or nullifier (accounts)", "12 per minute", "fixed"],
-          ["New accounts per visitor", "10 per day", <code key="2">ACCOUNTS_PER_IP_PER_DAY</code>],
-          ["Faucet accounts per visitor", "3 per day", <code key="3">FAUCET_ACCOUNTS_PER_IP</code>],
+          ["API requests per visitor (not /api/rpc)", "30 per minute"],
+          ["RPC requests per visitor", "900 per minute"],
+          ["Requests per account (relay) or nullifier (accounts)", "12 per minute"],
+          ["New accounts per visitor", "10 per day"],
+          ["Faucet requests per visitor", "3 per day"],
         ]}
       />
       <Callout kind="security" title="No raw IP addresses">
         A visitor is an HMAC-SHA256 of the IP address under a random secret that rotates every UTC day, kept in memory
-        only. The relayer trusts one proxy hop for the client address, so run it behind exactly one proxy with its port
-        bound to loopback.
+        only.
       </Callout>
     </>
   );

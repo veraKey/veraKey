@@ -37,7 +37,7 @@ export default function Introduction() {
       <H2>Where to go next</H2>
       <Cards>
         <Card href="/docs/guides/create-account" title="Use VeraKey" icon={Wallet}>Create an account, fund it and pay, step by step.</Card>
-        <Card href="/docs/build/quickstart" title="Build with VeraKey" icon={Code2}>Add passkey accounts and gasless USDG payments to your app.</Card>
+        <Card href="/docs/build/quickstart" title="Build with VeraKey" icon={Code2}>Developer preview: how apps add passkey accounts and gasless USDG payments.</Card>
         <Card href="/docs/architecture" title="Understand the architecture" icon={BookOpen}>Circuits, contracts and how a payment flows.</Card>
         <Card href="/docs/security" title="Review the security" icon={ShieldCheck}>Invariants, trust assumptions and known risks.</Card>
       </Cards>

@@ -1,11 +1,11 @@
-import { Callout, H2, Repository, Table } from "../../components";
+import { H2, Table } from "../../components";
 
 export default function GasPage() {
   return (
     <>
       <H2>Measured costs</H2>
       <p>
-        Measured on 2026-09-24 on a local nitro devnode (nitro-node v3.11.4, ArbOS 61), with both Stylus programs cached
+        Measured on 2026-09-24 on a local Arbitrum Nitro node (nitro-node v3.11.4, ArbOS 61), with both Stylus programs cached
         and real proofs.
       </p>
       <Table
@@ -78,9 +78,6 @@ export default function GasPage() {
         <li>Calldata costs about 144k gas for the proof and the client data.</li>
         <li>A clone with immutable arguments would remove most of <code>createAccount</code>'s storage writes.</li>
       </ul>
-      <Callout kind="note">
-        The full analysis, with the call trace, is in <code>docs/GAS.md</code> in <Repository />.
-      </Callout>
     </>
   );
 }

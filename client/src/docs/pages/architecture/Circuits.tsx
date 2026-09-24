@@ -5,7 +5,7 @@ export default function CircuitsPage() {
     <>
       <H2>The authorization circuit</H2>
       <p>
-        <code>circuits/webauthn</code> proves that a passkey approved one action, without revealing the passkey. Its private
+        The authorization circuit proves that a passkey approved one action, without revealing the passkey. Its private
         inputs are the P-256 public key, the signature, the 37-byte authenticator data and the PRF secret (two 128-bit
         limbs). It asserts:
       </p>
@@ -16,8 +16,8 @@ export default function CircuitsPage() {
         <li>the PRF limbs fit in 128 bits, and the nullifier is computed from the key, the PRF secret and the app id.</li>
       </ol>
       <p>
-        The circuit has 56,528 UltraHonk gates (it fits 2^16). A proof is 8,768 bytes. The assertion checks live in{" "}
-        <code>circuits/verakey_lib</code>, which both circuits share.
+        The circuit has 56,528 UltraHonk gates (it fits 2^16). A proof is 8,768 bytes. Both circuits share the same
+        assertion check.
       </p>
 
       <H2>Public inputs</H2>
@@ -36,7 +36,7 @@ export default function CircuitsPage() {
       </p>
 
       <H2>The nullifier</H2>
-      <Code lang="text" title="circuits/verakey_lib: compute_nullifier">{`
+      <Code lang="text" title="compute_nullifier">{`
 nullifier = Poseidon2([NULLIFIER_DOMAIN, pk.x_hi, pk.x_lo, pk.y_hi, pk.y_lo, prf_hi, prf_lo, app_id])
 NULLIFIER_DOMAIN = "VERAKEY_NULLIFIER_V1" (as a field element)
 `}</Code>
@@ -48,7 +48,7 @@ NULLIFIER_DOMAIN = "VERAKEY_NULLIFIER_V1" (as a field element)
 
       <H2>The link circuit</H2>
       <p>
-        <code>circuits/link</code> proves a disclosure: one hidden passkey owns two nullifiers and signed the disclosure
+        The link circuit proves a disclosure: one hidden passkey owns two nullifiers and signed the disclosure
         statement. It runs the same assertion check, then asserts that the two app ids differ and that both nullifiers
         derive from the same key and PRF secret. It has 8 public inputs: the client data hash and rpId hash (four limbs),
         then <code>appIdA</code>, <code>nullifierA</code>, <code>appIdB</code> and <code>nullifierB</code>.
@@ -62,18 +62,15 @@ NULLIFIER_DOMAIN = "VERAKEY_NULLIFIER_V1" (as a field element)
       <Table
         head={["", "Authorization circuit", "Link circuit"]}
         rows={[
-          ["Source", <code key="1">circuits/webauthn</code>, <code key="2">circuits/link</code>],
-          ["Tests (nargo test)", "11", "7"],
+          ["Tests", "11", "7"],
           ["Verification key hash", <code key="3">0x16378935…caf37f12</code>, <code key="4">0x16256f66…80f21683</code>],
           ["Solidity verifier", "HonkVerifier", "LinkHonkVerifier"],
         ]}
       />
       <p>
-        <code>scripts/build-circuit.sh</code> runs the tests, compiles with nargo 1.0.0-beta.25, writes each verification key
-        with <code>bb write_vk -t evm</code>, and generates each verifier with{" "}
-        <code>bb write_solidity_verifier -t evm --optimized</code> (Barretenberg 5.2.0). The optimized generator batches
-        field inversions, which brings on-chain verification to 712,554 gas. CI rebuilds everything and fails if a
-        committed verifier differs from the circuits.
+        The circuits are written in Noir 1.0.0-beta.25. Barretenberg 5.2.0 generates their verification keys and their
+        Solidity verifiers with its optimized generator, which batches field inversions and brings on-chain verification
+        to 712,554 gas. Every build regenerates the verifiers from the circuits and fails if they differ.
       </p>
       <Callout kind="warning">
         The circuits have not had an independent audit, and UltraHonk itself has not been independently audited.

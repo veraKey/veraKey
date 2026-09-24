@@ -5,7 +5,7 @@ export default function ValidatorPage() {
     <>
       <H2>What the module does</H2>
       <p>
-        <code>VeraKeyValidator</code> (<code>contracts/evm/src/modules/VeraKeyValidator.sol</code>) is an ERC-7579 validator
+        <code>VeraKeyValidator</code> is an ERC-7579 validator
         module (type 1). It lets a modular smart account accept VeraKey proofs, so a passkey can control it through a
         per-app nullifier, without its public key ever reaching the chain.
       </p>
