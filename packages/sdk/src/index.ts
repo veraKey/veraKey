@@ -12,4 +12,5 @@ export * from "./privacy";
 export * from "./disclosure";
 export * from "./validator";
 export * from "./signin";
+export * from "./connect";
 export * from "./client";
