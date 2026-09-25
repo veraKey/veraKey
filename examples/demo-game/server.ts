@@ -1,6 +1,7 @@
 // The demo game for "Sign in with VeraKey": a site on its own origin that signs players in through VeraKey's popup
 // and sells a sword for 1 USDG. Its server issues nonces and verifies every sign-in and payment itself.
-// Local only: run `pnpm dev` (VeraKey on :5190 against a devnode) and `pnpm demo:game` (this game on :5191).
+// Locally: run `pnpm dev` (VeraKey on :5190 against a devnode) and `pnpm demo:game` (this game on :5191). Against the
+// live Arbitrum Sepolia deployment: `VERAKEY_NETWORK=sepolia pnpm demo:game` (signing in works; buying needs test USDG).
 import { randomBytes, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -12,21 +13,24 @@ import { findPayment, verifyPayment, verifySignIn, type SignInResult } from "@ve
 const ROOT = path.resolve(import.meta.dirname, "../..");
 const PORT = Number(process.env.DEMO_GAME_PORT ?? 5191);
 const ORIGIN = `http://localhost:${PORT}`;
-const VERAKEY_URL = process.env.VERAKEY_URL ?? "http://localhost:5190";
-const deployment = JSON.parse(readFileSync(path.join(ROOT, "deployments/local.json"), "utf8")) as {
+const NETWORK = process.env.VERAKEY_NETWORK ?? "local";
+const deployment = JSON.parse(readFileSync(path.join(ROOT, `deployments/${NETWORK}.json`), "utf8")) as {
+  network: string;
   chainId: number;
   rpcUrl: string;
   origin: string;
   rpIdHash: Hex;
   contracts: { factory: Address; honkVerifier: Address };
 };
+// A deployment's origin is where its VeraKey runs; the local one is VeraKey's dev server.
+const VERAKEY_URL = process.env.VERAKEY_URL ?? (NETWORK === "local" ? "http://localhost:5190" : deployment.origin);
 /** The game's merchant address and the sword's price in USDG base units. */
 const MERCHANT: Address = "0x5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe";
 const PRICE = 1_000_000n;
 
 const chain = defineChain({
   id: deployment.chainId,
-  name: "nitro-devnode",
+  name: deployment.network,
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: { default: { http: [deployment.rpcUrl] } },
 });
