@@ -87,13 +87,9 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outli
 .announcement-muted { color: #758188; }
 .site-nav { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid rgba(213,235,218,.09); background: rgba(13,17,23,.72); backdrop-filter: blur(20px); }
 .nav-inner { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 26px; }
-.brand-lockup { display: inline-flex; align-items: center; gap: 11px; color: #f2f5ec; background: transparent; padding: 0; }
-.brand-mark { display: inline-grid; place-items: center; position: relative; width: 26px; height: 26px; }
-.brand-mark-ring { position: absolute; width: 20px; height: 20px; border: 1px solid #c9ff5b; border-radius: 50%; transform: rotate(45deg); }
-.brand-mark-ring::after { content: ""; position: absolute; inset: 3px; border: 1px solid rgba(115,228,210,.68); border-radius: 50%; }
-.brand-mark-core { width: 5px; height: 5px; border-radius: 50%; background: #c9ff5b; box-shadow: 0 0 10px #c9ff5b; }
-.brand-wordmark { font-size: 17px; letter-spacing: -.055em; font-weight: 650; }
-.brand-wordmark span { color: #79e2d1; font-weight: 400; }
+.brand-lockup { display: inline-flex; align-items: center; gap: 10px; color: #f2f5ec; background: transparent; padding: 0; }
+.brand-mark, .brand-logo { display: block; flex: none; user-select: none; }
+.brand-wordmark { font-size: 18px; letter-spacing: -.03em; font-weight: 700; }
 .desktop-nav { display: flex; align-items: center; gap: 28px; margin-left: auto; }
 .desktop-nav > button, .footer-links button { color: #96a3a4; background: transparent; padding: 7px 0; font-size: 12px; transition: color .18s ease, transform .18s ease; }
 .desktop-nav > button:hover, .footer-links button:hover { color: #f2f5ec; transform: translateY(-1px); }

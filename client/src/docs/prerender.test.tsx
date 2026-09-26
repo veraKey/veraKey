@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { lazy, Suspense } from "react";
 import { describe, expect, it } from "vitest";
 import { articleMarkdown } from "./markdown";
@@ -46,15 +46,32 @@ describe("prerendering the docs", () => {
   it("puts the page into the built index.html, with its title, description, docs styles and Markdown link", () => {
     const template =
       '<!doctype html><html lang="en" class="dark"><head><meta name="description" content="The app." />' +
+      '<meta property="og:title" content="VeraKey" /><meta property="og:description" content="The app." />' +
       "<title>VeraKey</title></head><body><div id=\"root\"></div></body></html>";
     const html = docsDocument(template, signIn, "<main>content</main>", { css: ["/assets/DocsSite.css"], modules: ["/assets/DocsSite.js"] });
     expect(html).toContain("<title>Sign in with VeraKey · VeraKey Docs</title>");
     expect(html).toContain(`<meta name="description" content="${signIn.description}" />`);
+    // Link cards (X, Discord, chat apps) name the page, not the site.
+    expect(html).toContain('<meta property="og:title" content="Sign in with VeraKey · VeraKey Docs" />');
+    expect(html).toContain(`<meta property="og:description" content="${signIn.description}" />`);
     expect(html).toMatch(/<link rel="stylesheet" crossorigin href="\/assets\/DocsSite.css">[\s\S]*<\/head>/);
     expect(html).toContain('<link rel="modulepreload" crossorigin href="/assets/DocsSite.js">');
     expect(html).toContain('<link rel="alternate" type="text/markdown" href="/docs/build/sign-in.md">');
     expect(html).toContain('<div id="root"><main>content</main></div>');
     expect(() => docsDocument(template.replace('<div id="root"></div>', ""), signIn, "", { css: [], modules: [] })).toThrow(/root/);
+  });
+
+  it("fills the real index.html, whose link card carries the logo from the site's own origin", () => {
+    const template = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+    const html = docsDocument(template, signIn, "<main>content</main>", { css: [], modules: [] });
+    expect(html).toContain('<meta property="og:title" content="Sign in with VeraKey · VeraKey Docs" />');
+    const image = html.match(/<meta property="og:image" content="([^"]+)"/)?.[1];
+    expect(image).toBe(`${ORIGIN}/brand/verakey-social.png`);
+    expect(existsSync(new URL("../../public/brand/verakey-social.png", import.meta.url))).toBe(true);
+    for (const icon of ["/favicon.ico", "/apple-touch-icon.png", "/brand/verakey-icon-192.png"]) {
+      expect(html).toContain(`href="${icon}"`);
+      expect(existsSync(new URL(`../../public${icon}`, import.meta.url)), icon).toBe(true);
+    }
   });
 
   it("preloads the chunks and styles a docs page needs beyond those index.html loads", () => {

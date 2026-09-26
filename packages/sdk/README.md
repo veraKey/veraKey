@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/veraKey/veraKey/main/client/public/brand/verakey-icon-192.png" alt="" width="72" height="72">
+
 # @verakey/sdk
 
 One passkey, unlinkable on-chain identities, on Arbitrum. VeraKey gives a person their own account and ID in every

@@ -6,4 +6,5 @@ h1 { margin: 0 0 8px; font-size: 44px; }
 .lede { font-size: 18px; line-height: 1.5; }
 section { margin-top: 28px; padding: 20px; border: 2px solid #2b2118; background: #fffaf0; }
 button { padding: 10px 16px; border: 2px solid #2b2118; background: #e6b84d; font: 600 15px system-ui, sans-serif; cursor: pointer; }
+#sign-in { display: inline-flex; align-items: center; gap: 9px; padding-left: 10px; }
 [role="status"] { min-height: 1.4em; font: 14px system-ui, sans-serif; overflow-wrap: anywhere; }

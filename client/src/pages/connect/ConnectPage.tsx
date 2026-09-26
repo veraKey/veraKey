@@ -181,7 +181,7 @@ export default function ConnectPage() {
 
   return (
     <div className="vk-app vk-connect">
-      <header className="vk-connect-head"><BrandMark /><b>VeraKey</b></header>
+      <header className="vk-connect-head"><BrandMark size={26} /><b>VeraKey</b></header>
       {connection.status === "no-opener" && (
         <div className="vk-connect-actions">
           <p className="vk-lede">

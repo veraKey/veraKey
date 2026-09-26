@@ -30,7 +30,7 @@ export function AppTop({ network, prover, session, onLock }: AppTopProps) {
       <div className="vk-top-inner">
         <Link href="/" className="brand-lockup" aria-label="VeraKey home">
           <BrandMark />
-          <span className="brand-wordmark">Vera<span>Key</span></span>
+          <span className="brand-wordmark">VeraKey</span>
         </Link>
         {network && (
           <span className="vk-pill is-network" title={`chain ${network.chainId}`}>

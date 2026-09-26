@@ -60,9 +60,13 @@ export function docsDocument(template: string, page: Pick<DocPage, "path" | "tit
     ...assets.modules.map(href => `<link rel="modulepreload" crossorigin href="${href}">`),
     `<link rel="alternate" type="text/markdown" href="${page.path}.md">`,
   ];
+  const title = `${escapeHtml(page.title)} · VeraKey Docs`;
+  const description = escapeHtml(page.description);
   const edits: [RegExp, string, string][] = [
-    [/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(page.title)} · VeraKey Docs</title>`, "title"],
-    [/<meta name="description" content="[^"]*"\s*\/?>/, `<meta name="description" content="${escapeHtml(page.description)}" />`, "description"],
+    [/<title>[\s\S]*?<\/title>/, `<title>${title}</title>`, "title"],
+    [/<meta name="description" content="[^"]*"\s*\/?>/, `<meta name="description" content="${description}" />`, "description"],
+    [/<meta property="og:title" content="[^"]*"\s*\/?>/, `<meta property="og:title" content="${title}" />`, "og:title"],
+    [/<meta property="og:description" content="[^"]*"\s*\/?>/, `<meta property="og:description" content="${description}" />`, "og:description"],
     [/<\/head>/, `  ${head.join("\n    ")}\n  </head>`, "head"],
     [/<div id="root"><\/div>/, `<div id="root">${app}</div>`, "root element"],
   ];

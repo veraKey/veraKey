@@ -1,4 +1,9 @@
-# VeraKey
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="client/public/brand/verakey-logo-on-dark.png">
+    <img src="client/public/brand/verakey-logo-on-light.png" alt="VeraKey" width="220">
+  </picture>
+</h1>
 
 **Hide-My-Email for wallets: one passkey, unlinkable on-chain identities on Arbitrum.**
 
@@ -314,5 +319,18 @@ During the Buildathon the landing page was edited to correct its claims and link
 The author's earlier public repository `adiitsuu-ui/arbitrum-nexus` (Stylus + WebAuthn P-256 + Orbit L3 + AI verification, no ZK) is a separate prior project.
 
 Everything else was produced during the Buildathon: the circuits, contracts, relayer, SDK, `/app`, `/docs`, tests and deployment tooling.
+
+## Logo
+
+The logo is in [`client/public/brand`](client/public/brand), in two forms:
+
+- **The mark with "VeraKey" below it** where the logo stands on its own: this README, the site's footer, link previews
+  (`verakey-logo-*.png`, `verakey-social.png`).
+- **The mark alone** where the name is written next to it or the space is small: the site's navigation bars, the
+  sign-in window, favicons, avatars and "Sign in with VeraKey" buttons (`verakey-mark-*.png`, `verakey-avatar.png`,
+  `verakey-icon-192.png`).
+
+The transparent files are drawn light for dark backgrounds. On a light background, use a file with its own dark tile:
+`verakey-logo-on-light.png`, `verakey-avatar.png` or `verakey-icon-192.png`.
 
 License: MIT.

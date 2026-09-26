@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
-import { BrandMark } from "@/components/BrandMark";
+import { BrandLogo, BrandMark } from "@/components/BrandMark";
 import { HeroShowcase } from "@/components/HeroShowcase";
 
 const pillars = [
@@ -360,7 +360,7 @@ export default function Home() {
         <div className="container nav-inner">
           <button className="brand-lockup" onClick={() => scrollTo("top")} aria-label="VeraKey home">
             <BrandMark />
-            <span className="brand-wordmark">Vera<span>Key</span></span>
+            <span className="brand-wordmark">VeraKey</span>
           </button>
 
           <nav className={`desktop-nav ${mobileMenu ? "mobile-open" : ""}`} aria-label="Primary navigation">
@@ -580,11 +580,11 @@ export default function Home() {
         </section>
 
         <section className="closing-section section-pad" data-reveal>
-          <div className="container closing-inner"><div className="closing-art"><div className="closing-orbit orbit-one" /><div className="closing-orbit orbit-two" /><div className="closing-orbit orbit-three" /><div className="closing-center"><BrandMark /><span>AUTHENTICATE<br /><em>PROVE.</em><br />USE.</span></div></div><div className="closing-copy"><SectionKicker light>THE NEW DEFAULT</SectionKicker><h2>Make the hard<br />things <em>invisible.</em></h2><p>Today, blockchain asks users to adapt to the infrastructure. VeraKey asks the infrastructure to adapt to the user—with privacy-preserving authentication that feels as natural as unlocking a phone.</p><div className="closing-actions"><button className="button button-primary button-large magnetic-button" onClick={openApp}>Open the app <ArrowUpRight size={17} /></button><button className="text-button light-button" onClick={openDocs}>Read the docs <ArrowRight size={16} /></button></div></div></div>
+          <div className="container closing-inner"><div className="closing-art"><div className="closing-orbit orbit-one" /><div className="closing-orbit orbit-two" /><div className="closing-orbit orbit-three" /><div className="closing-center"><BrandMark size={52} /><span>AUTHENTICATE<br /><em>PROVE.</em><br />USE.</span></div></div><div className="closing-copy"><SectionKicker light>THE NEW DEFAULT</SectionKicker><h2>Make the hard<br />things <em>invisible.</em></h2><p>Today, blockchain asks users to adapt to the infrastructure. VeraKey asks the infrastructure to adapt to the user—with privacy-preserving authentication that feels as natural as unlocking a phone.</p><div className="closing-actions"><button className="button button-primary button-large magnetic-button" onClick={openApp}>Open the app <ArrowUpRight size={17} /></button><button className="text-button light-button" onClick={openDocs}>Read the docs <ArrowRight size={16} /></button></div></div></div>
         </section>
       </main>
 
-      <footer className="site-footer"><div className="container footer-inner"><div className="footer-brand"><button className="brand-lockup" onClick={() => scrollTo("top")}><BrandMark /><span className="brand-wordmark">Vera<span>Key</span></span></button><p>Passkey-native authorization<br />for the Arbitrum era.</p></div><div className="footer-links"><div><span>EXPLORE</span><button onClick={() => scrollTo("why")}>Why now</button><button onClick={() => scrollTo("architecture")}>Architecture</button><button onClick={() => scrollTo("safety")}>Safety net</button></div><div><span>RESOURCES</span><button onClick={openApp}>Open the app</button><button onClick={openDocs}>Documentation</button></div><div><span>STATUS</span><p className="status-online"><span /> Live on Arbitrum Sepolia</p><p>Arbitrum Open House<br />Singapore · 2026</p></div></div></div><div className="container footer-bottom"><span>© 2026 VERAKEY SYSTEMS</span><span>BUILT WITH WEBAUTHN · ZK · STYLUS</span><span>TESTNET PREVIEW · CONTRACTS UNAUDITED</span></div></footer>
+      <footer className="site-footer"><div className="container footer-inner"><div className="footer-brand"><button className="brand-lockup footer-logo" onClick={() => scrollTo("top")} aria-label="VeraKey: back to top"><BrandLogo width={112} /></button><p>Passkey-native authorization<br />for the Arbitrum era.</p></div><div className="footer-links"><div><span>EXPLORE</span><button onClick={() => scrollTo("why")}>Why now</button><button onClick={() => scrollTo("architecture")}>Architecture</button><button onClick={() => scrollTo("safety")}>Safety net</button></div><div><span>RESOURCES</span><button onClick={openApp}>Open the app</button><button onClick={openDocs}>Documentation</button></div><div><span>STATUS</span><p className="status-online"><span /> Live on Arbitrum Sepolia</p><p>Arbitrum Open House<br />Singapore · 2026</p></div></div></div><div className="container footer-bottom"><span>© 2026 VERAKEY SYSTEMS</span><span>BUILT WITH WEBAUTHN · ZK · STYLUS</span><span>TESTNET PREVIEW · CONTRACTS UNAUDITED</span></div></footer>
     </div>
   );
 }

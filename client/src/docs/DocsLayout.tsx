@@ -158,7 +158,7 @@ export function DocsLayout({ page, children }: { page?: DocPage; children: React
           </button>
           <Link href="/docs" className="dx-brand" aria-label="VeraKey Docs home">
             <BrandMark />
-            <span className="brand-wordmark">Vera<span>Key</span></span>
+            <span className="brand-wordmark">VeraKey</span>
             <span className="dx-brand-tag">Docs</span>
           </Link>
           <button className="dx-search-button" onClick={() => setSearchOpen(true)} aria-label="Search the docs">
