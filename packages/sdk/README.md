@@ -67,7 +67,7 @@ In the page, from a click, so the browser allows the popup:
 ```ts
 import { VeraKeyConnect } from "@verakey/sdk/connect";
 
-const verakey = new VeraKeyConnect({ url: "https://verakey.mdloglabs.org" });
+const verakey = new VeraKeyConnect({ url: "https://verakey.xyz" });
 
 // A fresh nonce from your server. Throw its refusal: the popup closes, and your page gets it as error.cause.
 async function newNonce() {
@@ -98,19 +98,19 @@ const verdict = await verifySignIn(result, {
   publicClient,                // a viem client for Arbitrum
   deployment: {                // pinned in your configuration
     chainId, factory, rpIdHash, honkVerifier,
-    origin: "https://verakey.mdloglabs.org",
+    origin: "https://verakey.xyz",
   },
 });
 if (verdict.valid) startSession(verdict.playerId, verdict.account);
 ```
 
-Take the deployment's values from [Deployments](https://verakey.mdloglabs.org/docs/reference/deployments) and keep
+Take the deployment's values from [Deployments](https://verakey.xyz/docs/reference/deployments) and keep
 them in your configuration. `verakey.pay({ to, amount, account })` takes USDG payments in the same popup, and
 `verifyPayment` checks them on your server.
 
 While you develop, the popup also answers `http://localhost` and `http://127.0.0.1`. These are different sites, with
 different player IDs: verify as the exact origin in the browser's address bar. The
-[Sign in with VeraKey guide](https://verakey.mdloglabs.org/docs/build/sign-in) covers payments, errors, local
+[Sign in with VeraKey guide](https://verakey.xyz/docs/build/sign-in) covers payments, errors, local
 development, end-to-end tests with a virtual passkey, and a security checklist.
 
 ## Passkey accounts in your own app
@@ -118,7 +118,7 @@ development, end-to-end tests with a virtual passkey, and a security checklist.
 `VeraKeyClient` registers passkeys, derives each app's account, proves approvals in the browser and pays through
 a relayer. Every account is bound to one origin and one WebAuthn rpId, so this path needs a VeraKey deployment
 for your domain, which opens with developer access after the testnet preview. The
-[Quickstart](https://verakey.mdloglabs.org/docs/build/quickstart) shows the integration.
+[Quickstart](https://verakey.xyz/docs/build/quickstart) shows the integration.
 
 ## Modules
 
@@ -161,7 +161,7 @@ const account = await createKernelAccount(publicClient, { entryPoint: getEntryPo
 ```
 
 On Arbitrum Sepolia, a Kernel v3.3 account built this way deployed and paid 1 USDG in its first user operation
-([transaction](https://arbitrum-sepolia.blockscout.com/tx/0x66dbf2ed7552d9e0d563bdf9a8aee30656d1e99cfab4c9e8bade961c0d0cfc2f)). Set `verificationGasLimit` yourself (1,700,000 covered that first operation): the proof
+([transaction](https://arbitrum-sepolia.blockscout.com/tx/0x0f617b9b889c61f9322206631cdab1c5d207fc1a95b1f97a0bfc54c8ddf92fc3)). Set `verificationGasLimit` yourself (1,700,000 covered that first operation): the proof
 costs about 732,000 gas in the validator. The plugin signs user operations; it does not sign ERC-1271 messages yet.
 
 ## Proving
@@ -175,9 +175,9 @@ costs about 732,000 gas in the validator. The plugin signs user operations; it d
 
 ## Links
 
-- [Documentation](https://verakey.mdloglabs.org/docs)
-- [SDK reference](https://verakey.mdloglabs.org/docs/reference/sdk)
-- [Security model](https://verakey.mdloglabs.org/docs/security)
+- [Documentation](https://verakey.xyz/docs)
+- [SDK reference](https://verakey.xyz/docs/reference/sdk)
+- [Security model](https://verakey.xyz/docs/security)
 
 ## License
 

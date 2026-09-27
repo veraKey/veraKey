@@ -1,6 +1,6 @@
 {
   "name": "@verakey/sdk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "VeraKey SDK: one passkey, unlinkable on-chain identities. Sign-in, per-app accounts and payments on Arbitrum, each passkey approval proven in zero knowledge.",
   "keywords": [
     "passkey",
@@ -14,7 +14,7 @@
     "sign-in",
     "usdg"
   ],
-  "homepage": "https://verakey.mdloglabs.org/docs/build/sdk",
+  "homepage": "https://verakey.xyz/docs/build/sdk",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/veraKey/veraKey.git",

@@ -238,7 +238,7 @@ const notANumber: number = result.account;
 const verified: Promise<unknown> = verifySignIn(result, {} as Parameters<typeof verifySignIn>[1]);
 // @ts-expect-error verifySignIn needs its options
 verifySignIn(result);
-const connect = new VeraKeyConnect({ url: "https://verakey.mdloglabs.org" });
+const connect = new VeraKeyConnect({ url: "https://verakey.xyz" });
 // @ts-expect-error signIn is a method
 connect.signIn = 1;
 declare const state: ProofState;
@@ -263,7 +263,7 @@ export { appId, notAString, notANumber, verified, status, classes };
 const PAGE = `
 import { VeraKeyConnect } from "@verakey/sdk/connect";
 import { signInChallenge } from "@verakey/sdk/signin";
-export const connect = new VeraKeyConnect({ url: "https://verakey.mdloglabs.org" });
+export const connect = new VeraKeyConnect({ url: "https://verakey.xyz" });
 export { signInChallenge };
 `;
 
