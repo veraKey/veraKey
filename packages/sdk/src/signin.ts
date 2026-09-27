@@ -66,6 +66,12 @@ export interface PaymentResult {
   fee: string;
 }
 
+/** A signed-in player on a site: their player ID there, and their account for the site. */
+export interface VeraKeyPlayer {
+  id: Hex;
+  account: Address;
+}
+
 /** The serialized origin of `url` (scheme, host and port). Throws for anything that is not a web origin. */
 export function normalizeOrigin(url: string): string {
   const origin = new URL(url).origin;
