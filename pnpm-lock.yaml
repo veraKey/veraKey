@@ -252,9 +252,21 @@ importers:
         specifier: ^2.37.0
         version: 2.56.8(typescript@5.6.3)(zod@4.1.12)
     devDependencies:
+      '@types/react':
+        specifier: ^19.2.1
+        version: 19.2.1
+      '@types/react-dom':
+        specifier: ^19.2.1
+        version: 19.2.1(@types/react@19.2.1)
       '@zerodev/sdk':
         specifier: 5.5.10
         version: 5.5.10(viem@2.56.8(typescript@5.6.3)(zod@4.1.12))
+      react:
+        specifier: ^19.2.1
+        version: 19.2.1
+      react-dom:
+        specifier: ^19.2.1
+        version: 19.2.1(react@19.2.1)
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.6.3)
