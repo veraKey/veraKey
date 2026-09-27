@@ -25,6 +25,7 @@
     "sdk:publish:github": "pnpm --filter @verakey/sdk publish:github",
     "test:docs": "vitest run --config vite.config.ts --dir client/src/docs",
     "test:web": "vitest run --config vite.config.ts --dir client/src",
+    "test:server": "vitest run --config vite.config.ts --dir server",
     "deploy:local": "scripts/deploy.sh local",
     "deploy:sepolia": "scripts/deploy.sh sepolia",
     "deploy:sepolia:check": "scripts/deploy.sh sepolia --check",

@@ -7,6 +7,7 @@ import type { ApiError } from "../shared/api";
 import { loadConfig } from "./config";
 import { RateLimiter, VisitorKeys } from "./rate-limit";
 import { RelayError, Relayer } from "./relayer";
+import { formerHostRedirect } from "./redirect";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // dist/index.js in production, server/index.ts under tsx in development.
@@ -47,6 +48,13 @@ const faucetPerIp = new RateLimiter(Number(process.env.FAUCET_ACCOUNTS_PER_IP ??
 const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
+
+// A host VeraKey moved away from sends every request to the same path on the deployment's origin.
+app.use((req, res, next) => {
+  const target = formerHostRedirect(req.hostname, req.originalUrl, config.network.origin);
+  if (target) return void res.redirect(308, target);
+  next();
+});
 
 // Cross-origin isolation (multi-threaded proving) and a strict CSP. bb.js needs 'wasm-unsafe-eval'.
 // The Sign in with VeraKey popup (/connect) must keep its link to the site that opened it, which COOP would cut,
