@@ -4,7 +4,9 @@
 //   2. Node imports it: the sign-in helpers compute a known account address, and the prover makes and
 //      verifies a real proof of a synthetic passkey assertion;
 //   3. TypeScript resolves typed exports, with moduleResolution bundler and nodenext;
-//   4. a bundler builds a page that uses Sign in with VeraKey without pulling in the prover.
+//   4. a bundler builds a page that uses Sign in with VeraKey without pulling in the prover;
+//   5. the integration kit: its server routes run in Node, the React module is marked "use client" and renders on
+//      a server, React is an optional peer, and a React page bundles neither the prover nor the server.
 // It leaves the checked tarball in packages/sdk, ready for `npm publish <tarball> --access public`.
 //
 //   pnpm sdk:pack            (from the repository root; KEEP=1 keeps the scratch project)
@@ -67,10 +69,17 @@ async function main() {
       for (const path of [target.import, target.types]) assert.ok(files.includes(path.replace(/^\.\//, "")), `${path} is in the tarball`);
     }
     console.log(`${files.length} files; ${modules.length} modules exported with JS and types`);
+    // Next.js treats the React module as client code only when the file starts with the directive.
+    const reactModule = run("tar", ["-xzOf", tarball, "package/dist/react.js"], work);
+    assert.ok(reactModule.startsWith('"use client";'), 'dist/react.js starts with "use client"');
+    assert.deepEqual(manifest.peerDependencies, { react: ">=18" }, "React is a peer dependency");
+    assert.deepEqual(manifest.peerDependenciesMeta, { react: { optional: true } }, "an optional one");
 
     step("install in a fresh project");
     writeFileSync(join(work, "package.json"), JSON.stringify({ name: "consumer", private: true, type: "module" }));
     run("npm", ["install", "--no-audit", "--no-fund", "--loglevel=error", tarball], work, "inherit");
+    // The integration kit's React module needs React; sites without React never install it.
+    run("npm", ["install", "--no-audit", "--no-fund", "--loglevel=error", "react@19", "react-dom@19", "@types/react@19"], work, "inherit");
 
     step("Node: sign-in helpers and a real proof");
     writeFileSync(join(work, "node-check.mjs"), NODE_CHECK);
@@ -104,6 +113,23 @@ async function main() {
     assert.doesNotMatch(code, /barretenberg|noir_js|acvm/i, "no prover code");
     assert.ok(size < 300_000, `the page stays small (${size} bytes)`);
     console.log(`${outputs.join(", ")}: ${(size / 1024).toFixed(0)} KB, no prover`);
+    step("bundler: a React page with the kit leaves the prover and the server out");
+    writeFileSync(join(work, "react-page.js"), REACT_PAGE);
+    const reactOut = join(work, "react-page-dist");
+    await build({
+      root: work, configFile: false, logLevel: "warn",
+      build: {
+        outDir: reactOut, emptyOutDir: true,
+        lib: { entry: join(work, "react-page.js"), formats: ["es"], fileName: "react-page" },
+        rollupOptions: { external: ["react", "react/jsx-runtime", "react-dom", "react-dom/client"] },
+      },
+    });
+    const reactCode = readdirSync(reactOut).map(name => readFileSync(join(reactOut, name), "latin1")).join("\n");
+    assert.doesNotMatch(reactCode, /barretenberg|noir_js|acvm/i, "no prover code");
+    // The server's cookie MAC inputs exist only in its code; its name alone also appears in doc comments.
+    assert.doesNotMatch(reactCode, /verakey-session\||verakey-nonce\|/, "no server code");
+    assert.ok(reactCode.length < 300_000, `the page stays small (${reactCode.length} bytes)`);
+    console.log(`React page: ${(reactCode.length / 1024).toFixed(0)} KB of kit code, no prover, no server`);
 
     // INIT_CWD is where `pnpm sdk:pack` was typed; pnpm runs this script from packages/sdk.
     const where = relative(process.env.INIT_CWD ?? process.cwd(), tarball);
@@ -130,6 +156,12 @@ import { appIdFromName, computeNullifier } from "@verakey/sdk/nullifier";
 import { VeraKeyProver } from "@verakey/sdk/prover";
 import { accountAddressOf, appIdFromOrigin, verifySignIn } from "@verakey/sdk/signin";
 import { normalizeLowS, publicKeyFromSpki } from "@verakey/sdk/webauthn";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
+import { ARBITRUM_SEPOLIA } from "@verakey/sdk/deployments";
+import { SignInWithVeraKey, VeraKeyProvider } from "@verakey/sdk/react";
+import { createVeraKeyServer } from "@verakey/sdk/server";
+import { VeraKeySession } from "@verakey/sdk/session";
 
 for (const name of ["VeraKeyClient", "VeraKeyProver", "VeraKeyConnect", "verifySignIn", "appIdFromName"]) {
   assert.equal(typeof root[name], "function", "the root exports " + name);
@@ -145,6 +177,17 @@ const deployment = {
 };
 assert.equal(accountAddressOf(deployment, 1n, 2n), "0x4f8222091Abf79FfDD74a7aDFcD80B24DdaB4804");
 console.log("sign-in helpers: ok");
+// The integration kit: the server's routes run in Node, the root leaves React out, and the button renders on a server.
+for (const name of ["createVeraKeyServer", "VeraKeySession"]) assert.equal(typeof root[name], "function", "the root exports " + name);
+assert.equal(root.ARBITRUM_SEPOLIA.chainId, 421614);
+assert.equal(root.SignInWithVeraKey, undefined, "the root leaves React out");
+const kit = createVeraKeyServer({ origin: "https://game.example", deployment: ARBITRUM_SEPOLIA, secret: "a secret of at least thirty-two bytes" });
+const issued = await kit.handle(new Request("https://game.example/api/verakey/nonce", { method: "POST", headers: { origin: "https://game.example" } }));
+assert.equal(issued.status, 200);
+assert.match(issued.headers.getSetCookie()[0], /^__Host-verakey-nonce=0x[0-9a-f]{64}\\./);
+assert.equal(typeof VeraKeySession, "function");
+assert.match(renderToString(createElement(VeraKeyProvider, null, createElement(SignInWithVeraKey))), /Sign in with VeraKey/);
+console.log("integration kit: server routes, session and React button: ok");
 
 // A synthetic passkey assertion, as a browser returns it, proven and verified.
 const bytes = buffer => new Uint8Array(buffer);
@@ -179,6 +222,10 @@ import { appIdFromName, VeraKeyClient, VeraKeyProver } from "@verakey/sdk";
 import { VeraKeyError, type ProofState } from "@verakey/sdk/client";
 import { VeraKeyConnect, VeraKeyConnectError } from "@verakey/sdk/connect";
 import { appIdFromOrigin, verifySignIn, type SignInResult } from "@verakey/sdk/signin";
+import { ARBITRUM_SEPOLIA, type VeraKeyDeployment } from "@verakey/sdk/deployments";
+import { SignInWithVeraKey, useVeraKey, VeraKeyProvider } from "@verakey/sdk/react";
+import { createVeraKeyServer, toExpress } from "@verakey/sdk/server";
+import { VeraKeySession, VeraKeySessionError } from "@verakey/sdk/session";
 
 const appId: bigint = appIdFromOrigin("https://game.example");
 // @ts-expect-error appIdFromOrigin returns a bigint
@@ -197,6 +244,18 @@ connect.signIn = 1;
 declare const state: ProofState;
 const status: string = state.status;
 const classes = [VeraKeyError, VeraKeyConnectError, VeraKeyClient, VeraKeyProver];
+const pinned: VeraKeyDeployment = ARBITRUM_SEPOLIA;
+const kit = createVeraKeyServer({ origin: "https://game.example", deployment: ARBITRUM_SEPOLIA, secret: "s".repeat(32) });
+// @ts-expect-error the kit needs a secret
+createVeraKeyServer({ origin: "https://game.example", deployment: ARBITRUM_SEPOLIA });
+const handled: Promise<Response> = kit.handle(new Request("https://game.example/api/verakey/session"));
+const express = toExpress(kit);
+declare const hook: ReturnType<typeof useVeraKey>;
+const kitStatus: string = hook.status;
+// @ts-expect-error pay takes a bigint amount
+hook.pay({ amount: 1 });
+const kitParts = [VeraKeyProvider, SignInWithVeraKey, VeraKeySession, VeraKeySessionError];
+export { pinned, handled, express, kitStatus, kitParts };
 export { appId, notAString, notANumber, verified, status, classes };
 `;
 
@@ -206,6 +265,13 @@ import { VeraKeyConnect } from "@verakey/sdk/connect";
 import { signInChallenge } from "@verakey/sdk/signin";
 export const connect = new VeraKeyConnect({ url: "https://verakey.mdloglabs.org" });
 export { signInChallenge };
+`;
+
+// A React page with the kit's button, as a third-party site builds it.
+const REACT_PAGE = `
+import { createElement } from "react";
+import { SignInWithVeraKey, VeraKeyProvider } from "@verakey/sdk/react";
+export const app = createElement(VeraKeyProvider, null, createElement(SignInWithVeraKey));
 `;
 
 await main();
