@@ -342,6 +342,29 @@ interface DisclosedAccount {
         From <code>@verakey/sdk/kernel</code>. See <A href="/docs/build/erc-7579">ERC-7579 validator</A> for an example
         with <code>createKernelAccount</code>.
       </p>
+      <H2>Integration kit</H2>
+      <p>
+        Sign in with VeraKey and payments for React sites with a Node server: <code>@verakey/sdk/server</code> on the
+        server, <code>@verakey/sdk/react</code> or <code>@verakey/sdk/session</code> in the page. See{" "}
+        <A href="/docs/build/sign-in#use-the-kit">Use the kit</A>.
+      </p>
+      <Table
+        stack
+        head={["Export", "Signature", "What it does"]}
+        rows={methods([
+          ["createVeraKeyServer", "({ origin, deployment, secret, merchant?, rpcUrl?, publicClient?, sessionTtlSeconds?, store?, onSignIn?, onPayment? }): VeraKeyServer", "The kit's routes: session, nonce, sign-in, sign-out and payment. secret (at least 32 bytes) signs the session cookie; sessionTtlSeconds defaults to 7 days; onSignIn and onPayment refuse by throwing. Throws at once on a malformed origin, secret, merchant or deployment."],
+          ["VeraKeyServer.handle", "(request: Request): Promise<Response>", "Answers the route named by the last segment of the request's path: for Next.js route handlers, Hono and any Fetch API server."],
+          ["VeraKeyServer.getPlayer", "(request): Promise<{ id, account } | null>", "The signed-in player of a request, from its session cookie; takes a Fetch Request or an Express request."],
+          ["toExpress", "(server: VeraKeyServer): middleware", 'Mounts the kit in Express: app.use("/api/verakey", toExpress(verakey)).'],
+          ["memoryStore", "(): VeraKeyStore", "The default store: each nonce and payment is accepted once per process. Pass your own { claim, release } in production."],
+          ["ARBITRUM_SEPOLIA", "VeraKeyDeployment", "The Arbitrum Sepolia deployment, from @verakey/sdk/deployments: chainId, rpcUrl, origin, rpIdHash, factory, honkVerifier, usdg."],
+          ["VeraKeySession", "new VeraKeySession({ server?, fetch?, host? })", "The kit in the page: load(), signIn(), signOut() and pay({ amount }), with state and subscribe(listener). signIn and pay resolve null when the player cancels."],
+          ["VeraKeySessionError", "{ code, message, status?, checks?, cause? }", "Why a request failed: a popup code, server (with the server's checks), network or signed-out."],
+          ["VeraKeyProvider", "({ server?, children })", "One VeraKeySession for the React tree below it; server defaults to /api/verakey."],
+          ["useVeraKey", "(): { status, player, paying, error, signIn, signOut, pay }", "The session's state and actions, in a component."],
+          ["SignInWithVeraKey", "({ theme?, className?, style?, onSignIn?, onError? })", "The button: signs in, shows the player's shortened ID and signs out; theme is dark or light."],
+        ])}
+      />
       <H2>Sign-in helpers</H2>
       <p>For sites that use <A href="/docs/build/sign-in">Sign in with VeraKey</A>: <code>@verakey/sdk/connect</code> in the page, <code>@verakey/sdk/signin</code> on the server.</p>
       <Table

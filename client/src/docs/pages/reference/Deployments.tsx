@@ -2,6 +2,7 @@ import { formatUsdg } from "@/lib/format";
 import { useVeraKey } from "@/state/VeraKeyProvider";
 import sepolia from "../../../../../deployments/sepolia.json";
 import { A, Address, Callout, Code, H2, Table } from "../../components";
+import { SDK_NPM_URL } from "../../site";
 
 const RPC = sepolia.rpcUrl;
 
@@ -81,6 +82,12 @@ export default function DeploymentsPage() {
           ["Link circuit VK hash", <code key="l">{sepolia.linkCircuitVkHash}</code>],
         ]}
       />
+
+      <p>
+        In code, <code>ARBITRUM_SEPOLIA</code> from <A href={SDK_NPM_URL}><code>@verakey/sdk/deployments</code></A>{" "}
+        holds the values a site's server verifies against: the chain, the factory, the verifier, the rpIdHash and
+        VeraKey's origin. They are pinned in the SDK version you install, and a redeploy comes with a new version.
+      </p>
 
       <H2>Policy for new accounts</H2>
       <p>Every account the factory creates starts with this policy. The owner can tighten it at once, or loosen it after the change delay.</p>

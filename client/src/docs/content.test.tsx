@@ -260,6 +260,32 @@ describe("what the docs tell people", () => {
     expect(displayed(section(await render("/docs/build/sign-in"), "Add the button"))).toContain("if (!response.ok) throw new Error(");
   });
 
+  it("opens Sign in with VeraKey with the kit, and keeps the lower-level flow after it", async () => {
+    const html = await render("/docs/build/sign-in");
+    expect(headings(html, 2).map(h => h.title).slice(0, 3)).toEqual(["How sign-in works", "Use the kit", "Add the button"]);
+    const kit = displayed(section(html, "Use the kit"));
+    for (const phrase of [
+      "createVeraKeyServer", "ARBITRUM_SEPOLIA", "export const GET = verakey.handle", "toExpress(verakey)",
+      "<SignInWithVeraKey />", "useVeraKey()", "getPlayer(request)", "store",
+    ]) expect(kit, phrase).toContain(phrase);
+  });
+
+  it("lists every option of the kit's server in the SDK reference", async () => {
+    const source = readFileSync(new URL("../../../packages/sdk/src/server.ts", import.meta.url), "utf8");
+    const body = /export interface VeraKeyServerOptions \{([\s\S]*?)\n\}/.exec(source)?.[1] ?? "";
+    const options = [...body.matchAll(/^ {2}(\w+)\??[:(]/gm)].map(([, name]) => name);
+    expect(options.length).toBeGreaterThan(8);
+    const signature = signatureOf(await render("/docs/reference/sdk"), "createVeraKeyServer");
+    for (const option of options) expect(signature, option).toMatch(new RegExp(`\\b${option}\\b`));
+  });
+
+  it("lists the kit's modules in the SDK guide", async () => {
+    const modules = plain(await render("/docs/build/sdk"));
+    for (const module of ["@verakey/sdk/server", "@verakey/sdk/react", "@verakey/sdk/session", "@verakey/sdk/deployments"]) {
+      expect(modules).toContain(module);
+    }
+  });
+
   it("shows how to test an integration, and lists exactly the popup's test ids", async () => {
     const html = section(await render("/docs/build/sign-in"), "Test your integration");
     for (const phrase of ["addVirtualAuthenticator", "hasPrf: true", "getByTestId"]) expect(displayed(html)).toContain(phrase);

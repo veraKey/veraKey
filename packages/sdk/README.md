@@ -17,6 +17,46 @@ npm install @verakey/sdk
 The package is ESM with TypeScript types. Every module is its own entry point (`@verakey/sdk/<module>`), so a
 page loads the prover only when it imports it. The server helpers need Node 20 or later.
 
+## The integration kit: React and your server
+
+The quickest way to add Sign in with VeraKey and USDG payments to a React site with a Node server:
+
+```ts
+// lib/verakey.ts, on your server
+import { createVeraKeyServer } from "@verakey/sdk/server";
+import { ARBITRUM_SEPOLIA } from "@verakey/sdk/deployments";
+
+export const verakey = createVeraKeyServer({
+  origin: "https://your.game",
+  deployment: ARBITRUM_SEPOLIA,
+  secret: process.env.VERAKEY_SECRET!, // at least 32 random bytes
+  merchant: "0xYourShopAddress",
+  onPayment: ({ player, amount, hash }) => grantItem(player.id, amount, hash), // throw to refuse
+});
+
+// Next.js, in app/api/verakey/[route]/route.ts:
+//   export const GET = verakey.handle;
+//   export const POST = verakey.handle;
+// Express: app.use("/api/verakey", toExpress(verakey))
+```
+
+```tsx
+// your pages
+import { SignInWithVeraKey, VeraKeyProvider, useVeraKey } from "@verakey/sdk/react";
+
+<VeraKeyProvider>
+  <SignInWithVeraKey />
+</VeraKeyProvider>
+
+const { player, pay } = useVeraKey();
+await pay({ amount: 1_000_000n }); // 1 USDG to your merchant
+```
+
+The kit binds each nonce to the browser that asked for it, verifies every sign-in and payment on your server,
+keeps the session in a signed cookie, and accepts each payment once (in memory by default: pass a durable
+`store` in production). React is an optional peer dependency; without React, `VeraKeySession` from
+`@verakey/sdk/session` does the same in any page.
+
 ## Sign in with VeraKey
 
 Any site can sign players in through VeraKey's popup today, on its own domain. Each player gets an ID for your
@@ -86,6 +126,10 @@ for your domain, which opens with developer access after the testnet preview. Th
 |---|---|
 | `@verakey/sdk/connect` | `VeraKeyConnect`: the Sign in with VeraKey popup, for the browser |
 | `@verakey/sdk/signin` | `verifySignIn`, `verifyPayment`, `findPayment`, `appIdFromOrigin`, for your server |
+| `@verakey/sdk/server` | `createVeraKeyServer`, `toExpress`: the integration kit's routes, for your server |
+| `@verakey/sdk/react` | `VeraKeyProvider`, `useVeraKey`, `SignInWithVeraKey`: the integration kit for React |
+| `@verakey/sdk/session` | `VeraKeySession`: the integration kit in any page, without React |
+| `@verakey/sdk/deployments` | `ARBITRUM_SEPOLIA`: the deployment the kit verifies against |
 | `@verakey/sdk/client` | `VeraKeyClient`: passkeys, accounts, payments and the proof state machine |
 | `@verakey/sdk/prover` | `VeraKeyProver`: UltraHonk proofs of WebAuthn assertions |
 | `@verakey/sdk/disclosure` | Disclosures that prove two of a person's app accounts share one passkey |
@@ -94,7 +138,7 @@ for your domain, which opens with developer access after the testnet preview. Th
 | `@verakey/sdk/kernel` | `toVeraKeyKernelValidator`: a VeraKey passkey as a ZeroDev Kernel account's validator |
 | `@verakey/sdk/nullifier`, `/action`, `/relayer`, `/abi`, … | Lower-level building blocks |
 
-`@verakey/sdk` re-exports every module.
+`@verakey/sdk` re-exports every module except `react`, so importing it never needs React.
 
 ## ZeroDev Kernel accounts
 

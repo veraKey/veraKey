@@ -23,10 +23,82 @@ your page ◀── result ───────────── { playerId, a
 your server: verifySignIn(result) ── eth_call ──▶ HonkVerifier on Arbitrum
 `}</Code>
 
+      <H2>Use the kit</H2>
+      <p>
+        With React and a Node server, the SDK's kit does the rest of this page for you: nonces bound to the browser
+        session, verification, a session cookie, and payments checked on-chain and accepted once. Install{" "}
+        <A href={SDK_NPM_URL}>the SDK</A> with <code>npm install @verakey/sdk</code>, then create the kit's server once:
+      </p>
+      <Code lang="ts" title="lib/verakey.ts">{`
+import { createVeraKeyServer } from "@verakey/sdk/server";
+import { ARBITRUM_SEPOLIA } from "@verakey/sdk/deployments";
+
+export const verakey = createVeraKeyServer({
+  origin: "https://your.game",   // your site's exact origin
+  deployment: ARBITRUM_SEPOLIA,  // pinned in the SDK version you install
+  secret: VERAKEY_SECRET,        // at least 32 random bytes, known only to your server
+  merchant: SHOP_ADDRESS,        // where payments go
+  onPayment: ({ player, amount, hash }) => {
+    if (amount !== 1_000_000n) throw new Error("A sword costs 1 USDG."); // the player sees this message
+    return grantSword(player.id, hash);
+  },
+});
+`}</Code>
+      <p>Mount its routes under <code>/api/verakey</code>. With Next.js:</p>
+      <Code lang="ts" title="app/api/verakey/[route]/route.ts">{`
+import { verakey } from "@/lib/verakey";
+
+export const GET = verakey.handle;
+export const POST = verakey.handle;
+`}</Code>
+      <p>
+        With Express: <code>app.use("/api/verakey", toExpress(verakey))</code>, with <code>toExpress</code> from{" "}
+        <code>@verakey/sdk/server</code>. Then, in your pages:
+      </p>
+      <Code lang="ts" title="page.tsx">{`
+import { SignInWithVeraKey, VeraKeyProvider, useVeraKey } from "@verakey/sdk/react";
+
+export default function Page() {
+  return (
+    <VeraKeyProvider>
+      <SignInWithVeraKey />
+      <Shop />
+    </VeraKeyProvider>
+  );
+}
+
+function Shop() {
+  const { player, pay } = useVeraKey();
+  if (!player) return null;
+  // 1 USDG to your merchant: resolves with what onPayment returned, or null if the player cancelled.
+  return <button onClick={() => pay({ amount: 1_000_000n })}>Buy a sword</button>;
+}
+`}</Code>
+      <ul>
+        <li>
+          <code>SignInWithVeraKey</code> opens the popup, shows "Waiting for VeraKey…" while the player approves, then
+          the player's shortened ID with a way to sign out. <code>useVeraKey()</code> gives the same state to your own
+          components.
+        </li>
+        <li>In your own routes, <code>await verakey.getPlayer(request)</code> is the signed-in player, or null.</li>
+        <li>
+          <code>onPayment</code> receives a payment already verified on-chain, from the signed-in player's account to your
+          merchant: check that the amount pays for what you sell. If it throws, the player sees its message and can try
+          again.
+        </li>
+        <li>
+          The kit accepts each payment once, in memory by default. In production, or with more than one server process,
+          pass a <code>store</code> backed by your database, such as Redis <code>SET NX</code> or a unique key in SQL,
+          so a restart never accepts a payment twice.
+        </li>
+        <li>Sessions are cookies signed with <code>secret</code>: changing it signs every player out.</li>
+      </ul>
+
       <H2>Add the button</H2>
       <p>
-        Install <A href={SDK_NPM_URL}>the SDK</A> with <code>npm install @verakey/sdk</code>. Create one client with
-        VeraKey's address, and call <code>signIn</code> from a click, so the browser allows the popup:
+        Without React, or to build it yourself: create one client with VeraKey's address, and call{" "}
+        <code>signIn</code> from a click, so the browser allows the popup. The rest of this page is what the kit does
+        for you:
       </p>
       <Code lang="ts" title="game.ts">{`
 import { VeraKeyConnect, VeraKeyConnectError } from "@verakey/sdk/connect";
@@ -245,6 +317,10 @@ test("a player signs in with a new VeraKey passkey", async ({ page }) => {
         <li>
           Choose your origin for good. Player IDs and accounts belong to the exact origin, so moving to another domain, or
           from game.example to www.game.example, starts every player over with a new ID and an empty account.
+        </li>
+        <li>
+          With the kit, <code>createVeraKeyServer</code> covers the first three items; the https origin, the headers
+          and your choice of origin stay yours.
         </li>
       </ul>
 
