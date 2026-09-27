@@ -5,6 +5,31 @@
   </picture>
 </h1>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Arbitrum-Stylus-30363d?style=flat-square&labelColor=161b22" alt="Arbitrum Stylus">
+  <img src="https://img.shields.io/badge/Rust-stylus--sdk%200.9-30363d?style=flat-square&labelColor=161b22&logo=rust&logoColor=white" alt="Rust stylus-sdk 0.9">
+  <img src="https://img.shields.io/badge/Solidity-0.8.27-30363d?style=flat-square&labelColor=161b22&logo=solidity&logoColor=white" alt="Solidity 0.8.27">
+  <img src="https://img.shields.io/badge/OpenZeppelin-Stylus%200.3-30363d?style=flat-square&labelColor=161b22&logo=openzeppelin&logoColor=white" alt="OpenZeppelin Stylus 0.3">
+  <img src="https://img.shields.io/badge/USDG-Paxos-30363d?style=flat-square&labelColor=161b22" alt="USDG Paxos">
+  <br>
+  <img src="https://img.shields.io/badge/Noir-1.0.0--beta.25-30363d?style=flat-square&labelColor=161b22" alt="Noir 1.0.0-beta.25">
+  <img src="https://img.shields.io/badge/UltraHonk-bb.js%205.2%2C%20in%20the%20browser-30363d?style=flat-square&labelColor=161b22" alt="UltraHonk bb.js 5.2, in the browser">
+  <img src="https://img.shields.io/badge/WebAuthn-passkeys%20%2B%20PRF-30363d?style=flat-square&labelColor=161b22&logo=webauthn&logoColor=white" alt="WebAuthn passkeys + PRF">
+  <br>
+  <img src="https://img.shields.io/badge/TypeScript-5.6-30363d?style=flat-square&labelColor=161b22&logo=typescript&logoColor=white" alt="TypeScript 5.6">
+  <img src="https://img.shields.io/badge/React-19-30363d?style=flat-square&labelColor=161b22&logo=react&logoColor=white" alt="React 19">
+  <img src="https://img.shields.io/badge/Vite-7-30363d?style=flat-square&labelColor=161b22&logo=vite&logoColor=white" alt="Vite 7">
+  <img src="https://img.shields.io/badge/Tailwind%20CSS-4-30363d?style=flat-square&labelColor=161b22&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 4">
+  <img src="https://img.shields.io/badge/viem-2-30363d?style=flat-square&labelColor=161b22" alt="viem 2">
+  <img src="https://img.shields.io/badge/Node.js-22-30363d?style=flat-square&labelColor=161b22&logo=nodedotjs&logoColor=white" alt="Node.js 22">
+  <img src="https://img.shields.io/badge/Express-4-30363d?style=flat-square&labelColor=161b22&logo=express&logoColor=white" alt="Express 4">
+  <br>
+  <img src="https://img.shields.io/badge/pnpm-10-30363d?style=flat-square&labelColor=161b22&logo=pnpm&logoColor=white" alt="pnpm 10">
+  <img src="https://img.shields.io/badge/Vitest-2-30363d?style=flat-square&labelColor=161b22&logo=vitest&logoColor=white" alt="Vitest 2">
+  <img src="https://img.shields.io/badge/Foundry-forge-30363d?style=flat-square&labelColor=161b22" alt="Foundry forge">
+  <img src="https://img.shields.io/badge/Docker-Nitro%20devnode-30363d?style=flat-square&labelColor=161b22&logo=docker&logoColor=white" alt="Docker Nitro devnode">
+</p>
+
 **Hide-My-Email for wallets: one passkey, unlinkable on-chain identities on Arbitrum.**
 
 Every app gets its own USDG account and ID behind a single passkey, with payments, sign-in and recovery built in, and
