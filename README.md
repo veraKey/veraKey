@@ -65,6 +65,12 @@ Docs: **https://verakey.mdloglabs.org/docs** (users, developers and reviewers).
 | USDG (Paxos Global Dollar) | [`0xFFC95faa3d63Cde504a05B567C600B78C0b41892`](https://sepolia.arbiscan.io/address/0xFFC95faa3d63Cde504a05B567C600B78C0b41892) |
 
 - Accounts are EIP-1167 clones created by the factory.
+- First USDG payment on Arbitrum Sepolia, on 27 September 2026: a passkey on an iPhone approved 2 USDG, the phone's
+  browser made the proof, and the account verified it and paid, gasless:
+  [`0x81c5d7e4…f797`](https://sepolia.arbiscan.io/tx/0x81c5d7e446873a656deefe7910dd65719a5c3dac4cc2c95719d9f8173c5ff797)
+  (1,225,020 gas, 0.02 USDG fee). Before it, the same account froze
+  ([`0xd09c08e9…3c38`](https://sepolia.arbiscan.io/tx/0xd09c08e98a9ca1149f14fd4b9907c6b9e2a7785ff169e4a0bcfe744562f83c38)),
+  scheduled its unfreeze with a proof and applied it after the 2-minute delay.
 - The full configuration is in `deployments/sepolia.json`.
 - The Solidity contracts are source-verified on Sourcify (exact match): [`HonkVerifier`](https://repo.sourcify.dev/421614/0x9BF57a65Cb388132982D3061C9b2d5Ec3bA2df06), [`LinkHonkVerifier`](https://repo.sourcify.dev/421614/0xDb3B0Bfb96504381dcFA8a32Cb81dee3401bDF2B), [`VeraKeyValidator`](https://repo.sourcify.dev/421614/0xcc96c0C520Fc6E8a068f5e2A74aBa7cAab8d9b6C).
 - The Stylus programs build from `contracts/stylus` with the pinned toolchain below.
