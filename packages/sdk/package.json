@@ -1,6 +1,6 @@
 {
   "name": "@verakey/sdk",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "VeraKey SDK: one passkey, unlinkable on-chain identities. Sign-in, per-app accounts and payments on Arbitrum, each passkey approval proven in zero knowledge.",
   "keywords": [
     "passkey",

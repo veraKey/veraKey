@@ -9,6 +9,14 @@ export default function ChangelogPage() {
       <H2>2026-09-27</H2>
       <ul>
         <li>
+          <strong>SDK 0.2.0, the integration kit:</strong> <code>createVeraKeyServer</code> from{" "}
+          <code>@verakey/sdk/server</code>, and <code>SignInWithVeraKey</code> and <code>useVeraKey</code> from{" "}
+          <code>@verakey/sdk/react</code>, add Sign in with VeraKey and payments to a React site with a Node server in
+          about ten lines: nonces bound to the browser, sessions in a signed cookie, and payments verified on-chain and
+          accepted once. <code>ARBITRUM_SEPOLIA</code> pins the deployment. See{" "}
+          <A href="/docs/build/sign-in#use-the-kit">Use the kit</A>.
+        </li>
+        <li>
           <strong>SDK 0.1.2, VeraKey passkeys own ZeroDev Kernel accounts:</strong>{" "}
           <code>toVeraKeyKernelValidator</code> from <code>@verakey/sdk/kernel</code> makes the ERC-7579 validator a
           Kernel plugin. On Arbitrum Sepolia a Kernel v3.3 account deployed and paid 1 USDG with a passkey proof (
