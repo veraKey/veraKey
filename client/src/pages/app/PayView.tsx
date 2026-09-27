@@ -252,7 +252,7 @@ function ProofOverlay({ state }: { state: Extract<ProofState, { status: BusyStat
   return (
     <div className="vk-mpay-overlay" role="status">
       <div className="vk-mpay-ring">
-        <svg viewBox="0 0 120 120" aria-hidden="true">
+        <svg className="vk-mpay-ring-arc" viewBox="0 0 120 120" aria-hidden="true">
           <circle className="vk-mpay-ring-track" cx="60" cy="60" r="52" />
           <circle className="vk-mpay-ring-fill" cx="60" cy="60" r="52" pathLength="100" style={{ strokeDashoffset: 100 - progress * 100 }} />
         </svg>
