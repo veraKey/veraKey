@@ -33,12 +33,15 @@ export default function SdkGuidePage() {
           [<code key="11">@verakey/sdk/store</code>, "LocalPasskeyStore, MemoryPasskeyStore"],
           [<code key="12">@verakey/sdk/abi</code>, "veraKeyAccountAbi, veraKeyFactoryAbi, honkVerifierAbi, erc20Abi"],
           [<code key="13">@verakey/sdk/privacy</code>, "countPublicKeyOccurrences: check calldata for a public key"],
+          [<code key="21">@verakey/sdk/bytes</code>, "concatBytes, toFieldHex, limbs, sha256, base64url and other byte helpers"],
+          [<code key="22">@verakey/sdk/errors</code>, "ProofGenerationError"],
         ]}
       />
 
       <H2>Configuration</H2>
       <p><code>new VeraKeyClient(config)</code> takes:</p>
       <Table
+        stack
         head={["Field", "Type", "Meaning"]}
         rows={[
           [<code key="1">rpId</code>, "string", "The WebAuthn relying party id, e.g. the app's domain. From /api/config."],
@@ -47,6 +50,8 @@ export default function SdkGuidePage() {
           [<code key="4">rpcUrl</code>, "string", "A JSON-RPC URL for reads, usually the relayer's /api/rpc."],
           [<code key="5">factory</code>, "Address", "The VeraKeyFactory."],
           [<code key="6">usdg</code>, "Address", "The USDG token."],
+          [<code key="14">accountImplementation</code>, "Address?", "The account implementation, from /api/config. With configHash, proveSignIn computes account addresses offline."],
+          [<code key="15">configHash</code>, "Hex?", "The factory's configuration hash, from /api/config. proveSignIn needs it, with accountImplementation."],
           [<code key="7">rpIdHash</code>, "Hex", "sha256 of the rpId, as the accounts store it."],
           [<code key="8">relayerUrl</code>, "string", "The relayer API base URL, e.g. \"/api\"."],
           [<code key="9">relayerFee</code>, "bigint", "The fee the relayer expects, in USDG base units. It is signed into every action."],
@@ -71,7 +76,7 @@ export default function SdkGuidePage() {
           at creation; call <code>unlock()</code> then. <code>payment: true</code> enrolls it for the{" "}
           <A href="/docs/build/payment-sheet">payment sheet</A>.
         </li>
-        <li><code>unlock(passkey?)</code> runs one assertion with PRF and makes it the current session. On a new device it recovers the public key from the assertion.</li>
+        <li><code>unlock(passkey?)</code> runs one assertion with PRF and makes it the current session. On a new device it recovers the public key from the assertion, and asks for a second assertion when no account of <code>appIds</code> tells the two candidate keys apart.</li>
         <li><code>authenticate(passkey?)</code> does the same without switching the current session, e.g. for a backup passkey.</li>
         <li><code>lock()</code> forgets the session and its PRF secret. <code>session</code> returns the current one, or <code>null</code>.</li>
       </ul>
@@ -108,7 +113,7 @@ export default function SdkGuidePage() {
       </Callout>
 
       <H2>The proof state machine</H2>
-      <p>Every action method takes a listener that receives these states, in order:</p>
+      <p>Every action method except <code>applyChange</code> and <code>executeRecovery</code> takes a listener that receives these states, in order:</p>
       <Code lang="ts" title="ProofState">{`
 type ProofState =
   | { status: "idle" }

@@ -68,7 +68,7 @@ keccak256(abi.encode(GUARDIAN_TYPEHASH, account, guardian, salt))
         <li>The guardian calls <code>initiateRecovery(newNullifier, salt)</code> on your account.</li>
         <li>
           The recovery waits out the recovery delay. The Recovery page shows <strong>Recovery in progress</strong> to any
-          owner, with <strong>Cancel recovery</strong>, in case it was not you.
+          owner, with <strong>Cancel with my passkey</strong>, in case it was not you.
         </li>
         <li>
           After the delay, anyone may complete it (<strong>Complete recovery</strong>). The new passkey becomes the only

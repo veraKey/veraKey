@@ -5,7 +5,7 @@ export const GROUPS = ["Get started", "Use VeraKey", "Build", "Architecture", "S
 export type DocGroup = (typeof GROUPS)[number];
 
 /** When the docs were last checked against the code and the live deployment. */
-export const DOCS_UPDATED = "2026-09-24";
+export const DOCS_UPDATED = "2026-09-28";
 
 export interface DocPage {
   path: string;
@@ -270,7 +270,7 @@ export const PAGES: DocPage[] = [
     path: "/docs/security/review",
     title: "Review and accepted risks",
     group: "Security",
-    description: "The audit status, the internal review and its fixes, the risks VeraKey accepts, and how to report a vulnerability.",
+    description: "The audit status, the two internal reviews and their fixes, the risks VeraKey accepts, and how to report a vulnerability.",
     keywords: ["audit", "review", "vulnerabilities", "risks", "dependencies", "report", "disclosure policy"],
     sections: ["Audit status", "Internal review", "Accepted risks", "Dependencies", "Report a vulnerability"],
     load: () => import("./pages/security/Review"),
@@ -305,7 +305,7 @@ export const PAGES: DocPage[] = [
     path: "/docs/reference/contracts",
     title: "Contract reference",
     group: "Reference",
-    description: "The functions, views, events and errors of the VeraKey account and factory, and the action and change kinds.",
+    description: "The functions, views and events of the VeraKey account and factory, and the action and change kinds.",
     keywords: ["abi", "solidity interface", "functions", "events", "stylus", "account", "factory", "change kinds"],
     sections: ["Account functions", "Account views", "Account events", "Factory", "Change kinds", "Action kinds"],
     headingKeywords: {

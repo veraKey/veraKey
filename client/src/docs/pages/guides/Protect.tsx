@@ -84,7 +84,7 @@ export default function ProtectGuide() {
 
       <H2>Require the payment sheet</H2>
       <p>
-        In Chrome on macOS, Windows and Android, you can make the browser's own payment sheet mandatory: select{" "}
+        In Chrome on macOS and Android, you can make the browser's own payment sheet mandatory: select{" "}
         <strong>Require the payment sheet now</strong>. From then on, the account refuses any payment that was not
         confirmed in the sheet, so a tampered page cannot pay without the browser showing you the payee and the total.
       </p>

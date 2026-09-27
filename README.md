@@ -67,13 +67,17 @@ Docs: **https://verakey.xyz/docs** (users, developers and reviewers).
 
 - Accounts are EIP-1167 clones created by the factory.
 - On 27 September 2026 VeraKey moved from verakey.mdloglabs.org to verakey.xyz. Accounts are bound to their domain
-  for good, so the contracts above are a new deployment for verakey.xyz; the first one, for verakey.mdloglabs.org,
-  stays on-chain with its accounts, and the old address redirects here.
+  for good, so the contracts above are a new deployment for verakey.xyz; the previous one, for verakey.mdloglabs.org,
+  stays on-chain with its accounts.
 - A ZeroDev Kernel v3.3 account owned by a VeraKey passkey: `VeraKeyValidator` is its root validator, and its first
   user operation, bundled by VeraKey's relayer, deployed it and paid 1 USDG
   ([`0x0f617b9b…2fc3`](https://sepolia.arbiscan.io/tx/0x0f617b9b889c61f9322206631cdab1c5d207fc1a95b1f97a0bfc54c8ddf92fc3), 1,218,222 gas). Reproduce it with
   `node --env-file=.env --import tsx packages/sdk/scripts/kernel-sepolia.mts` (add `--dry-run` to only simulate).
-- First USDG payment on Arbitrum Sepolia, on 27 September 2026, on the first deployment: a passkey on an iPhone
+- Sign in with VeraKey and a payment on this deployment: the integration kit's end-to-end test (the React quickstart
+  in headless Chrome, a virtual passkey with PRF) signed a player in through the live popup, then paid 1 USDG and the
+  0.02 USDG fee
+  ([`0xea54a309…a855`](https://sepolia.arbiscan.io/tx/0xea54a309445e3c58d38463555080e40cd8ada19099a0520cd73d411d3b18a855), 1,187,516 gas).
+- First USDG payment on Arbitrum Sepolia, on 27 September 2026, on the previous deployment: a passkey on an iPhone
   approved 2 USDG, the phone's browser made the proof, and the account verified it and paid, gasless:
   [`0x81c5d7e4…f797`](https://sepolia.arbiscan.io/tx/0x81c5d7e446873a656deefe7910dd65719a5c3dac4cc2c95719d9f8173c5ff797)
   (1,225,020 gas, 0.02 USDG fee). Before it, the same account froze
@@ -158,7 +162,7 @@ Nothing on-chain connects a user's accounts in different apps. When someone need
 | Stylus account and factory, Solidity verifiers | real, deployed with `scripts/deploy.sh` |
 | ERC-7579 validator | real and deployed; tested with real proofs (36 Foundry tests); the root validator of a [ZeroDev Kernel v3.3 account](https://sepolia.arbiscan.io/address/0xF6CeD86ff40FF0f9CC09517c4998BF5ca2aF1106) on Arbitrum Sepolia, whose first user operation deployed it and paid 1 USDG ([transaction](https://sepolia.arbiscan.io/tx/0x0f617b9b889c61f9322206631cdab1c5d207fc1a95b1f97a0bfc54c8ddf92fc3)); not yet tried in a Nexus account |
 | Disclosures (link circuit, on-chain verifier, verify page) | real |
-| Secure Payment Confirmation | real in Chrome on macOS, Windows and Android; tested in headless Chrome with its SPC test mode |
+| Secure Payment Confirmation | real in Chrome on macOS and Android, where the app enrolls passkeys for it; tested in headless Chrome with its SPC test mode |
 | USDG | Paxos Global Dollar on Arbitrum Sepolia `0xFFC95faa3d63Cde504a05B567C600B78C0b41892` (a mintable stand-in is used only on a local devnode) |
 | Relayer (gasless, USDG fee) | real (`server/`) |
 | Private funding | not available on Arbitrum Sepolia: no privacy pool runs there. The Receive panel explains how to fund each account separately. |
@@ -181,7 +185,7 @@ Nothing on-chain connects a user's accounts in different apps. When someone need
 | Baseline: `P256VERIFY` precompile (no privacy) | 3,450 gas |
 
 - Gas is measured on a local nitro devnode at ArbOS 61.
-- The account implementation (46.0 KB) and the factory (29.3 KB) are deployed as multi-fragment Stylus programs, which Arbitrum Sepolia and One support since ArbOS 60.
+- The account implementation (46.3 KB) and the factory (29.4 KB) are deployed as multi-fragment Stylus programs, which Arbitrum Sepolia and One support since ArbOS 60.
 - Both programs are cached (`cargo stylus cache bid`), which cuts their per-call initialization cost.
 
 ## Security model
@@ -211,6 +215,7 @@ Nothing on-chain connects a user's accounts in different apps. When someone need
 - 18 circuit tests (`nargo test`: 11 for the authorization circuit, 7 for the link circuit);
 - 44 Rust unit tests and 9 property tests (`contracts/stylus/core`, 2,000 cases each);
 - 36 Foundry tests for the ERC-7579 validator, with real proofs;
+- 117 SDK unit tests (`pnpm test`), the integration kit's routes, cookies, session and React button among them;
 - 75 end-to-end tests (`packages/sdk/test/e2e`). They deploy the real contracts to a nitro devnode and use real proofs:
   - 44 cover the account: front-running, replay, cross-account and cross-chain proofs, tampered proofs, caps, fees, the new-recipient cap, freezing, timelocks, the payment sheet, backup owners, the guardian and recovery;
   - 7 replay the internal audit's attacks;
@@ -222,7 +227,12 @@ Nothing on-chain connects a user's accounts in different apps. When someone need
   - it runs into the new-recipient cap;
   - it finds a change scheduled elsewhere and freezes;
   - it discloses and verifies, and makes a guardian card.
-- CI (`.github/workflows/ci.yml`) rebuilds the circuits, verifiers and contracts from source and runs everything above except the browser workflow on every push.
+- Two more browser workflows use VeraKey's popup from another site, with real proofs and transactions:
+  - `scripts/connect-e2e.mjs`: the demo game signs a player in and takes a payment, and its server verifies both;
+  - `scripts/kit-e2e.mjs`: the React quickstart signs in with the integration kit, pays 1 USDG, keeps the session
+    across a reload and signs out. It also ran against the live popup on Arbitrum Sepolia (the payment above).
+- CI (`.github/workflows/ci.yml`) rebuilds the circuits, verifiers and contracts from source on every push and runs
+  the circuit, Rust, Foundry and end-to-end tests above. The SDK unit tests and the browser workflows run locally.
 
 ## Repository layout
 
@@ -232,10 +242,12 @@ circuits/link            Noir consent-to-link circuit (one passkey owns two null
 circuits/verakey_lib     shared WebAuthn assertion check and nullifier
 contracts/stylus         Rust: core (pure logic + property tests), account, factory
 contracts/evm            Foundry: bb-generated verifiers, ERC-7579 validator + tests, deploy scripts, test token
-packages/sdk             @verakey/sdk (npm): WebAuthn/PRF/SPC, action hashing, provers, VeraKeyClient, sign-in, disclosures, validator
-server                   Express relayer: /api/config, /api/accounts, /api/relay, /api/faucet, /api/rpc
-client                   Vite + React app: landing page, /app (accounts, pay, policy, recovery, disclose, verify), /docs
-scripts                  build-circuit.sh, gen-abi.sh, devnode.sh (local chain), deploy.sh, browser-e2e.mjs, build-server.mjs
+packages/sdk             @verakey/sdk (npm): WebAuthn/PRF/SPC, action hashing, provers, VeraKeyClient, sign-in, disclosures, validator, ZeroDev Kernel plugin, integration kit (server, session, React)
+server                   Express relayer: /api/config, /api/health, /api/accounts, /api/relay, /api/faucet, /api/rpc
+shared                   API types shared by the relayer and the app
+client                   Vite + React app: landing page, /app (accounts, pay, policy, recovery, disclose, verify), /connect (the Sign in with VeraKey popup), /docs
+examples                 demo-game (Sign in with VeraKey, a sword for 1 USDG) and react-quickstart (the integration kit)
+scripts                  build-circuit.sh, gen-abi.sh, devnode.sh (local chain), deploy.sh, browser-e2e.mjs, connect-e2e.mjs, kit-e2e.mjs, prerender-docs.mjs, check-docs.mjs, build-server.mjs
 deployments              addresses per network
 ```
 
@@ -252,6 +264,7 @@ pnpm install
 scripts/build-circuit.sh            # both circuits: nargo test + compile, verification keys, Solidity verifiers
 pnpm contracts:test                 # Rust unit + property tests
 pnpm contracts:evm:test             # ERC-7579 validator (Foundry, real proofs)
+pnpm test                           # SDK unit tests, the integration kit included
 
 scripts/devnode.sh up               # nitro devnode on :8649, upgraded to ArbOS 61 (multi-fragment Stylus)
 scripts/deploy.sh local             # verifiers, validator, test USDG, account implementation, factories
@@ -259,7 +272,10 @@ pnpm test:e2e                       # 75 end-to-end tests with real proofs
 pnpm sdk:pack                       # build and pack @verakey/sdk, check the tarball from a fresh project
 pnpm sdk:publish:github             # the checked tarball to GitHub Packages too (GH_TOKEN with write:packages)
 pnpm dev                            # relayer on :3090, app on http://localhost:5190
+pnpm demo:game                      # next to pnpm dev: the Sign in with VeraKey demo game on :5191
+pnpm demo:react                     # next to pnpm dev: the integration kit's React quickstart on :5192
 node scripts/browser-e2e.mjs http://localhost:5190 /tmp/verakey-browser desktop  # also: mobile; add "spc" for the payment sheet
+node scripts/kit-e2e.mjs http://localhost:5192  # the kit end to end; connect-e2e.mjs takes the demo game's URL
 ```
 
 The devnode keeps no state: after `scripts/devnode.sh down` or a reboot, run `up` and `deploy.sh local`
@@ -299,9 +315,16 @@ The SDK is [on npm](https://www.npmjs.com/package/@verakey/sdk), with TypeScript
 npm install @verakey/sdk
 ```
 
-Any https site can use Sign in with VeraKey today: `@verakey/sdk/connect` in its pages, `@verakey/sdk/signin` on
-its server (see [packages/sdk/README.md](packages/sdk/README.md)). The full client below needs a deployment bound
-to the app's origin.
+Any https site can use Sign in with VeraKey and take USDG payments today. For a React site with a Node server, the
+integration kit does it in about ten lines:
+- `createVeraKeyServer` from `@verakey/sdk/server` serves the routes: nonces bound to the browser, the session in a
+  signed cookie, and payments verified on-chain and accepted once;
+- `<SignInWithVeraKey />` and `useVeraKey()` from `@verakey/sdk/react` drive VeraKey's popup;
+- `examples/react-quickstart` runs it (`pnpm demo:react`).
+
+Other stacks use `@verakey/sdk/connect` in their pages and `@verakey/sdk/signin` on their server (see
+[packages/sdk/README.md](packages/sdk/README.md)). The full client below needs a deployment bound to the app's
+origin.
 
 ```ts
 import { VeraKeyClient } from "@verakey/sdk/client";
@@ -337,7 +360,8 @@ const pkg = await vera.createDisclosure({ appIdA: APP_ID, appIdB: OTHER_APP_ID, 
 - The circuits and contracts are unaudited, and the verifiers are bb-generated Solidity contracts.
 - VeraKey requires the WebAuthn PRF extension: iCloud Keychain on iOS 18.4+ and macOS 15.4+, or Google Password Manager.
 - The payment sheet works only in Chromium.
-- A payment takes about 1M gas (0.99M to 1.04M): cents on Arbitrum, but far more than a non-private passkey wallet.
+- A payment takes about 1M gas to execute (0.99M to 1.06M), and on a live chain another 0.1M to 0.2M for posting its
+  calldata to L1: cents on Arbitrum, but far more than a non-private passkey wallet.
 
 **Next steps:**
 - an independent audit;

@@ -6,7 +6,9 @@ export default function GasPage() {
       <H2>Measured costs</H2>
       <p>
         Measured on 2026-09-24 on a local Arbitrum Nitro node (nitro-node v3.11.4, ArbOS 61), with both Stylus programs cached
-        and real proofs.
+        and real proofs. The local node prices L1 data at zero, so these numbers are L2 execution only. On Arbitrum
+        Sepolia a transaction's gas used also counts its L1 data fee: a 1 USDG payment through the live popup used
+        1,187,516 gas, 1,062,352 of it on L2.
       </p>
       <Table
         head={["Operation", "Gas"]}

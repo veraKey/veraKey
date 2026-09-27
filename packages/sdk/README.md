@@ -138,7 +138,7 @@ for your domain, which opens with developer access after the testnet preview. Th
 | `@verakey/sdk/kernel` | `toVeraKeyKernelValidator`: a VeraKey passkey as a ZeroDev Kernel account's validator |
 | `@verakey/sdk/nullifier`, `/action`, `/relayer`, `/abi`, … | Lower-level building blocks |
 
-`@verakey/sdk` re-exports every module except `react`, so importing it never needs React.
+`@verakey/sdk` re-exports every module except `react` and `link-prover`, so importing it never needs React.
 
 ## ZeroDev Kernel accounts
 

@@ -40,6 +40,7 @@ export default function RelayerApiPage() {
     "veraKeyValidator": "0x42aEc9C527280e8E3E3B90135FA7C007274b4fdE",
     "accountImplementation": "0xfab5e61aece00c0399cc3d186b154ae194156d0d",
     "factory": "0xbaac250f9f1b07651c121e314bccc6fa4c64e55c",
+    "factoryAlt": "",
     "usdg": "0xFFC95faa3d63Cde504a05B567C600B78C0b41892"
   },
   "policy": {

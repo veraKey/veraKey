@@ -10,10 +10,13 @@ export default function ChangelogPage() {
       <ul>
         <li>
           <strong>VeraKey moves to verakey.xyz:</strong> accounts are bound to their domain for good, so Arbitrum Sepolia
-          has a new deployment for https://verakey.xyz (see <A href="/docs/reference/deployments">Deployments</A>), and 
-          <code>ARBITRUM_SEPOLIA</code> in SDK 0.2.1 points to it. Accounts made on verakey.mdloglabs.org stay on the first
-          deployment. A Kernel v3.3 account runs on the new validator (
-          <A href="https://arbitrum-sepolia.blockscout.com/tx/0x0f617b9b889c61f9322206631cdab1c5d207fc1a95b1f97a0bfc54c8ddf92fc3">transaction</A>).
+          has a new deployment for https://verakey.xyz (see <A href="/docs/reference/deployments">Deployments</A>), and{" "}
+          <code>ARBITRUM_SEPOLIA</code> in SDK 0.2.1 points to it; 0.2.0, which pinned the previous deployment, is
+          deprecated. Accounts made on verakey.mdloglabs.org stay on the previous deployment, and their passkeys do not
+          work on verakey.xyz: create a new passkey there. A Kernel v3.3 account runs on the new validator (
+          <A href="https://arbitrum-sepolia.blockscout.com/tx/0x0f617b9b889c61f9322206631cdab1c5d207fc1a95b1f97a0bfc54c8ddf92fc3">transaction</A>),
+          and the integration kit's end-to-end test paid 1 USDG through the live popup (
+          <A href="https://arbitrum-sepolia.blockscout.com/tx/0xea54a309445e3c58d38463555080e40cd8ada19099a0520cd73d411d3b18a855">transaction</A>).
         </li>
         <li>
           <strong>SDK 0.2.0, the integration kit:</strong> <code>createVeraKeyServer</code> from{" "}
@@ -26,12 +29,12 @@ export default function ChangelogPage() {
         <li>
           <strong>SDK 0.1.2, VeraKey passkeys own ZeroDev Kernel accounts:</strong>{" "}
           <code>toVeraKeyKernelValidator</code> from <code>@verakey/sdk/kernel</code> makes the ERC-7579 validator a
-          Kernel plugin. On Arbitrum Sepolia, on the first deployment, a Kernel v3.3 account deployed and paid 1 USDG with a passkey proof (
+          Kernel plugin. On Arbitrum Sepolia, on the previous deployment, a Kernel v3.3 account deployed and paid 1 USDG with a passkey proof (
           <A href="https://arbitrum-sepolia.blockscout.com/tx/0x66dbf2ed7552d9e0d563bdf9a8aee30656d1e99cfab4c9e8bade961c0d0cfc2f">transaction</A>). See <A href="/docs/build/erc-7579">ERC-7579 validator</A>.
         </li>
         <li>
           <strong>Payments on Arbitrum Sepolia:</strong> test USDG arrived from Paxos, and the first payment was approved
-          with a passkey on an iPhone, on the first deployment (
+          with a passkey on an iPhone, on the previous deployment (
           <A href="https://arbitrum-sepolia.blockscout.com/tx/0x81c5d7e446873a656deefe7910dd65719a5c3dac4cc2c95719d9f8173c5ff797">transaction</A>).
         </li>
       </ul>

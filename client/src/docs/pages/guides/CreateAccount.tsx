@@ -15,7 +15,7 @@ export default function CreateAccountGuide() {
       <p>
         PRF lets your passkey return a secret that keeps your accounts unlinkable. VeraKey refuses to create accounts
         with a passkey that does not support it, because without PRF your public key alone would identify you in every
-        app. In Chrome on macOS, Windows and Android, the passkey can also be enrolled for the browser's{" "}
+        app. In Chrome on macOS and Android, the app also enrolls the passkey for the browser's{" "}
         <A href="/docs/guides/pay#confirm-in-the-payment-sheet">payment sheet</A>.
       </p>
       <p>Before you start, the app checks your browser and shows the result of each check:</p>
@@ -43,7 +43,7 @@ export default function CreateAccountGuide() {
         </Step>
         <Step title="See your accounts">
           <p>
-            The Accounts page opens with your accounts. Nothing was sent to a server: your accounts are derived from the
+            The Accounts page opens with your accounts. Nothing is stored on a server: your accounts are derived from the
             passkey in your browser.
           </p>
         </Step>

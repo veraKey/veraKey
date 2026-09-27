@@ -80,7 +80,7 @@ export default function ContractReferencePage() {
           [c("GuardianFroze()"), "The guardian freezes the account."],
           [c("RecoveryInitiated(bytes32 indexed newNullifier, uint64 eta)"), "The guardian starts a recovery."],
           [c("RecoveryExecuted(bytes32 indexed newNullifier, uint256 ownerEpoch)"), "A recovery completes."],
-          [c("RecoveryCancelled(bytes32 indexed newNullifier)"), "An owner or the guardian cancels a recovery."],
+          [c("RecoveryCancelled(bytes32 indexed newNullifier)"), "An owner or the guardian cancels a recovery, or a change to the guardian ends it."],
         ]}
       />
 
@@ -94,6 +94,7 @@ export default function ContractReferencePage() {
           [c("configHash() → bytes32"), "The hash of the configuration every account gets; part of each account's salt."],
           [c("config() → (address, address, address, bytes32, uint256, uint256, uint256, uint64, uint64, address, uint256)"), "implementation, verifier, usdg, rpIdHash, perTxCap, dailyCap, newPayeeCap, changeDelay, recoveryDelay, feeRecipient, maxFee."],
           [c("origin() → bytes"), "The origin every account accepts."],
+          [c("event AccountCreated(bytes32 indexed appId, bytes32 indexed nullifier, address indexed account)"), "Emitted when createAccount deploys a new account."],
         ]}
       />
       <p>

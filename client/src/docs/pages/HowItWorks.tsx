@@ -36,7 +36,7 @@ keccak256(abi.encode(typehash, chainId, account, nonce, kind, target, amount, da
       <p>
         The browser asks your passkey for a WebAuthn assertion over that challenge. Your device checks Face ID, Touch ID
         or your PIN first (user verification). VeraKey asks for no extensions when signing, so the authenticator data
-        is always 37 bytes. In Chrome on macOS, Windows and Android, the browser's own{" "}
+        is always 37 bytes. In Chrome on macOS and Android, the browser's own{" "}
         <A href="/docs/guides/pay#confirm-in-the-payment-sheet">payment sheet</A> can ask instead, showing the payee and
         the total.
       </p>

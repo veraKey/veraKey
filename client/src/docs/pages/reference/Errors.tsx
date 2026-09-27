@@ -16,7 +16,7 @@ const ACCOUNT_ERRORS: [string, ReactNode, ReactNode][] = [
   ["InvalidAmount()", "The amount is zero, or amount plus fee overflows.", "Pay a positive amount."],
   ["InvalidChange()", "The change kind is unknown or its payload is malformed; a freeze was sent to scheduleChange (use restrict); a per-payment cap is below maxFee; or a recovery names a zero or out-of-field nullifier.", <>Build payloads with <code>changePayload</code>.</>],
   ["InvalidClientData(uint8 code)", "The signed client data does not authorize this action at this origin.", <>See <A href="#client-data-error-codes">the codes below</A>.</>],
-  ["InvalidConfig()", "initialize got an invalid configuration: an app id or owner nullifier outside the field, a zero address, an empty or over-long origin, a per-payment cap of zero or above the daily cap, or a delay over 30 days.", "Deploy the factory with a valid configuration."],
+  ["InvalidConfig()", "initialize got an invalid configuration: an app id or owner nullifier outside the field, a zero address, an empty or over-long origin, a per-payment cap of zero or above the daily cap, a maximum fee above the per-payment cap, or a delay over 30 days.", "Deploy the factory with a valid configuration."],
   ["InvalidProof()", "The verifier rejected the proof for the public inputs the account computed.", "Prove again. Check that the rpId, the app id and the nullifier match this account."],
   ["InvalidRecipient()", "The recipient is the zero address or the account itself.", "Pay another address."],
   ["LastOwner()", "A RemoveOwner change would remove the only owner.", "Add another owner first."],
@@ -108,7 +108,9 @@ export default function ErrorsPage() {
 
       <H2>SDK rejection stages</H2>
       <p>
-        Every failed SDK action rejects with a <code>VeraKeyError</code> and emits <code>{'{ status: "rejected", stage, message, revert? }'}</code>.
+        A failed SDK action rejects with a <code>VeraKeyError</code> and emits <code>{'{ status: "rejected", stage, message, revert? }'}</code>{" "}
+        (<code>applyChange</code> and <code>executeRecovery</code> take no listener, and <code>executeRecovery</code> rejects with a{" "}
+        <code>RelayerError</code>).
         The stage says where it failed:
       </p>
       <Table

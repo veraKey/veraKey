@@ -35,8 +35,9 @@ export default function FaqGuide() {
 
       <H2>The payment sheet does not appear</H2>
       <p>
-        The payment sheet (Secure Payment Confirmation) works only in Chrome on macOS, Windows and Android, with a
-        passkey enrolled for it in that browser profile. Elsewhere the app uses the ordinary passkey prompt. If your
+        The payment sheet (Secure Payment Confirmation) appears only in Chrome on macOS and Android, with a passkey
+        enrolled for it in that browser profile: the app enrolls passkeys for it only there, where the platform's passkeys
+        support PRF. Elsewhere the app uses the ordinary passkey prompt. If your
         account requires the sheet, pay from a browser that can show it, or schedule{" "}
         <A href="/docs/guides/protect#require-the-payment-sheet">Stop requiring it</A>.
       </p>

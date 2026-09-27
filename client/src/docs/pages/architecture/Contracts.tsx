@@ -6,7 +6,7 @@ export default function ContractsPage() {
       <H2>The account</H2>
       <p>
         <code>VeraKeyAccount</code> is a Rust program on Arbitrum Stylus. It is
-        deployed once as an implementation (46.0 KB, as a multi-fragment Stylus program, which Arbitrum supports since
+        deployed once as an implementation (46.3 KB, as a multi-fragment Stylus program, which Arbitrum supports since
         ArbOS 60), and every user account is an EIP-1167 clone that delegates to it. The implementation locks itself in
         its constructor, so it cannot be initialized as an account.
       </p>
@@ -68,7 +68,7 @@ not frozen → amount > 0 → a valid recipient (not zero, not the account) → 
 
       <H2>The factory</H2>
       <p>
-        <code>VeraKeyFactory</code> (29.3 KB) holds one configuration and creates
+        <code>VeraKeyFactory</code> (29.4 KB) holds one configuration and creates
         accounts with it. <code>createAccount(appId, nullifier)</code> is idempotent and anyone may call it. The address
         commits to the whole configuration:
       </p>

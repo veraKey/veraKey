@@ -76,8 +76,9 @@ export default function ReviewPage() {
       <p>
         A second internal audit the same day ran Nemesis over the Stylus contracts, the ERC-7579 validator and both circuits:
         alternating passes that question every line and map every piece of state that must change together, until nothing
-        new surfaces. Each finding was reproduced on a local Arbitrum Nitro node with real proofs, and each fix has a
-        regression test that replays the attack.
+        new surfaces. Every finding but the last was reproduced on a local Arbitrum Nitro node with real proofs, and its
+        fix has a regression test that replays the attack. The last one, the factory's bounds, was confirmed by reading
+        the code, and its fix has unit tests.
       </p>
       <Table
         head={["Severity", "Finding", "Fix"]}

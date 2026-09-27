@@ -12,7 +12,10 @@ export default function PayGuide() {
           </p>
         </Step>
         <Step title="Enter the amount">
-          <p>Amounts are in USDG, with up to 6 decimals. The page shows your balance and how much you can still spend today.</p>
+          <p>
+            Amounts are in USDG, with up to 6 decimals. The page shows your balance and, on a wide screen, how much you
+            can still spend today.
+          </p>
         </Step>
         <Step title="Approve with passkey">
           <p>
@@ -25,15 +28,15 @@ export default function PayGuide() {
       <H2>What happens when you approve</H2>
       <p>The page shows each stage as it happens:</p>
       <Table
-        head={["Stage", "What happens"]}
+        head={["On a wide screen", "On a phone", "What happens"]}
         rows={[
-          ["Authenticating", "Your passkey signs the exact payment."],
-          ["Proving", "Your browser proves the signature in zero knowledge, in about 2 seconds on a desktop."],
-          ["Relaying", "The relayer simulates the payment, then submits it."],
-          ["Confirming", "Arbitrum includes the transaction."],
-          ["Verified", "The account checked the proof and the policy, and paid."],
+          ["Passkey", "Approve with your passkey", "Your passkey signs the exact payment."],
+          ["Zero-knowledge proof", "Proving on this device", "Your browser proves the signature in zero knowledge, in about 2 seconds on a desktop."],
+          ["Gasless relay", "Sending the proof", "The relayer simulates the payment, then submits it."],
+          ["Arbitrum", "Confirming on Arbitrum", "Arbitrum includes the transaction: the account checks the proof and the policy, and pays."],
         ]}
       />
+      <p>When the payment is confirmed, the page shows a receipt, <strong>Paid</strong>, with a link to the transaction.</p>
       <p>
         If any stage fails, the page says which one and why. See <A href="#when-a-payment-is-refused">When a payment is
         refused</A>.
@@ -51,7 +54,7 @@ export default function PayGuide() {
 
       <H2>Confirm in the payment sheet</H2>
       <p>
-        In Chrome on macOS, Windows and Android, the browser can show its own payment sheet instead of the plain passkey
+        In Chrome on macOS and Android, the browser can show its own payment sheet instead of the plain passkey
         prompt. The sheet shows the payee (the recipient's address, in lowercase) and the total (the amount plus the
         fee). The account checks that the payee and total you confirmed are exactly the ones in the payment.
       </p>
@@ -74,7 +77,8 @@ export default function PayGuide() {
       <H2>When a payment is refused</H2>
       <p>
         A valid approval only proves that you signed. Your account's policy decides whether the payment may happen. When
-        it says no, the page shows "Authenticated, not authorized" and the reason:
+        it says no, the page shows "Authenticated, not authorized." and the reason, or "Authenticated, not funded." when
+        the account cannot cover the amount and the fee:
       </p>
       <Table
         head={["Reason", "What it means", "What to do"]}

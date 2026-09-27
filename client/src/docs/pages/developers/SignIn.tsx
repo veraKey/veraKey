@@ -35,7 +35,7 @@ import { ARBITRUM_SEPOLIA } from "@verakey/sdk/deployments";
 
 export const verakey = createVeraKeyServer({
   origin: "https://your.game",   // your site's exact origin
-  deployment: ARBITRUM_SEPOLIA,  // pinned in the SDK version you install
+  deployment: ARBITRUM_SEPOLIA,  // pinned in the SDK version you install (0.2.1 or later)
   secret: VERAKEY_SECRET,        // at least 32 random bytes, known only to your server
   merchant: SHOP_ADDRESS,        // where payments go
   onPayment: ({ player, amount, hash }) => {
@@ -134,7 +134,8 @@ button.onclick = async () => {
 `}</Code>
       <p>
         The first time, the player creates their VeraKey passkey right in the popup. After that, a sign-in takes two
-        passkey prompts: one unlocks the passkey, one approves the sign-in.
+        passkey prompts: one unlocks the passkey, one approves the sign-in. In a browser that has not seen the passkey
+        yet, the first sign-in asks once more, to learn the passkey's public key.
       </p>
 
       <H2>Verify on your server</H2>
@@ -192,9 +193,10 @@ try {
 
 // on your server, for the signed-in player
 const hash = body.hash ?? (await findPayment({ publicClient, account: session.account, nonce: BigInt(body.nonce) }));
-const paid = hash && (await verifyPayment(hash, {
+const verdict = hash ? await verifyPayment(hash, {
   publicClient, account: session.account, to: MERCHANT, amount: 1_000_000n,
-}));
+}) : null;
+const paid = verdict?.valid === true; // grant the item once per payment
 `}</Code>
       <ul>
         <li>The popup shows your domain, the recipient, the amount plus the relayer fee, and the balance.</li>
@@ -344,7 +346,7 @@ test("a player signs in with a new VeraKey passkey", async ({ page }) => {
         ]}
       />
       <ul>
-        <li>A sign-in takes two passkey prompts, because the popup keeps nothing between visits.</li>
+        <li>A sign-in takes two passkey prompts, and three the first time in a browser that has not seen the passkey, because the popup keeps no unlocked session between visits.</li>
         <li>Chrome proves on several threads. Safari and Firefox prove on one thread, so their sign-ins and payments take a few seconds longer; proving on iPhone has not been measured yet.</li>
         <li>Each passkey is its own player: a backup passkey, or a new passkey after a guardian recovery, gets a new player ID on your site.</li>
         <li>A phishing site gets its own origin shown in the popup, never yours; players still need to read it.</li>
