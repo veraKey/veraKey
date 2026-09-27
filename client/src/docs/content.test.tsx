@@ -266,7 +266,9 @@ describe("what the docs tell people", () => {
     const kit = displayed(section(html, "Use the kit"));
     for (const phrase of [
       "createVeraKeyServer", "ARBITRUM_SEPOLIA", "export const GET = verakey.handle", "toExpress(verakey)",
-      "<SignInWithVeraKey />", "useVeraKey()", "getPlayer(request)", "store",
+      "<SignInWithVeraKey />", "useVeraKey()", "getPlayer(request)", "store", "confirmPayment(error.payment)",
+      // The page example is a client component in the Next.js App Router, and pay() resolves with a receipt.
+      '"use client"', "result is what onPayment returned",
     ]) expect(kit, phrase).toContain(phrase);
   });
 

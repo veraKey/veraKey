@@ -189,6 +189,39 @@ describe("VeraKeySession", () => {
     expect(server.calls.some(c => c.route === "POST payment")).toBe(false);
   });
 
+  it("keeps a payment the server did not accept on the error, and confirmPayment sends it again without a popup", async () => {
+    let attempts = 0;
+    const server = signedInSite({
+      "POST payment": body =>
+        ++attempts === 1
+          ? { status: 400, body: { error: "The shop is closed for a minute." } }
+          : { body: { hash: body.hash, amount: body.amount, fee: "0", result: { swords: 1 } } },
+    });
+    const { session, window } = await loaded(server);
+    const paying = session.pay({ amount: 1_000_000n });
+    await answer(window, { type: "result", result: { version: 1, hash: HASH } });
+    const error = await paying.catch(e => e);
+    expect(error).toBeInstanceOf(VeraKeySessionError);
+    expect(error).toMatchObject({ code: "server", message: "The shop is closed for a minute.", payment: { amount: 1_000_000n, hash: HASH } });
+    expect(await session.confirmPayment(error.payment)).toEqual({ hash: HASH, amount: 1_000_000n, fee: 0n, result: { swords: 1 } });
+    expect(window.opened).toHaveLength(1);
+    expect(server.calls.filter(c => c.route === "POST payment").map(c => c.body)).toEqual([
+      { amount: "1000000", hash: HASH },
+      { amount: "1000000", hash: HASH },
+    ]);
+  });
+
+  it("keeps a payment known only by its nonce on the error too", async () => {
+    const server = signedInSite({ "POST payment": () => "offline" });
+    const { session, window } = await loaded(server);
+    const paying = session.pay({ amount: 1_000_000n });
+    window.emit(envelope({ type: "ready" }));
+    await until(() => window.request);
+    window.emit(envelope({ type: "progress", id: window.request.id, stage: "sending", account: PLAYER.account, nonce: "7" }));
+    window.emit(envelope({ type: "error", id: window.request.id, code: "relay", message: "The relayer stopped answering." }));
+    await expect(paying).rejects.toMatchObject({ code: "network", payment: { amount: 1_000_000n, nonce: 7n } });
+  });
+
   it("goes back to signed out when the server says the session ended", async () => {
     const server = signedInSite({ "POST payment": () => ({ status: 401, body: { error: "Sign in first." } }) });
     const { session, window } = await loaded(server);

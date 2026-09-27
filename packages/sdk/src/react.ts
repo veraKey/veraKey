@@ -12,7 +12,13 @@ import {
   type ReactNode,
 } from "react";
 import { signInButton } from "./kit/button";
-import { VeraKeySession, type VeraKeyPaymentReceipt, type VeraKeySessionError, type VeraKeySessionState } from "./session";
+import {
+  VeraKeySession,
+  type VeraKeyPaymentReceipt,
+  type VeraKeySentPayment,
+  type VeraKeySessionError,
+  type VeraKeySessionState,
+} from "./session";
 import type { VeraKeyPlayer } from "./signin";
 
 /**
@@ -37,6 +43,7 @@ export interface VeraKeyHook extends VeraKeySessionState {
   signIn(): Promise<VeraKeyPlayer | null>;
   signOut(): Promise<void>;
   pay(params: { amount: bigint }): Promise<VeraKeyPaymentReceipt | null>;
+  confirmPayment(payment: VeraKeySentPayment): Promise<VeraKeyPaymentReceipt>;
 }
 
 /** The session's state and actions, in any component below VeraKeyProvider. */
@@ -45,7 +52,13 @@ export function useVeraKey(): VeraKeyHook {
   if (!session) throw new Error("useVeraKey needs a <VeraKeyProvider> above it.");
   const subscribe = useCallback((listener: () => void) => session.subscribe(listener), [session]);
   const state = useSyncExternalStore(subscribe, () => session.state, () => LOADING);
-  return { ...state, signIn: () => session.signIn(), signOut: () => session.signOut(), pay: params => session.pay(params) };
+  return {
+    ...state,
+    signIn: () => session.signIn(),
+    signOut: () => session.signOut(),
+    pay: params => session.pay(params),
+    confirmPayment: payment => session.confirmPayment(payment),
+  };
 }
 
 export interface SignInWithVeraKeyProps {

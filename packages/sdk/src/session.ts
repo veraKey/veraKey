@@ -28,19 +28,29 @@ export interface VeraKeyPaymentReceipt {
 
 export type VeraKeySessionErrorCode = ConnectErrorCode | "server" | "network" | "signed-out";
 
+/** A payment the popup sent, or may have sent, that your server has not accepted yet: confirmPayment asks it again. */
+export type VeraKeySentPayment = { amount: bigint; hash: Hex } | { amount: bigint; nonce: bigint };
+
 export class VeraKeySessionError extends Error {
   readonly code: VeraKeySessionErrorCode;
   /** The HTTP status your server answered with, for code "server". */
   readonly status?: number;
   /** Why your server refused a sign-in or a payment. */
   readonly checks?: SignInCheck[];
+  /** Set when the player's payment left their account but your server has not accepted it: pass it to confirmPayment. */
+  readonly payment?: VeraKeySentPayment;
 
-  constructor(code: VeraKeySessionErrorCode, message: string, details: { status?: number; checks?: SignInCheck[]; cause?: unknown } = {}) {
+  constructor(
+    code: VeraKeySessionErrorCode,
+    message: string,
+    details: { status?: number; checks?: SignInCheck[]; payment?: VeraKeySentPayment; cause?: unknown } = {}
+  ) {
     super(message, details.cause === undefined ? undefined : { cause: details.cause });
     this.name = "VeraKeySessionError";
     this.code = code;
     this.status = details.status;
     this.checks = details.checks;
+    this.payment = details.payment;
   }
 }
 
@@ -149,22 +159,42 @@ export class VeraKeySession {
     }
   }
 
-  private async finishPayment(payment: Promise<PaymentResult>, amount: bigint): Promise<VeraKeyPaymentReceipt | null> {
-    let sent: { hash: Hex } | { nonce: string };
-    try {
-      sent = { hash: (await payment).hash };
-    } catch (error) {
-      // A payment sent (hash) or maybe sent (pending) before the popup stopped goes to the server to verify.
-      if (error instanceof VeraKeyConnectError && error.hash) sent = { hash: error.hash };
-      else if (error instanceof VeraKeyConnectError && error.pending) sent = { nonce: error.pending.nonce.toString() };
-      else if (quiet(error)) return null;
-      else throw asSessionError(error);
-    }
+  /**
+   * Asks your server again to accept a payment the popup already sent, without a popup or a second payment: after
+   * pay() rejected with `error.payment`, once your site is back.
+   */
+  async confirmPayment(payment: VeraKeySentPayment): Promise<VeraKeyPaymentReceipt> {
+    const sent = "hash" in payment ? { hash: payment.hash } : { nonce: payment.nonce.toString() };
     const receipt = await this.call<{ hash: Hex; amount: string; fee: string; result: unknown }>("POST", "payment", {
-      amount: amount.toString(),
+      amount: payment.amount.toString(),
       ...sent,
     });
     return { hash: receipt.hash, amount: BigInt(receipt.amount), fee: BigInt(receipt.fee), result: receipt.result };
+  }
+
+  private async finishPayment(payment: Promise<PaymentResult>, amount: bigint): Promise<VeraKeyPaymentReceipt | null> {
+    let sent: VeraKeySentPayment;
+    try {
+      sent = { amount, hash: (await payment).hash };
+    } catch (error) {
+      // A payment sent (hash) or maybe sent (pending) before the popup stopped goes to the server to verify.
+      if (error instanceof VeraKeyConnectError && error.hash) sent = { amount, hash: error.hash };
+      else if (error instanceof VeraKeyConnectError && error.pending) sent = { amount, nonce: error.pending.nonce };
+      else if (quiet(error)) return null;
+      else throw asSessionError(error);
+    }
+    try {
+      return await this.confirmPayment(sent);
+    } catch (error) {
+      // The payment left the player's account: the error keeps it, so the page can confirm it later.
+      const failure = asSessionError(error);
+      throw new VeraKeySessionError(failure.code, failure.message, {
+        status: failure.status,
+        checks: failure.checks,
+        payment: sent,
+        cause: failure.cause,
+      });
+    }
   }
 
   private update(patch: Partial<VeraKeySessionState>): void {

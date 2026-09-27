@@ -64,6 +64,9 @@ const NONCE_TTL_SECONDS = 300;
 const NONCE_CLAIM_SECONDS = 360;
 const DEFAULT_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MAX_BODY_BYTES = 64 * 1024;
+/** How often, and how far apart, the payment route asks again about a transaction its node does not know yet. */
+const RECEIPT_RETRIES = 5;
+const RECEIPT_RETRY_MS = 1_000;
 const ROUTES = ["session", "nonce", "sign-in", "sign-out", "payment"];
 
 class HttpError extends Error {
@@ -79,6 +82,34 @@ function json(status: number, body: unknown, cookies: string[] = []): Response {
   const headers = new Headers({ "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
   for (const cookie of cookies) headers.append("set-cookie", cookie);
   return new Response(JSON.stringify(body, (_key, value) => (typeof value === "bigint" ? value.toString() : value)), { status, headers });
+}
+
+/**
+ * The request body as text, read as it arrives and refused past MAX_BODY_BYTES: a chunked body has no Content-Length,
+ * and these routes take requests before anyone signs in.
+ */
+async function readLimited(request: Request): Promise<string> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_BODY_BYTES) {
+      await reader.cancel().catch(() => {});
+      throw new HttpError(413, "The request is too large.");
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    all.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(all);
 }
 
 /** The default store: a Map with expiries, for one process. Payments need a durable, shared store in production. */
@@ -192,8 +223,7 @@ export function createVeraKeyServer(options: VeraKeyServerOptions): VeraKeyServe
 
   async function readBody(request: Request): Promise<unknown> {
     if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) throw new HttpError(413, "The request is too large.");
-    const text = await request.text();
-    if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) throw new HttpError(413, "The request is too large.");
+    const text = await readLimited(request);
     try {
       return JSON.parse(text);
     } catch {
@@ -255,7 +285,14 @@ export function createVeraKeyServer(options: VeraKeyServerOptions): VeraKeyServe
         found = await findPayment({ publicClient, account: player.account, nonce: BigInt(nonce) });
       } else throw new HttpError(400, "Send the payment's hash, or the nonce of a payment the popup was sending.");
       if (!found) throw new HttpError(400, "No payment was found.");
-      const verdict = await verifyPayment(found, { publicClient, account: player.account, to: merchant, amount: BigInt(amount) });
+      const verify = () => verifyPayment(found!, { publicClient, account: player.account, to: merchant, amount: BigInt(amount) });
+      let verdict = await verify();
+      // A node behind the one the relayer sent to may not know the transaction yet: ask again for a few seconds.
+      const unknown = () => verdict.checks.length === 1 && verdict.checks[0].detail === "not found";
+      for (let tries = 0; tries < RECEIPT_RETRIES && unknown(); tries++) {
+        await new Promise(resolve => setTimeout(resolve, RECEIPT_RETRY_MS));
+        verdict = await verify();
+      }
       if (!verdict.valid) throw new HttpError(400, "The payment did not verify.", verdict.checks);
       const claim = `payment:${found.toLowerCase()}`;
       if (!(await store.claim(claim))) throw new HttpError(409, "This payment was already accepted.");
@@ -305,6 +342,9 @@ interface ExpressLikeRequest extends AsyncIterable<Uint8Array | string> {
   url?: string;
   headers: NodeHeaders;
   body?: unknown;
+  /** Set by body-parser 1.x when it parsed this request. */
+  _body?: boolean;
+  readableEnded?: boolean;
 }
 interface ExpressLikeResponse {
   statusCode: number;
@@ -329,9 +369,12 @@ async function serve(server: VeraKeyServer, req: ExpressLikeRequest, res: Expres
   const method = (req.method ?? "GET").toUpperCase();
   let body: string | undefined;
   if (method !== "GET" && method !== "HEAD") {
-    if (typeof req.body === "string") body = req.body;
-    else if (req.body instanceof Uint8Array) body = new TextDecoder().decode(req.body);
-    else if (typeof req.body === "object" && req.body !== null) body = JSON.stringify(req.body);
+    // A parser that skipped this request (another content type) can still leave req.body = {}: trust req.body only
+    // when a parser read the stream.
+    const parsed = req.body !== undefined && (req._body === true || req.readableEnded === true);
+    if (parsed && typeof req.body === "string") body = req.body;
+    else if (parsed && req.body instanceof Uint8Array) body = new TextDecoder().decode(req.body);
+    else if (parsed && typeof req.body === "object" && req.body !== null) body = JSON.stringify(req.body);
     else {
       const read = await readStream(req);
       if (read === null) {

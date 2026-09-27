@@ -61,6 +61,17 @@ describe("VeraKeyProvider", () => {
     expect(markup).toMatch(/<button[^>]*disabled/);
   });
 
+  it("gives components the session's actions, confirmPayment among them", () => {
+    let hook: ReturnType<typeof useVeraKey> | undefined;
+    const Probe = () => {
+      hook = useVeraKey();
+      return null;
+    };
+    renderToString(createElement(VeraKeyProvider, null, createElement(Probe)));
+    expect(hook?.status).toBe("loading");
+    for (const action of ["signIn", "signOut", "pay", "confirmPayment"] as const) expect(typeof hook?.[action], action).toBe("function");
+  });
+
   it("makes useVeraKey outside a provider say what is missing", () => {
     const Orphan = () => {
       useVeraKey();

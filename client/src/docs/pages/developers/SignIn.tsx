@@ -56,6 +56,8 @@ export const POST = verakey.handle;
         <code>@verakey/sdk/server</code>. Then, in your pages:
       </p>
       <Code lang="ts" title="page.tsx">{`
+"use client"; // the kit's hooks run in the browser: in the Next.js App Router, a client component
+
 import { SignInWithVeraKey, VeraKeyProvider, useVeraKey } from "@verakey/sdk/react";
 
 export default function Page() {
@@ -70,7 +72,8 @@ export default function Page() {
 function Shop() {
   const { player, pay } = useVeraKey();
   if (!player) return null;
-  // 1 USDG to your merchant: resolves with what onPayment returned, or null if the player cancelled.
+  // 1 USDG to your merchant. It resolves with a receipt whose result is what onPayment returned,
+  // or with null if the player cancelled.
   return <button onClick={() => pay({ amount: 1_000_000n })}>Buy a sword</button>;
 }
 `}</Code>
@@ -83,8 +86,9 @@ function Shop() {
         <li>In your own routes, <code>await verakey.getPlayer(request)</code> is the signed-in player, or null.</li>
         <li>
           <code>onPayment</code> receives a payment already verified on-chain, from the signed-in player's account to your
-          merchant: check that the amount pays for what you sell. If it throws, the player sees its message and can try
-          again.
+          merchant: check that the amount pays for what you sell. If it throws, the player sees its message, and{" "}
+          <code>pay()</code> rejects with <code>error.payment</code>: once your site is back,{" "}
+          <code>confirmPayment(error.payment)</code> asks it again without a second payment.
         </li>
         <li>
           The kit accepts each payment once, in memory by default. In production, or with more than one server process,

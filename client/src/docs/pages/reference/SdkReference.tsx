@@ -358,10 +358,10 @@ interface DisclosedAccount {
           ["toExpress", "(server: VeraKeyServer): middleware", 'Mounts the kit in Express: app.use("/api/verakey", toExpress(verakey)).'],
           ["memoryStore", "(): VeraKeyStore", "The default store: each nonce and payment is accepted once per process. Pass your own { claim, release } in production."],
           ["ARBITRUM_SEPOLIA", "VeraKeyDeployment", "The Arbitrum Sepolia deployment, from @verakey/sdk/deployments: chainId, rpcUrl, origin, rpIdHash, factory, honkVerifier, usdg."],
-          ["VeraKeySession", "new VeraKeySession({ server?, fetch?, host? })", "The kit in the page: load(), signIn(), signOut() and pay({ amount }), with state and subscribe(listener). signIn and pay resolve null when the player cancels."],
-          ["VeraKeySessionError", "{ code, message, status?, checks?, cause? }", "Why a request failed: a popup code, server (with the server's checks), network or signed-out."],
+          ["VeraKeySession", "new VeraKeySession({ server?, fetch?, host? })", "The kit in the page: load(), signIn(), signOut(), pay({ amount }) and confirmPayment(payment), with state and subscribe(listener). signIn and pay resolve null when the player cancels; confirmPayment asks the server again about a payment already sent, without a popup."],
+          ["VeraKeySessionError", "{ code, message, status?, checks?, payment?, cause? }", "Why a request failed: a popup code, server (with the server's checks), network or signed-out. payment: a payment that left the player's account but the server has not accepted; pass it to confirmPayment."],
           ["VeraKeyProvider", "({ server?, children })", "One VeraKeySession for the React tree below it; server defaults to /api/verakey."],
-          ["useVeraKey", "(): { status, player, paying, error, signIn, signOut, pay }", "The session's state and actions, in a component."],
+          ["useVeraKey", "(): { status, player, paying, error, signIn, signOut, pay, confirmPayment }", "The session's state and actions, in a component."],
           ["SignInWithVeraKey", "({ theme?, className?, style?, onSignIn?, onError? })", "The button: signs in, shows the player's shortened ID and signs out; theme is dark or light."],
         ])}
       />

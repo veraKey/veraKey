@@ -135,6 +135,23 @@ describe("createVeraKeyServer: sign-in", () => {
     expect((await server.handle(request("POST", "sign-in", { raw: JSON.stringify({ pad: "x".repeat(70_000) }) }))).status).toBe(413);
   });
 
+  it("stops reading a chunked body at the limit, without buffering the rest", async () => {
+    // No Content-Length: the kit must count bytes as they arrive, not buffer everything first.
+    let sent = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent >= 1024 * 1024) return controller.close();
+        sent += 16 * 1024;
+        controller.enqueue(new Uint8Array(16 * 1024).fill(0x20));
+      },
+    });
+    const response = await kit().handle(
+      new Request(`${GAME}/api/verakey/sign-in`, { method: "POST", headers: { origin: GAME }, body, duplex: "half" } as RequestInit)
+    );
+    expect(response.status).toBe(413);
+    expect(sent).toBeLessThan(256 * 1024);
+  });
+
   it("runs onSignIn before the session starts, and refuses the sign-in when it throws", async () => {
     const seen: unknown[] = [];
     const { response } = await signIn(kit({ onSignIn: player => void seen.push(player) }));
@@ -231,6 +248,24 @@ describe("createVeraKeyServer: payments", () => {
     expect((await pay(server, session, { amount: "1000000", hash: HASH })).status).toBe(200);
   });
 
+  it("gives a node that has not seen the transaction yet a few seconds before refusing", async () => {
+    let asked = 0;
+    const log = paidLog(ACCOUNT, MERCHANT, 1_000_000n, 20_000n);
+    const late = {
+      ...chain(),
+      getTransactionReceipt: async () => {
+        if (++asked < 3) throw new Error("not found");
+        return { status: "success", logs: [log] };
+      },
+      getTransaction: async () => {
+        throw new Error("not found");
+      },
+    } as unknown as PublicClient;
+    const { server, session } = await signIn(shop({ publicClient: late }));
+    expect((await pay(server, session, { amount: "1000000", hash: HASH })).status).toBe(200);
+    expect(asked).toBe(3);
+  });
+
   it("refuses a payment that does not verify, with its checks", async () => {
     const { server, session } = await signIn(shop());
     const response = await pay(server, session, { amount: "2000000", hash: HASH });
@@ -280,7 +315,7 @@ describe("toExpress", () => {
   type Ended = { status: number; headers: Record<string, string | string[]>; body: string };
 
   /** An Express-like request and response, and what the response ended with (status -1: next got an error). */
-  function exchange(init: { method: string; url: string; headers?: Record<string, string>; body?: unknown; stream?: string[] }) {
+  function exchange(init: { method: string; url: string; headers?: Record<string, string>; body?: unknown; parsed?: boolean; stream?: string[] }) {
     let done!: (value: Ended) => void;
     const ended = new Promise<Ended>(resolve => (done = resolve));
     const headers: Record<string, string | string[]> = {};
@@ -289,6 +324,8 @@ describe("toExpress", () => {
       originalUrl: init.url,
       headers: { host: "game.example", origin: GAME, ...init.headers },
       body: init.body,
+      // body-parser 1.x marks a body it parsed; for another content type it still sets req.body = {}.
+      _body: init.parsed ? true : undefined,
       async *[Symbol.asyncIterator]() {
         for (const chunk of init.stream ?? []) yield chunk;
       },
@@ -326,9 +363,24 @@ describe("toExpress", () => {
     const raw = exchange({ method: "POST", url: "/api/verakey/sign-in", headers: { cookie }, stream: [JSON.stringify(result)] });
     toExpress(server)(raw.req, raw.res, raw.next);
     expect((await raw.ended).status).toBe(200);
-    const parsed = exchange({ method: "POST", url: "/api/verakey/sign-in", headers: { cookie }, body: {} });
+    const parsed = exchange({ method: "POST", url: "/api/verakey/sign-in", headers: { cookie }, body: {}, parsed: true });
     toExpress(server)(parsed.req, parsed.res, parsed.next);
     expect(JSON.parse((await parsed.ended).body)).toEqual({ error: "This is not a VeraKey sign-in." });
+  });
+
+  it("reads the stream when a parser for another content type left req.body empty", async () => {
+    const server = kit();
+    const nonce = exchange({ method: "POST", url: "/api/verakey/nonce" });
+    toExpress(server)(nonce.req, nonce.res, nonce.next);
+    const issued = await nonce.ended;
+    const cookie = (issued.headers["set-cookie"] as string[])[0].split(";")[0];
+    const result = await signedIn({ nonce: JSON.parse(issued.body).nonce });
+    // express.urlencoded() alone, as many Express 4 apps mount it: req.body is {} and the JSON is still in the stream.
+    const skipped = exchange({ method: "POST", url: "/api/verakey/sign-in", headers: { cookie }, body: {}, stream: [JSON.stringify(result)] });
+    toExpress(server)(skipped.req, skipped.res, skipped.next);
+    const answer = await skipped.ended;
+    expect(answer.body).not.toContain("This is not a VeraKey sign-in.");
+    expect(answer.status).toBe(200);
   });
 
   it("refuses a raw body larger than the kit accepts", async () => {
