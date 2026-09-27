@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Address, Hex } from "viem";
+import type { Address, Hex, PublicClient } from "viem";
 import type { VeraKeyDeployment } from "../src/deployments";
 import { createVeraKeyServer, memoryStore, type VeraKeyServerOptions } from "../src/server";
-import { ACCOUNT, GAME, NOW, VERAKEY, chain, deployment as signInDeployment, signedIn, statement } from "./fixtures/signin";
+import { ACCOUNT, GAME, HASH, NOW, VERAKEY, chain, deployment as signInDeployment, paidLog, signedIn, statement } from "./fixtures/signin";
 
 const SECRET = "a secret of at least thirty-two bytes";
 const MERCHANT: Address = "0x00000000000000000000000000000000000000cc";
@@ -185,5 +185,93 @@ describe("createVeraKeyServer: sign-in", () => {
     expect(() => kit({ merchant: "0x1234" as Address })).toThrow(/merchant/);
     expect(() => kit({ deployment: { ...deployment, rpIdHash: "0x12" } })).toThrow(/deployment/);
     expect(() => kit({ sessionTtlSeconds: 0 })).toThrow(/sessionTtlSeconds/);
+  });
+});
+
+/** A chain that verifies sign-ins and holds one 1 USDG payment to the merchant, found by nonce 7. */
+function paymentChain(status: "success" | "pending" = "success"): PublicClient {
+  const log = paidLog(ACCOUNT, MERCHANT, 1_000_000n, 20_000n);
+  return {
+    ...chain(),
+    getTransactionReceipt: async () => {
+      if (status === "pending") throw new Error("not found");
+      return { status: "success", logs: [log] };
+    },
+    getTransaction: async () => ({ hash: HASH }),
+    waitForTransactionReceipt: async () => ({ status: "success", logs: [log] }),
+    getBlockNumber: async () => 100n,
+    getContractEvents: async ({ args }: { args: { nonce: bigint } }) => (args.nonce === 7n ? [{ transactionHash: HASH }] : []),
+  } as unknown as PublicClient;
+}
+
+describe("createVeraKeyServer: payments", () => {
+  const shop = (options: Partial<VeraKeyServerOptions> = {}) => kit({ merchant: MERCHANT, publicClient: paymentChain(), ...options });
+  const pay = (server: ReturnType<typeof kit>, session: string, body: unknown) => server.handle(request("POST", "payment", { body, cookie: session }));
+
+  it("verifies a payment on-chain, hands it to onPayment, and accepts it once", async () => {
+    const paid: unknown[] = [];
+    const { server, session } = await signIn(shop({ onPayment: payment => (paid.push(payment), { swords: 1n }) }));
+    const response = await pay(server, session, { amount: "1000000", hash: HASH });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ hash: HASH, amount: "1000000", fee: "20000", result: { swords: "1" } });
+    expect(paid).toEqual([{ player: PLAYER, hash: HASH, to: MERCHANT, amount: 1_000_000n, fee: 20_000n }]);
+    expect((await pay(server, session, { amount: "1000000", hash: HASH })).status).toBe(409);
+    expect(paid).toHaveLength(1);
+  });
+
+  it("finds a payment by the nonce of a payment the popup was sending", async () => {
+    const { server, session } = await signIn(shop());
+    const response = await pay(server, session, { amount: "1000000", nonce: "7" });
+    expect(response.status).toBe(200);
+    expect((await response.json()).hash).toBe(HASH);
+  });
+
+  it("waits for a payment that is sent but not yet in a block", async () => {
+    const { server, session } = await signIn(shop({ publicClient: paymentChain("pending") }));
+    expect((await pay(server, session, { amount: "1000000", hash: HASH })).status).toBe(200);
+  });
+
+  it("refuses a payment that does not verify, with its checks", async () => {
+    const { server, session } = await signIn(shop());
+    const response = await pay(server, session, { amount: "2000000", hash: HASH });
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("The payment did not verify.");
+    expect(body.checks.filter((c: { ok: boolean }) => !c.ok).map((c: { name: string }) => c.name)).toEqual(["To this recipient, for this amount"]);
+  });
+
+  it("lets the player try again when onPayment throws", async () => {
+    let attempts = 0;
+    const onPayment = () => {
+      if (++attempts === 1) throw new Error("The shop is closed for a minute.");
+      return "ok";
+    };
+    const { server, session } = await signIn(shop({ onPayment }));
+    const first = await pay(server, session, { amount: "1000000", hash: HASH });
+    expect(first.status).toBe(400);
+    expect(await first.json()).toEqual({ error: "The shop is closed for a minute." });
+    expect(await (await pay(server, session, { amount: "1000000", hash: HASH })).json()).toMatchObject({ result: "ok" });
+  });
+
+  it("needs a signed-in player and a merchant", async () => {
+    expect((await pay(shop(), "", { amount: "1000000", hash: HASH })).status).toBe(401);
+    const noShop = await signIn(kit());
+    expect((await pay(noShop.server, noShop.session, { amount: "1000000", hash: HASH })).status).toBe(404);
+  });
+
+  it("refuses malformed payment requests", async () => {
+    const { server, session } = await signIn(shop());
+    for (const body of [{ amount: "0", hash: HASH }, { amount: 1000000, hash: HASH }, { amount: "1000000" }, { amount: "1000000", hash: "0x12" }]) {
+      expect((await pay(server, session, body)).status, JSON.stringify(body)).toBe(400);
+    }
+  });
+
+  it("warns once at startup when payments would be remembered in memory only", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    createVeraKeyServer({ origin: GAME, deployment, secret: SECRET, publicClient: chain(), merchant: MERCHANT });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toMatch(/durable store/);
+    kit({ merchant: MERCHANT });
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });

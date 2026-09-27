@@ -3,7 +3,7 @@ import { base64UrlDecode, base64UrlEncode, bytesToHex } from "./bytes";
 import { isAllowedRequesterOrigin } from "./connect";
 import type { VeraKeyDeployment } from "./deployments";
 import { hmacKey, mac, macValid, parseCookies, serializeCookie } from "./kit/cookies";
-import { verifySignIn, type SignInCheck, type SignInResult, type VeraKeyPlayer } from "./signin";
+import { findPayment, verifyPayment, verifySignIn, type SignInCheck, type SignInResult, type VeraKeyPlayer } from "./signin";
 
 /**
  * The integration kit on your server: the routes a page's VeraKeySession calls (session, nonce, sign-in, sign-out
@@ -132,6 +132,9 @@ export function createVeraKeyServer(options: VeraKeyServerOptions): VeraKeyServe
   const SESSION_COOKIE = secure ? "__Host-verakey-session" : "verakey-session";
   const sessionTtl = options.sessionTtlSeconds ?? DEFAULT_SESSION_TTL_SECONDS;
   const store = options.store ?? memoryStore();
+  if (merchant && !options.store) {
+    console.warn("VeraKey: payments are accepted once per process only; pass a durable store in production.");
+  }
   const rpcUrl = options.rpcUrl ?? deployment.rpcUrl;
   const publicClient =
     options.publicClient ??
@@ -235,6 +238,37 @@ export function createVeraKeyServer(options: VeraKeyServerOptions): VeraKeyServe
     "POST sign-out": async request => {
       requireOrigin(request);
       return json(200, {}, [cookie(SESSION_COOKIE, "", 0, "Lax")]);
+    },
+
+    "POST payment": async request => {
+      requireOrigin(request);
+      const player = await readSession(request.headers.get("cookie"));
+      if (!player) throw new HttpError(401, "Sign in first.");
+      if (!merchant) throw new HttpError(404, "This site takes no payments.");
+      const { amount, hash, nonce } = ((await readBody(request)) ?? {}) as { amount?: unknown; hash?: unknown; nonce?: unknown };
+      if (typeof amount !== "string" || !/^[1-9][0-9]{0,38}$/.test(amount)) {
+        throw new HttpError(400, "amount must be a whole number of USDG base units, as a string.");
+      }
+      let found: Hex | null;
+      if (typeof hash === "string" && isHex(hash) && hash.length === 66) found = hash;
+      else if (typeof nonce === "string" && /^[0-9]{1,20}$/.test(nonce)) {
+        found = await findPayment({ publicClient, account: player.account, nonce: BigInt(nonce) });
+      } else throw new HttpError(400, "Send the payment's hash, or the nonce of a payment the popup was sending.");
+      if (!found) throw new HttpError(400, "No payment was found.");
+      const verdict = await verifyPayment(found, { publicClient, account: player.account, to: merchant, amount: BigInt(amount) });
+      if (!verdict.valid) throw new HttpError(400, "The payment did not verify.", verdict.checks);
+      const claim = `payment:${found.toLowerCase()}`;
+      if (!(await store.claim(claim))) throw new HttpError(409, "This payment was already accepted.");
+      const payment: VerifiedPayment = { player, hash: found, to: merchant, amount: BigInt(amount), fee: verdict.fee ?? 0n };
+      let result: unknown;
+      try {
+        result = await options.onPayment?.(payment, request);
+      } catch (error) {
+        // The payment stays the player's: let them try again once the site is back.
+        await store.release(claim);
+        throw new HttpError(400, messageOf(error));
+      }
+      return json(200, { hash: found, amount, fee: payment.fee.toString(), result: result ?? null });
     },
   };
 
