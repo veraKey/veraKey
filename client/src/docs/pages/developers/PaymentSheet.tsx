@@ -70,8 +70,8 @@ await vera.scheduleChange(APP_ID, changePayload.setPaymentSheet(false)); // drop
         accepts it only for <code>pay</code>, and only if it matches byte for byte:
       </p>
       <Code lang="json" title="clientDataJSON (shape)">{`
-{"type":"payment.get","challenge":"<the action hash, base64url>","origin":"https://verakey.mdloglabs.org",
- "crossOrigin":false,"payment":{"rpId":"verakey.mdloglabs.org","topOrigin":"https://verakey.mdloglabs.org",
+{"type":"payment.get","challenge":"<the action hash, base64url>","origin":"https://verakey.xyz",
+ "crossOrigin":false,"payment":{"rpId":"verakey.xyz","topOrigin":"https://verakey.xyz",
  "payeeName":"0x<the recipient, lowercase hex>","total":{"value":"2.02","currency":"USD"},"instrument":{…}}}
 `}</Code>
       <Table

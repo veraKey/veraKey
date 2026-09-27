@@ -9,6 +9,13 @@ export default function ChangelogPage() {
       <H2>2026-09-27</H2>
       <ul>
         <li>
+          <strong>VeraKey moves to verakey.xyz:</strong> accounts are bound to their domain for good, so Arbitrum Sepolia
+          has a new deployment for https://verakey.xyz (see <A href="/docs/reference/deployments">Deployments</A>), and 
+          <code>ARBITRUM_SEPOLIA</code> in SDK 0.2.1 points to it. Accounts made on verakey.mdloglabs.org stay on the first
+          deployment. A Kernel v3.3 account runs on the new validator (
+          <A href="https://arbitrum-sepolia.blockscout.com/tx/0x0f617b9b889c61f9322206631cdab1c5d207fc1a95b1f97a0bfc54c8ddf92fc3">transaction</A>).
+        </li>
+        <li>
           <strong>SDK 0.2.0, the integration kit:</strong> <code>createVeraKeyServer</code> from{" "}
           <code>@verakey/sdk/server</code>, and <code>SignInWithVeraKey</code> and <code>useVeraKey</code> from{" "}
           <code>@verakey/sdk/react</code>, add Sign in with VeraKey and payments to a React site with a Node server in
@@ -19,12 +26,12 @@ export default function ChangelogPage() {
         <li>
           <strong>SDK 0.1.2, VeraKey passkeys own ZeroDev Kernel accounts:</strong>{" "}
           <code>toVeraKeyKernelValidator</code> from <code>@verakey/sdk/kernel</code> makes the ERC-7579 validator a
-          Kernel plugin. On Arbitrum Sepolia a Kernel v3.3 account deployed and paid 1 USDG with a passkey proof (
+          Kernel plugin. On Arbitrum Sepolia, on the first deployment, a Kernel v3.3 account deployed and paid 1 USDG with a passkey proof (
           <A href="https://arbitrum-sepolia.blockscout.com/tx/0x66dbf2ed7552d9e0d563bdf9a8aee30656d1e99cfab4c9e8bade961c0d0cfc2f">transaction</A>). See <A href="/docs/build/erc-7579">ERC-7579 validator</A>.
         </li>
         <li>
           <strong>Payments on Arbitrum Sepolia:</strong> test USDG arrived from Paxos, and the first payment was approved
-          with a passkey on an iPhone (
+          with a passkey on an iPhone, on the first deployment (
           <A href="https://arbitrum-sepolia.blockscout.com/tx/0x81c5d7e446873a656deefe7910dd65719a5c3dac4cc2c95719d9f8173c5ff797">transaction</A>).
         </li>
       </ul>

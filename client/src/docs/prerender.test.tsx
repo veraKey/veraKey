@@ -5,7 +5,7 @@ import { articleMarkdown } from "./markdown";
 import { docsAssets, docsDocument, llmsFull, llmsIndex, pageSource, prerenderHtml, renderApp, type Manifest } from "./prerender";
 import { GROUPS, PAGES } from "./registry";
 
-const ORIGIN = "https://verakey.mdloglabs.org";
+const ORIGIN = "https://verakey.xyz";
 const signIn = PAGES.find(page => page.path === "/docs/build/sign-in")!;
 
 describe("prerendering the docs", () => {
@@ -37,7 +37,7 @@ describe("prerendering the docs", () => {
   it("reads a page's Markdown from its article: code with its language, tables, and no site navigation", async () => {
     const text = articleMarkdown(await renderApp(signIn.path), ORIGIN + signIn.path);
     expect(text.startsWith("# Sign in with VeraKey\n\n")).toBe(true);
-    for (const part of ["## Test your integration", '```ts title="game.ts"', "| `request` |", "[Deployments](https://verakey.mdloglabs.org/docs/reference/deployments)"]) {
+    for (const part of ["## Test your integration", '```ts title="game.ts"', "| `request` |", "[Deployments](https://verakey.xyz/docs/reference/deployments)"]) {
       expect(text).toContain(part);
     }
     expect(text).not.toMatch(/Search docs|Skip to content|Open app/);

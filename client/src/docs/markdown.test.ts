@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { articleMarkdown, htmlToMarkdown } from "./markdown";
 
-const PAGE = "https://verakey.mdloglabs.org/docs/build/sign-in";
+const PAGE = "https://verakey.xyz/docs/build/sign-in";
 const md = (html: string) => htmlToMarkdown(html, PAGE);
 
 describe("docs HTML as Markdown", () => {
@@ -17,8 +17,8 @@ describe("docs HTML as Markdown", () => {
       `<p>Use <code>verifySignIn</code> on <strong>your</strong>   server; see <a href="/docs/reference/deployments">Deployments</a>, ` +
       `<a href="#errors-and-limits">errors</a> and <a href="https://www.npmjs.com/package/@verakey/sdk" target="_blank">npm<svg><path d=""></path></svg></a>.</p>`;
     expect(md(html)).toBe(
-      "Use `verifySignIn` on **your** server; see [Deployments](https://verakey.mdloglabs.org/docs/reference/deployments), " +
-        "[errors](https://verakey.mdloglabs.org/docs/build/sign-in#errors-and-limits) and [npm](https://www.npmjs.com/package/@verakey/sdk).\n"
+      "Use `verifySignIn` on **your** server; see [Deployments](https://verakey.xyz/docs/reference/deployments), " +
+        "[errors](https://verakey.xyz/docs/build/sign-in#errors-and-limits) and [npm](https://www.npmjs.com/package/@verakey/sdk).\n"
     );
   });
 
@@ -54,12 +54,12 @@ describe("docs HTML as Markdown", () => {
     const html =
       `<aside class="dx-callout is-tip"><svg></svg><div><strong>No deployment?</strong>` +
       `<div>Start with <a href="/docs/build/sign-in">Sign in</a>.</div></div></aside>`;
-    expect(md(html)).toBe("> **No deployment?** Start with [Sign in](https://verakey.mdloglabs.org/docs/build/sign-in).\n");
+    expect(md(html)).toBe("> **No deployment?** Start with [Sign in](https://verakey.xyz/docs/build/sign-in).\n");
   });
 
   it("writes cards as links, flows as numbered steps, lanes and glossaries as terms", () => {
     const cards = `<div class="dx-cards"><a class="dx-card" href="/docs/build/sdk"><svg></svg><strong>SDK guide</strong><span>In depth.</span></a></div>`;
-    expect(md(cards)).toBe("- [SDK guide](https://verakey.mdloglabs.org/docs/build/sdk): In depth.\n");
+    expect(md(cards)).toBe("- [SDK guide](https://verakey.xyz/docs/build/sdk): In depth.\n");
     const flow = `<ol class="dx-flow"><li><span>01</span><strong>Unlock</strong><small>The passkey signs.</small></li></ol>`;
     expect(md(flow)).toBe("1. **Unlock**: The passkey signs.\n");
     const lanes = `<div class="dx-lanes"><section><p class="dx-lane-title">Browser</p><ul><li><strong>Prover</strong><span>Makes proofs.</span></li></ul></section></div>`;

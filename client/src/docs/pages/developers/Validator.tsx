@@ -16,7 +16,7 @@ export default function ValidatorPage() {
       <Callout kind="note" title="What is tested">
         The module is tested with real proofs (36 Foundry tests), and it runs in a ZeroDev Kernel v3.3 account on
         Arbitrum Sepolia: that account was created with <code>VeraKeyValidator</code> as its root validator, and its first
-        user operation, a 1 USDG payment, was authorized by a proof (<A href="https://arbitrum-sepolia.blockscout.com/tx/0x66dbf2ed7552d9e0d563bdf9a8aee30656d1e99cfab4c9e8bade961c0d0cfc2f">transaction</A>). It has not
+        user operation, a 1 USDG payment, was authorized by a proof (<A href="https://arbitrum-sepolia.blockscout.com/tx/0x0f617b9b889c61f9322206631cdab1c5d207fc1a95b1f97a0bfc54c8ddf92fc3">transaction</A>). It has not
         been tried in a Nexus account yet.
       </Callout>
 

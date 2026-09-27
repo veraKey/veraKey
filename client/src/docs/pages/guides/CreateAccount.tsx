@@ -31,7 +31,7 @@ export default function CreateAccountGuide() {
       <Steps>
         <Step title="Open the app">
           <p>
-            Go to <A href="https://verakey.mdloglabs.org/app">verakey.mdloglabs.org/app</A>. The app runs on Arbitrum
+            Go to <A href="https://verakey.xyz/app">verakey.xyz/app</A>. The app runs on Arbitrum
             Sepolia, a test network: nothing you do there uses real money.
           </p>
         </Step>

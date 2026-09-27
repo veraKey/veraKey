@@ -154,7 +154,7 @@ export function HeroShowcase() {
       <div className="showcase-browser" aria-hidden="true" inert>
         <div className="browser-bar">
           <span className="browser-dots"><i /><i /><i /></span>
-          <span className="browser-url"><Lock size={10} /> verakey.mdloglabs.org<span>/app/pay</span></span>
+          <span className="browser-url"><Lock size={10} /> verakey.xyz<span>/app/pay</span></span>
           <span className="browser-tag">Preview</span>
         </div>
         <div ref={viewport} className="browser-viewport">
@@ -188,7 +188,7 @@ export function HeroShowcase() {
               </div>
               {(phase === "sheet" || phase === "faceid") && <PasskeySheet scanning={phase === "faceid"} />}
               <div className="ios-safari">
-                <span className="ios-url"><span className="ios-aa">AA</span><span><Lock size={11} /> verakey.mdloglabs.org</span><RotateCw size={13} /></span>
+                <span className="ios-url"><span className="ios-aa">AA</span><span><Lock size={11} /> verakey.xyz</span><RotateCw size={13} /></span>
                 <span className="ios-home" />
               </div>
             </div>
@@ -211,9 +211,9 @@ function PasskeySheet({ scanning }: { scanning: boolean }) {
       <span className="ios-dim" />
       <div className="ios-sheet">
         <span className="ios-grabber" />
-        <div className="ios-sheet-site"><span className="ios-sheet-icon"><KeyRound size={20} /></span>verakey.mdloglabs.org</div>
+        <div className="ios-sheet-site"><span className="ios-sheet-icon"><KeyRound size={20} /></span>verakey.xyz</div>
         <b className="ios-sheet-title">Sign in with your passkey?</b>
-        <p className="ios-sheet-text">Use Face ID to sign in to “verakey.mdloglabs.org”.</p>
+        <p className="ios-sheet-text">Use Face ID to sign in to “verakey.xyz”.</p>
         <div className={`ios-faceid ${scanning ? "is-scanning" : ""}`}>
           <ScanFace className="ios-faceid-glyph" size={62} strokeWidth={1.3} />
           <span className="ios-faceid-done"><Check size={36} strokeWidth={2.6} /></span>

@@ -31,15 +31,15 @@ export default function RelayerApiPage() {
   "chainName": "Arbitrum Sepolia",
   "rpcUrl": "/api/rpc",
   "explorerUrl": "https://sepolia.arbiscan.io",
-  "rpId": "verakey.mdloglabs.org",
-  "origin": "https://verakey.mdloglabs.org",
-  "rpIdHash": "0x0fe14846fe0610bfa7471c5396156cdf8b0c6594cc04194ffadcf8e8a490f4e1",
+  "rpId": "verakey.xyz",
+  "origin": "https://verakey.xyz",
+  "rpIdHash": "0x57bea8798cb14a63fbde043755cfe53f5f7c3ed90da0d3cbbbbfee14af74c88c",
   "contracts": {
-    "honkVerifier": "0x9BF57a65Cb388132982D3061C9b2d5Ec3bA2df06",
-    "linkVerifier": "0xDb3B0Bfb96504381dcFA8a32Cb81dee3401bDF2B",
-    "veraKeyValidator": "0xcc96c0C520Fc6E8a068f5e2A74aBa7cAab8d9b6C",
-    "accountImplementation": "0x281476444a4b1c4ee019b2417539a8efc4af7930",
-    "factory": "0x6a1505b412e934f6f57f6b8eedcd68c7c8acb276",
+    "honkVerifier": "0x6158Fc3c9F78f78eA780f30ab3E8515AD04Bd834",
+    "linkVerifier": "0x8d5CF3023DA9a9257D680eb1bF3832df10CCe291",
+    "veraKeyValidator": "0x42aEc9C527280e8E3E3B90135FA7C007274b4fdE",
+    "accountImplementation": "0xfab5e61aece00c0399cc3d186b154ae194156d0d",
+    "factory": "0xbaac250f9f1b07651c121e314bccc6fa4c64e55c",
     "usdg": "0xFFC95faa3d63Cde504a05B567C600B78C0b41892"
   },
   "policy": {
@@ -49,7 +49,7 @@ export default function RelayerApiPage() {
   },
   "relayer": { "address": "0x6D377a3927df664FDA9946Aa0E6fb8F707844fA8", "fee": "20000", "faucetAmount": "5000000" },
   "circuitVkHash": "0x16378935c4dee31e952a8c42d2f20d4d5dbd00ee2e8225a1eb16e908caf37f12",
-  "configHash": "0x7b702db55819b2adba4fc4406aed1150d7f437400936406ce9153cc8668e6701"
+  "configHash": "0xe00ba16d1ea81d6a62721f9230dfb109f065f569198cec2c375bdd57bdb132e2"
 }
 `}</Code>
       <p>

@@ -107,7 +107,7 @@ function Shop() {
       <Code lang="ts" title="game.ts">{`
 import { VeraKeyConnect, VeraKeyConnectError } from "@verakey/sdk/connect";
 
-const verakey = new VeraKeyConnect({ url: "https://verakey.mdloglabs.org" });
+const verakey = new VeraKeyConnect({ url: "https://verakey.xyz" });
 
 // A fresh nonce from your server. Throw its refusal: the popup closes, and your page gets it as error.cause.
 async function newNonce() {
@@ -148,7 +148,7 @@ const verdict = await verifySignIn(result, {
   publicClient,                // a viem client for Arbitrum
   deployment: {                // pinned in your configuration
     chainId, factory, rpIdHash, honkVerifier,
-    origin: "https://verakey.mdloglabs.org",
+    origin: "https://verakey.xyz",
   },
 });
 if (verdict.valid) startSession(verdict.playerId, verdict.account);
