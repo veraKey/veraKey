@@ -11,6 +11,7 @@
     "start": "NODE_ENV=production node --env-file-if-exists=.env dist/index.js",
     "preview": "vite preview",
     "demo:game": "node --import tsx examples/demo-game/server.ts",
+    "demo:react": "node --import tsx examples/react-quickstart/server.ts",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "circuit:build": "scripts/build-circuit.sh",
