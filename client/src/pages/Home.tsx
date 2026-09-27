@@ -141,7 +141,7 @@ const useCases = [
     title: "Your app",
     subtitle: "@verakey/sdk",
     copy: "Add passkey accounts to any Arbitrum app with the SDK: register, derive the account, authorize, pay. Proving runs in your users' browsers.",
-    detail: "On a modular smart account? The VeraKey ERC-7579 validator verifies the same proofs. It is built for accounts such as Kernel and Nexus and tested with real proofs as a module.",
+    detail: "On a modular smart account? The VeraKey ERC-7579 validator verifies the same proofs. It is built for accounts such as Kernel and Nexus, and a ZeroDev Kernel account on Arbitrum Sepolia already runs on it.",
     icon: Building2,
     color: "orange",
     tags: ["typescript sdk", "gasless relay", "erc-7579 validator"],

@@ -24,6 +24,7 @@ export default function SdkGuidePage() {
           [<code key="7">@verakey/sdk/link-prover</code>, "LinkProver: the consent-to-link circuit's prover and verifier"],
           [<code key="8">@verakey/sdk/disclosure</code>, "linkDisclosureChallenge, verifyDisclosure and the disclosure types"],
           [<code key="9">@verakey/sdk/validator</code>, "Helpers for the ERC-7579 VeraKeyValidator module"],
+          [<code key="16">@verakey/sdk/kernel</code>, "toVeraKeyKernelValidator: a VeraKey passkey as a ZeroDev Kernel account's validator"],
           [<code key="10">@verakey/sdk/relayer</code>, "RelayerClient, RelayerError"],
           [<code key="11">@verakey/sdk/store</code>, "LocalPasskeyStore, MemoryPasskeyStore"],
           [<code key="12">@verakey/sdk/abi</code>, "veraKeyAccountAbi, veraKeyFactoryAbi, honkVerifierAbi, erc20Abi"],
