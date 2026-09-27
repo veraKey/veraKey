@@ -15,4 +15,5 @@ export * from "./kernel";
 export * from "./signin";
 export * from "./connect";
 export * from "./deployments";
+export * from "./server";
 export * from "./client";
