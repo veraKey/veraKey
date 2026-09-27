@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Address, Hex, PublicClient } from "viem";
 import type { VeraKeyDeployment } from "../src/deployments";
-import { createVeraKeyServer, memoryStore, type VeraKeyServerOptions } from "../src/server";
+import { createVeraKeyServer, memoryStore, toExpress, type VeraKeyServerOptions } from "../src/server";
 import { ACCOUNT, GAME, HASH, NOW, VERAKEY, chain, deployment as signInDeployment, paidLog, signedIn, statement } from "./fixtures/signin";
 
 const SECRET = "a secret of at least thirty-two bytes";
@@ -273,5 +273,67 @@ describe("createVeraKeyServer: payments", () => {
     expect(String(warn.mock.calls[0][0])).toMatch(/durable store/);
     kit({ merchant: MERCHANT });
     expect(warn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("toExpress", () => {
+  type Ended = { status: number; headers: Record<string, string | string[]>; body: string };
+
+  /** An Express-like request and response, and what the response ended with (status -1: next got an error). */
+  function exchange(init: { method: string; url: string; headers?: Record<string, string>; body?: unknown; stream?: string[] }) {
+    let done!: (value: Ended) => void;
+    const ended = new Promise<Ended>(resolve => (done = resolve));
+    const headers: Record<string, string | string[]> = {};
+    const req = {
+      method: init.method,
+      originalUrl: init.url,
+      headers: { host: "game.example", origin: GAME, ...init.headers },
+      body: init.body,
+      async *[Symbol.asyncIterator]() {
+        for (const chunk of init.stream ?? []) yield chunk;
+      },
+    };
+    const res = {
+      statusCode: 0,
+      setHeader(name: string, value: string | string[]) {
+        headers[name] = value;
+      },
+      end(body?: string) {
+        done({ status: this.statusCode, headers, body: body ?? "" });
+      },
+    };
+    const next = (error?: unknown) => done({ status: -1, headers, body: String(error) });
+    return { req, res, next, ended };
+  }
+
+  it("serves the kit's routes through Express's request and response", async () => {
+    const { req, res, next, ended } = exchange({ method: "POST", url: "/api/verakey/nonce" });
+    toExpress(kit())(req, res, next);
+    const answer = await ended;
+    expect(answer.status).toBe(200);
+    expect(JSON.parse(answer.body).nonce).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(answer.headers["set-cookie"]).toEqual([expect.stringMatching(/^__Host-verakey-nonce=/)]);
+    expect(answer.headers["content-type"]).toBe("application/json; charset=utf-8");
+  });
+
+  it("reads a raw body, or one Express already parsed", async () => {
+    const server = kit();
+    const nonce = exchange({ method: "POST", url: "/api/verakey/nonce" });
+    toExpress(server)(nonce.req, nonce.res, nonce.next);
+    const issued = await nonce.ended;
+    const cookie = (issued.headers["set-cookie"] as string[])[0].split(";")[0];
+    const result = await signedIn({ nonce: JSON.parse(issued.body).nonce });
+    const raw = exchange({ method: "POST", url: "/api/verakey/sign-in", headers: { cookie }, stream: [JSON.stringify(result)] });
+    toExpress(server)(raw.req, raw.res, raw.next);
+    expect((await raw.ended).status).toBe(200);
+    const parsed = exchange({ method: "POST", url: "/api/verakey/sign-in", headers: { cookie }, body: {} });
+    toExpress(server)(parsed.req, parsed.res, parsed.next);
+    expect(JSON.parse((await parsed.ended).body)).toEqual({ error: "This is not a VeraKey sign-in." });
+  });
+
+  it("refuses a raw body larger than the kit accepts", async () => {
+    const { req, res, next, ended } = exchange({ method: "POST", url: "/api/verakey/sign-in", stream: ["x".repeat(40_000), "x".repeat(40_000)] });
+    toExpress(kit())(req, res, next);
+    expect((await ended).status).toBe(413);
   });
 });

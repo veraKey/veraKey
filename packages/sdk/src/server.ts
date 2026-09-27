@@ -297,3 +297,78 @@ export function createVeraKeyServer(options: VeraKeyServerOptions): VeraKeyServe
 
   return { handle, getPlayer };
 }
+
+type NodeHeaders = Record<string, string | string[] | undefined>;
+interface ExpressLikeRequest extends AsyncIterable<Uint8Array | string> {
+  method?: string;
+  originalUrl?: string;
+  url?: string;
+  headers: NodeHeaders;
+  body?: unknown;
+}
+interface ExpressLikeResponse {
+  statusCode: number;
+  setHeader(name: string, value: string | string[]): unknown;
+  end(body?: string): unknown;
+}
+
+/** Mounts the kit in Express (or Connect): app.use("/api/verakey", toExpress(verakey)). No dependency on Express. */
+export function toExpress(server: VeraKeyServer): (req: unknown, res: unknown, next: (error?: unknown) => void) => void {
+  return (req, res, next) => {
+    serve(server, req as ExpressLikeRequest, res as ExpressLikeResponse).catch(next);
+  };
+}
+
+async function serve(server: VeraKeyServer, req: ExpressLikeRequest, res: ExpressLikeResponse): Promise<void> {
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(req.headers)) {
+    // The body goes on as read, or as Express parsed it, so its original length no longer applies.
+    if (value === undefined || name === "content-length" || name === "transfer-encoding") continue;
+    for (const item of Array.isArray(value) ? value : [value]) headers.append(name, item);
+  }
+  const method = (req.method ?? "GET").toUpperCase();
+  let body: string | undefined;
+  if (method !== "GET" && method !== "HEAD") {
+    if (typeof req.body === "string") body = req.body;
+    else if (req.body instanceof Uint8Array) body = new TextDecoder().decode(req.body);
+    else if (typeof req.body === "object" && req.body !== null) body = JSON.stringify(req.body);
+    else {
+      const read = await readStream(req);
+      if (read === null) {
+        res.statusCode = 413;
+        res.setHeader("content-type", "application/json; charset=utf-8");
+        res.end(JSON.stringify({ error: "The request is too large." }));
+        return;
+      }
+      body = read;
+    }
+  }
+  const url = new URL(req.originalUrl ?? req.url ?? "/", `http://${headers.get("host") ?? "localhost"}`);
+  const response = await server.handle(new Request(url, { method, headers, body }));
+  res.statusCode = response.status;
+  response.headers.forEach((value, name) => {
+    if (name !== "set-cookie") res.setHeader(name, value);
+  });
+  const cookies = response.headers.getSetCookie();
+  if (cookies.length > 0) res.setHeader("set-cookie", cookies);
+  res.end(await response.text());
+}
+
+/** The raw body as text, or null when it is larger than the kit accepts. */
+async function readStream(req: AsyncIterable<Uint8Array | string>): Promise<string | null> {
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    const bytes = typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk;
+    size += bytes.length;
+    if (size > MAX_BODY_BYTES) return null;
+    chunks.push(bytes);
+  }
+  const all = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    all.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return new TextDecoder().decode(all);
+}
