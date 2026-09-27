@@ -327,6 +327,21 @@ interface DisclosedAccount {
       <p>
         See <A href="/docs/build/erc-7579">ERC-7579 validator</A> for installing the module and signing user operations.
       </p>
+
+      <H2>Kernel plugin</H2>
+      <Table
+        stack
+        head={["Export", "Signature", "What it does"]}
+        rows={methods([
+          ["toVeraKeyKernelValidator", "({ validator, chainId, appId, nullifier, prove, supportedKernelVersions? }): VeraKeyKernelValidator", "A ZeroDev Kernel v3 validator plugin backed by VeraKeyValidator: installs the owner's nullifier, and has the passkey prove each userOpHash."],
+          ["ENTRY_POINT_07", "Address", "EntryPoint v0.7, whose user operations VeraKeyValidator validates."],
+          ["VERAKEY_PROOF_BYTES", "number", "8768, the size of a proof: the plugin's stub signature has it, for gas estimates."],
+        ])}
+      />
+      <p>
+        From <code>@verakey/sdk/kernel</code>. See <A href="/docs/build/erc-7579">ERC-7579 validator</A> for an example
+        with <code>createKernelAccount</code>.
+      </p>
       <H2>Sign-in helpers</H2>
       <p>For sites that use <A href="/docs/build/sign-in">Sign in with VeraKey</A>: <code>@verakey/sdk/connect</code> in the page, <code>@verakey/sdk/signin</code> on the server.</p>
       <Table

@@ -6,6 +6,21 @@ export default function ChangelogPage() {
     <>
       <p>Newest first. Each entry is one step of the build.</p>
 
+      <H2>2026-09-27</H2>
+      <ul>
+        <li>
+          <strong>SDK 0.1.2, VeraKey passkeys own ZeroDev Kernel accounts:</strong>{" "}
+          <code>toVeraKeyKernelValidator</code> from <code>@verakey/sdk/kernel</code> makes the ERC-7579 validator a
+          Kernel plugin. On Arbitrum Sepolia a Kernel v3.3 account deployed and paid 1 USDG with a passkey proof (
+          <A href="https://arbitrum-sepolia.blockscout.com/tx/0x66dbf2ed7552d9e0d563bdf9a8aee30656d1e99cfab4c9e8bade961c0d0cfc2f">transaction</A>). See <A href="/docs/build/erc-7579">ERC-7579 validator</A>.
+        </li>
+        <li>
+          <strong>Payments on Arbitrum Sepolia:</strong> test USDG arrived from Paxos, and the first payment was approved
+          with a passkey on an iPhone (
+          <A href="https://arbitrum-sepolia.blockscout.com/tx/0x81c5d7e446873a656deefe7910dd65719a5c3dac4cc2c95719d9f8173c5ff797">transaction</A>).
+        </li>
+      </ul>
+
       <H2>2026-09-24</H2>
       <ul>
         <li>

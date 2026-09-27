@@ -11,6 +11,7 @@
   <img src="https://img.shields.io/badge/Solidity-0.8.27-30363d?style=flat-square&labelColor=161b22&logo=solidity&logoColor=white" alt="Solidity 0.8.27">
   <img src="https://img.shields.io/badge/OpenZeppelin-Stylus%200.3-30363d?style=flat-square&labelColor=161b22&logo=openzeppelin&logoColor=white" alt="OpenZeppelin Stylus 0.3">
   <img src="https://img.shields.io/badge/USDG-Paxos-30363d?style=flat-square&labelColor=161b22" alt="USDG Paxos">
+  <img src="https://img.shields.io/badge/ZeroDev-Kernel%20v3.3-30363d?style=flat-square&labelColor=161b22" alt="ZeroDev Kernel v3.3">
   <br>
   <img src="https://img.shields.io/badge/Noir-1.0.0--beta.25-30363d?style=flat-square&labelColor=161b22" alt="Noir 1.0.0-beta.25">
   <img src="https://img.shields.io/badge/UltraHonk-bb.js%205.2%2C%20in%20the%20browser-30363d?style=flat-square&labelColor=161b22" alt="UltraHonk bb.js 5.2, in the browser">
@@ -43,7 +44,7 @@ nothing on-chain links them. Unlinkable, not anonymous: each account's own histo
 - **Sign in with VeraKey.** Any https site can sign people in through VeraKey's popup. Each site gets its own ID for a
   person, and its server verifies a zero-knowledge proof of every sign-in.
 - **Unlinkable by default, linkable by consent.** The owner can prove to an auditor that two accounts share a passkey, without revealing the key.
-- **Not only VeraKey accounts.** An ERC-7579 validator module brings the same proofs to modular smart accounts such as Kernel and Nexus.
+- **Not only VeraKey accounts.** An ERC-7579 validator module brings the same proofs to modular smart accounts such as Kernel and Nexus: a ZeroDev Kernel account on Arbitrum Sepolia already runs on it.
 
 Built for the Arbitrum Open House Singapore Buildathon (HackQuest), September–October 2026.
 
@@ -71,6 +72,10 @@ Docs: **https://verakey.mdloglabs.org/docs** (users, developers and reviewers).
   (1,225,020 gas, 0.02 USDG fee). Before it, the same account froze
   ([`0xd09c08e9…3c38`](https://sepolia.arbiscan.io/tx/0xd09c08e98a9ca1149f14fd4b9907c6b9e2a7785ff169e4a0bcfe744562f83c38)),
   scheduled its unfreeze with a proof and applied it after the 2-minute delay.
+- A ZeroDev Kernel v3.3 account owned by a VeraKey passkey: `VeraKeyValidator` is its root validator, and its first
+  user operation, bundled by VeraKey's relayer, deployed it and paid 1 USDG
+  ([`0x66dbf2ed…fc2f`](https://sepolia.arbiscan.io/tx/0x66dbf2ed7552d9e0d563bdf9a8aee30656d1e99cfab4c9e8bade961c0d0cfc2f), 1,218,222 gas). Reproduce it with
+  `node --env-file=.env --import tsx packages/sdk/scripts/kernel-sepolia.mts` (add `--dry-run` to only simulate).
 - The full configuration is in `deployments/sepolia.json`.
 - The Solidity contracts are source-verified on Sourcify (exact match): [`HonkVerifier`](https://repo.sourcify.dev/421614/0x9BF57a65Cb388132982D3061C9b2d5Ec3bA2df06), [`LinkHonkVerifier`](https://repo.sourcify.dev/421614/0xDb3B0Bfb96504381dcFA8a32Cb81dee3401bDF2B), [`VeraKeyValidator`](https://repo.sourcify.dev/421614/0xcc96c0C520Fc6E8a068f5e2A74aBa7cAab8d9b6C).
 - The Stylus programs build from `contracts/stylus` with the pinned toolchain below.
@@ -148,7 +153,7 @@ Nothing on-chain connects a user's accounts in different apps. When someone need
 | WebAuthn registration and PRF unlock in the browser | real (`packages/sdk/src/webauthn.ts`) |
 | UltraHonk proof of a P-256 passkey signature, generated in the browser | real, 1.85 s with 8 threads (desktop Chrome, measured) |
 | Stylus account and factory, Solidity verifiers | real, deployed with `scripts/deploy.sh` |
-| ERC-7579 validator | real and deployed; tested with real proofs as a module (36 Foundry tests), not yet installed in a Kernel or Nexus account |
+| ERC-7579 validator | real and deployed; tested with real proofs (36 Foundry tests); the root validator of a [ZeroDev Kernel v3.3 account](https://sepolia.arbiscan.io/address/0x7d53584931a585BAfE193919a4645587889C2A38) on Arbitrum Sepolia, whose first user operation deployed it and paid 1 USDG ([transaction](https://sepolia.arbiscan.io/tx/0x66dbf2ed7552d9e0d563bdf9a8aee30656d1e99cfab4c9e8bade961c0d0cfc2f)); not yet tried in a Nexus account |
 | Disclosures (link circuit, on-chain verifier, verify page) | real |
 | Secure Payment Confirmation | real in Chrome on macOS, Windows and Android; tested in headless Chrome with its SPC test mode |
 | USDG | Paxos Global Dollar on Arbitrum Sepolia `0xFFC95faa3d63Cde504a05B567C600B78C0b41892` (a mintable stand-in is used only on a local devnode) |

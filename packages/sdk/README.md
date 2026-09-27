@@ -91,9 +91,34 @@ for your domain, which opens with developer access after the testnet preview. Th
 | `@verakey/sdk/disclosure` | Disclosures that prove two of a person's app accounts share one passkey |
 | `@verakey/sdk/webauthn` | WebAuthn, PRF and payment-sheet helpers |
 | `@verakey/sdk/validator` | The ERC-7579 validator module's helpers |
+| `@verakey/sdk/kernel` | `toVeraKeyKernelValidator`: a VeraKey passkey as a ZeroDev Kernel account's validator |
 | `@verakey/sdk/nullifier`, `/action`, `/relayer`, `/abi`, … | Lower-level building blocks |
 
 `@verakey/sdk` re-exports every module.
+
+## ZeroDev Kernel accounts
+
+`toVeraKeyKernelValidator` makes VeraKey's ERC-7579 validator a plugin for ZeroDev's SDK: the Kernel account installs
+it with the owner's per-app nullifier, and each user operation carries a proof that the passkey signed its userOpHash.
+
+```ts
+import { createKernelAccount } from "@zerodev/sdk";
+import { KERNEL_V3_3, getEntryPoint } from "@zerodev/sdk/constants";
+import { toVeraKeyKernelValidator } from "@verakey/sdk/kernel";
+
+const sudo = toVeraKeyKernelValidator({
+  validator, // VeraKeyValidator for your relying party
+  chainId,
+  appId,
+  nullifier,
+  prove: async (userOpHash) => ({ proof, clientDataJSON }), // the passkey signs, the browser proves
+});
+const account = await createKernelAccount(publicClient, { entryPoint: getEntryPoint("0.7"), kernelVersion: KERNEL_V3_3, plugins: { sudo } });
+```
+
+On Arbitrum Sepolia, a Kernel v3.3 account built this way deployed and paid 1 USDG in its first user operation
+([transaction](https://arbitrum-sepolia.blockscout.com/tx/0x66dbf2ed7552d9e0d563bdf9a8aee30656d1e99cfab4c9e8bade961c0d0cfc2f)). Set `verificationGasLimit` yourself (1,700,000 covered that first operation): the proof
+costs about 732,000 gas in the validator. The plugin signs user operations; it does not sign ERC-1271 messages yet.
 
 ## Proving
 

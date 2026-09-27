@@ -14,8 +14,10 @@ export default function ValidatorPage() {
         Each account that installs it stores its own <code>appId</code> and <code>nullifier</code>.
       </p>
       <Callout kind="note" title="What is tested">
-        The module is tested with real proofs as a module (36 Foundry tests). It has not yet been installed in a Kernel or
-        Nexus account.
+        The module is tested with real proofs (36 Foundry tests), and it runs in a ZeroDev Kernel v3.3 account on
+        Arbitrum Sepolia: that account was created with <code>VeraKeyValidator</code> as its root validator, and its first
+        user operation, a 1 USDG payment, was authorized by a proof (<A href="https://arbitrum-sepolia.blockscout.com/tx/0x66dbf2ed7552d9e0d563bdf9a8aee30656d1e99cfab4c9e8bade961c0d0cfc2f">transaction</A>). It has not
+        been tried in a Nexus account yet.
       </Callout>
 
       <H2>Install it</H2>
@@ -52,6 +54,40 @@ userOp.verificationGasLimit = VALIDATOR_VERIFICATION_GAS + accountOverhead;
         whose sender is not the calling account.
       </p>
 
+      <H2>ZeroDev Kernel</H2>
+      <p>
+        With ZeroDev's SDK, VeraKey's plugin becomes a Kernel account's sudo validator: <code>createKernelAccount</code>{" "}
+        installs <code>VeraKeyValidator</code> with the owner's nullifier, and every user operation the account signs asks
+        the passkey to sign its userOpHash and the browser to prove it.
+      </p>
+      <Code lang="ts">{`
+import { createKernelAccount } from "@zerodev/sdk";
+import { KERNEL_V3_3, getEntryPoint } from "@zerodev/sdk/constants";
+import { toVeraKeyKernelValidator } from "@verakey/sdk/kernel";
+
+const sudo = toVeraKeyKernelValidator({
+  validator: VERAKEY_VALIDATOR, // see Deployments
+  chainId: 421614,
+  appId,                        // the app's id and the owner's nullifier in it (32-byte hex)
+  nullifier,
+  prove: async (userOpHash) => {
+    const assertion = await getAssertion({ rpId, challenge: hexToBytes(userOpHash), credentialIds: [credentialIdBytes(passkey)] });
+    const { proof } = await prover.prove({ /* as above */ });
+    return { proof, clientDataJSON: bytesToHex(assertion.clientDataJSON) };
+  },
+});
+const account = await createKernelAccount(publicClient, {
+  entryPoint: getEntryPoint("0.7"),
+  kernelVersion: KERNEL_V3_3,
+  plugins: { sudo },
+});
+`}</Code>
+      <p>
+        Send the account's user operations through any ERC-4337 bundler for EntryPoint v0.7. On Arbitrum Sepolia,
+        VeraKey's relayer bundled the first one itself (<code>EntryPoint.handleOps</code>): it deployed the account and
+        paid 1 USDG. The plugin signs user operations only; it refuses ERC-1271 messages for now.
+      </p>
+
       <H2>ERC-1271 signatures</H2>
       <p>
         For <code>isValidSignatureWithSender</code>, the passkey never signs the raw hash. It signs a challenge that binds
@@ -75,6 +111,7 @@ const challenge = validatorErc1271Challenge(account, hash, chainId);
         rows={[
           ["Verifying a valid proof inside the module", "about 732,000"],
           [<code key="1">VALIDATOR_VERIFICATION_GAS</code>, "850,000, to set as the module's share of verificationGasLimit"],
+          ["A Kernel v3.3 account's first user operation on Arbitrum Sepolia (deploys it, pays 1 USDG)", "1,218,222 used, with verificationGasLimit 1,700,000"],
         ]}
       />
       <p>

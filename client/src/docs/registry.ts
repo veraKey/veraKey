@@ -205,8 +205,8 @@ export const PAGES: DocPage[] = [
     group: "Build",
     preview: true,
     description: "Bring VeraKey proofs to modular smart accounts with the VeraKeyValidator module: installation, user operation and ERC-1271 signatures, and gas.",
-    keywords: ["erc-7579", "validator", "module", "kernel", "nexus", "erc-4337", "user operation", "erc-1271"],
-    sections: ["What the module does", "Install it", "Sign a user operation", "ERC-1271 signatures", "Gas", "Limits"],
+    keywords: ["erc-7579", "validator", "module", "kernel", "zerodev", "nexus", "erc-4337", "user operation", "erc-1271"],
+    sections: ["What the module does", "Install it", "Sign a user operation", "ZeroDev Kernel", "ERC-1271 signatures", "Gas", "Limits"],
     load: () => import("./pages/developers/Validator"),
   },
   {
@@ -281,7 +281,7 @@ export const PAGES: DocPage[] = [
     preview: true,
     description: "Every public method and type of the VeraKey SDK, with its signature.",
     keywords: ["api reference", "veraKeyclient", "methods", "types", "signatures"],
-    sections: ["VeraKeyClient", "Types", "Action helpers", "WebAuthn helpers", "Disclosure helpers", "Validator helpers", "Sign-in helpers"],
+    sections: ["VeraKeyClient", "Types", "Action helpers", "WebAuthn helpers", "Disclosure helpers", "Validator helpers", "Kernel plugin", "Sign-in helpers"],
     subsections: ["VeraKeyConfig", "Passkeys and sessions", "Accounts", "Actions", "Payment sheet, guardians and disclosures", "Properties and lower-level classes"],
     headingKeywords: {
       "VeraKeyConfig": ["rpId", "relayerUrl", "relayerFee", "appIds", "loadProver", "paymentInstrument"],
@@ -360,7 +360,7 @@ export const PAGES: DocPage[] = [
     group: "Reference",
     description: "How VeraKey was built, milestone by milestone.",
     keywords: ["changelog", "history", "releases", "milestones", "what's new"],
-    sections: ["2026-09-24", "2026-09-23"],
+    sections: ["2026-09-27", "2026-09-24", "2026-09-23"],
     load: () => import("./pages/reference/Changelog"),
   },
 ];
