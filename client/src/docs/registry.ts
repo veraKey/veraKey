@@ -362,7 +362,7 @@ export const PAGES: DocPage[] = [
     group: "Reference",
     description: "How VeraKey was built, milestone by milestone.",
     keywords: ["changelog", "history", "releases", "milestones", "what's new"],
-    sections: ["2026-09-27", "2026-09-24", "2026-09-23"],
+    sections: ["2026-09-28", "2026-09-27", "2026-09-24", "2026-09-23"],
     load: () => import("./pages/reference/Changelog"),
   },
 ];

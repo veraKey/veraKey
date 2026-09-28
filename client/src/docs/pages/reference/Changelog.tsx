@@ -6,6 +6,22 @@ export default function ChangelogPage() {
     <>
       <p>Newest first. Each entry is one step of the build.</p>
 
+      <H2>2026-09-28</H2>
+      <ul>
+        <li>
+          <strong>SDK 0.2.2, one passkey keeps one identity:</strong> some password managers return a different PRF secret
+          for the same passkey through another route, such as a phone's QR code instead of the manager on the device, and a
+          different secret opens different accounts. VeraKey now remembers a one-way check of the secret each passkey
+          returned in a browser, and refuses an unlock that returns another one. See{" "}
+          <A href="/docs/guides/faq#my-passkey-opens-a-different-wallet">My passkey opens a different wallet</A>.
+        </li>
+        <li>
+          <strong>The docs were checked against the code and the live deployment.</strong> The payment sample in{" "}
+          <A href="/docs/build/sign-in">Sign in with VeraKey</A> treated any <code>verifyPayment</code> result as paid; it
+          now accepts a payment only when <code>valid</code> is true.
+        </li>
+      </ul>
+
       <H2>2026-09-27</H2>
       <ul>
         <li>
