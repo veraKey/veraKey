@@ -19,6 +19,15 @@ export default function FaqGuide() {
         passkey itself is gone, see <A href="/docs/guides/recovery">Recovery and guardians</A>.
       </p>
 
+      <H2>My passkey opens a different wallet</H2>
+      <p>
+        Your accounts are derived from your passkey and a secret it returns for VeraKey (PRF). Some password managers
+        return a different secret for the same passkey through another route, for example through a phone's QR code
+        instead of the password manager on this device, and a different secret opens different accounts. VeraKey
+        remembers the secret each passkey returned in this browser and refuses an unlock that returns another one, so
+        unlock the way you did before. In a browser that has never seen the passkey, use the route you used first.
+      </p>
+
       <H2>The faucet is out of USDG</H2>
       <p>
         The demo faucet pays from a shared treasury that is refilled by hand. Try again later, or claim test USDG at{" "}

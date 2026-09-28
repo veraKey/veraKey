@@ -3,9 +3,9 @@ import { base64UrlDecode, base64UrlEncode } from "./bytes";
 import type { PasskeyPublicKey } from "./webauthn";
 
 /**
- * What VeraKey remembers about a passkey on this device: its id and public key. Never the PRF
- * output, never an assertion. Losing this cache is harmless: the public key can be recovered from
- * a fresh assertion.
+ * What VeraKey remembers about a passkey on this device: its id, its public key and a one-way check
+ * of its PRF secret. Never the PRF output itself, never an assertion. Losing this cache is harmless:
+ * the public key can be recovered from a fresh assertion.
  */
 export interface StoredPasskey {
   credentialId: string; // base64url
@@ -14,6 +14,11 @@ export interface StoredPasskey {
   createdAt: number;
   /** Enrolled for Secure Payment Confirmation in this browser profile. */
   payment?: boolean;
+  /**
+   * `prfCheck` of the PRF secret this passkey returned when this browser first saw it. An unlock that
+   * returns another secret is refused: it would derive other accounts for the same passkey.
+   */
+  prfCheck?: string;
 }
 
 export interface PasskeyStore {

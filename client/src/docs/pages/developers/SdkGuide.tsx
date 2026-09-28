@@ -76,7 +76,7 @@ export default function SdkGuidePage() {
           at creation; call <code>unlock()</code> then. <code>payment: true</code> enrolls it for the{" "}
           <A href="/docs/build/payment-sheet">payment sheet</A>.
         </li>
-        <li><code>unlock(passkey?)</code> runs one assertion with PRF and makes it the current session. On a new device it recovers the public key from the assertion, and asks for a second assertion when no account of <code>appIds</code> tells the two candidate keys apart.</li>
+        <li><code>unlock(passkey?)</code> runs one assertion with PRF and makes it the current session. On a new device it recovers the public key from the assertion, and asks for a second assertion when no account of <code>appIds</code> tells the two candidate keys apart. A passkey this browser knows must return the same PRF secret as before, or the unlock is refused.</li>
         <li><code>authenticate(passkey?)</code> does the same without switching the current session, e.g. for a backup passkey.</li>
         <li><code>lock()</code> forgets the session and its PRF secret. <code>session</code> returns the current one, or <code>null</code>.</li>
       </ul>

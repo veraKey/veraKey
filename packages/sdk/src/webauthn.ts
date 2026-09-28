@@ -1,5 +1,5 @@
 import { p256 } from "@noble/curves/p256";
-import { PRF_SALT_LABEL } from "./constants";
+import { PRF_CHECK_LABEL, PRF_SALT_LABEL } from "./constants";
 import { asBytes, concatBytes, sha256 } from "./bytes";
 
 export interface PasskeyPublicKey {
@@ -89,6 +89,16 @@ export function recoverPublicKeys(digest: Uint8Array, signature: Uint8Array): Pa
 /** The fixed PRF input VeraKey evaluates; the authenticator turns it into a per-credential secret. */
 export async function prfSalt(): Promise<Uint8Array> {
   return sha256(new TextEncoder().encode(PRF_SALT_LABEL));
+}
+
+/**
+ * A one-way check of a PRF secret (16 bytes of SHA-256, hex), kept with a remembered passkey. The same
+ * passkey can answer with another secret through another route (a phone's QR code instead of the password
+ * manager on this device), and another secret derives other accounts; the check catches that.
+ */
+export async function prfCheck(prfSecret: Uint8Array): Promise<string> {
+  const digest = await sha256(concatBytes(new TextEncoder().encode(PRF_CHECK_LABEL), prfSecret));
+  return Array.from(digest.subarray(0, 16), byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
 export function randomChallenge(): Uint8Array {

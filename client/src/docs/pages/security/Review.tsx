@@ -146,6 +146,12 @@ export default function ReviewPage() {
           <A href="/docs/guides/recovery">Recovery and guardians</A>.
         </li>
         <li>
+          <strong>A passkey can return a different PRF secret through another route.</strong> Some password managers
+          answer the same passkey with another secret through a phone's QR code than on the device itself, and another
+          secret opens other accounts. The app remembers the secret each passkey returned in a browser and refuses a
+          different one there, but a browser that has never seen the passkey cannot tell. Use the same route every time.
+        </li>
+        <li>
           <strong>Secure Payment Confirmation</strong> works only in Chromium (macOS, Windows, Android), and its enrollment
           belongs to one browser profile. Requiring the sheet therefore limits payments to the browsers where the passkey is
           enrolled for it. Elsewhere the app uses the ordinary passkey prompt.

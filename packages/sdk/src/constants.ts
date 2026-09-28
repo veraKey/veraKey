@@ -16,6 +16,9 @@ export const ACTION_TYPEHASH =
 /** The WebAuthn PRF input whose output salts every nullifier (see docs/THREAT_MODEL.md). */
 export const PRF_SALT_LABEL = "VeraKey PRF nullifier salt v1";
 
+/** Labels the one-way check of a PRF secret that a remembered passkey is held to (see `prfCheck`). */
+export const PRF_CHECK_LABEL = "VeraKey PRF check v1";
+
 /** Maximum lifetime of an authorization, enforced by the account (seconds). */
 export const MAX_DEADLINE_WINDOW = 600;
 

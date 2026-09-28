@@ -127,8 +127,8 @@ export const PAGES: DocPage[] = [
     title: "FAQ and troubleshooting",
     group: "Use VeraKey",
     description: "Answers to common questions and fixes for the problems people run into most often.",
-    keywords: ["faq", "help", "troubleshooting", "support", "problems", "questions"],
-    sections: ["My passkey provider is not supported", "I lost my phone", "The faucet is out of USDG", "Authenticated, not authorized", "The payment sheet does not appear", "Is this real money?", "Where can I see my transactions?"],
+    keywords: ["faq", "help", "troubleshooting", "support", "problems", "questions", "different wallet", "prf secret"],
+    sections: ["My passkey provider is not supported", "I lost my phone", "My passkey opens a different wallet", "The faucet is out of USDG", "Authenticated, not authorized", "The payment sheet does not appear", "Is this real money?", "Where can I see my transactions?"],
     load: () => import("./pages/guides/Faq"),
   },
   {

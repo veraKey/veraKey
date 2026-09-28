@@ -42,7 +42,7 @@ const vera = new VeraKeyClient(config); // config: VeraKeyConfig
           [n("relayerFee"), c("bigint"), "The relayer fee in USDG base units; it is signed into every action."],
           [n("appIds"), c("bigint[]"), "The app ids this client manages; used to recognise a passkey on a new device."],
           [n("loadProver"), c("() => Promise<VeraKeyProver>"), "Loads the prover lazily: bb.js and the CRS are several megabytes."],
-          [n("store"), c("PasskeyStore?"), "Where passkey ids and public keys are kept (default LocalPasskeyStore)."],
+          [n("store"), c("PasskeyStore?"), "Where passkey ids, public keys and PRF checks are kept (default LocalPasskeyStore)."],
           [n("paymentInstrument"), c("{ displayName: string; icon: string }?"), "Shown in the browser's payment sheet."],
         ]}
       />
@@ -53,7 +53,7 @@ const vera = new VeraKeyClient(config); // config: VeraKeyConfig
         rows={methods([
           ["VeraKeyClient.browserSupportsPrf", "static (): Promise<boolean | undefined>", "Whether the browser reports PRF support; undefined when it cannot tell."],
           ["register", "(label: string, options?: { userName?: string; activate?: boolean; payment?: boolean }): Promise<{ passkey: StoredPasskey; session: Session | null }>", "Creates a passkey, optionally enrolled for the payment sheet. Returns a session when PRF was evaluated at creation; activate: false keeps the current session (for a backup passkey)."],
-          ["unlock", "(passkey?: StoredPasskey): Promise<Session>", "One user-verified assertion that evaluates PRF. On a new device, the public key is recovered from the assertion, with a second assertion when no account of appIds tells the two candidate keys apart."],
+          ["unlock", "(passkey?: StoredPasskey): Promise<Session>", "One user-verified assertion that evaluates PRF. On a new device, the public key is recovered from the assertion, with a second assertion when no account of appIds tells the two candidate keys apart. A passkey this browser knows must return the same PRF secret as before, or unlock rejects at the device stage (PRF_SECRET_CHANGED)."],
           ["authenticate", "(passkey?: StoredPasskey): Promise<Session>", "The unlock ceremony without switching the active session, e.g. to learn a backup passkey's nullifier."],
           ["lock", "(): void", "Forgets the session and its PRF secret."],
           ["session", "get session(): Session | null", "The active session."],
@@ -175,13 +175,14 @@ class VeraKeyError extends Error {
       <Code lang="ts" title="Sessions and stored passkeys">{`
 interface Session { passkey: StoredPasskey; publicKey: PasskeyPublicKey; prfSecret: Uint8Array }
 
-// What VeraKey remembers on a device: never the PRF output, never an assertion.
+// What VeraKey remembers on a device: never the PRF output itself, never an assertion.
 interface StoredPasskey {
   credentialId: string;           // base64url
   publicKey: { x: Hex; y: Hex };
   label: string;
   createdAt: number;
   payment?: boolean;              // enrolled for the payment sheet in this browser profile
+  prfCheck?: string;              // a one-way check of the PRF secret it returned here; another is refused
 }
 `}</Code>
       <p>

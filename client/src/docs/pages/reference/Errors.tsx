@@ -119,7 +119,7 @@ export default function ErrorsPage() {
         rows={[
           [c("funds"), "The account cannot pay the relayer fee. Checked before the passkey prompt.", "Fund the account."],
           [c("authentication"), "The passkey prompt was cancelled or timed out, or the payment sheet was closed.", "Try again. Nothing was sent."],
-          [c("device"), "The passkey provider does not support PRF, the passkey is not ES256, or the authenticator returned authenticator data that is not 37 bytes.", "Use a passkey from iCloud Keychain or Google Password Manager."],
+          [c("device"), "The passkey provider does not support PRF, the passkey is not ES256, the authenticator returned authenticator data that is not 37 bytes, or a passkey this browser knows returned a different PRF secret than before.", "Use a passkey from iCloud Keychain or Google Password Manager. For a different secret, unlock the way you did before."],
           [c("proof"), "Proving failed, for example because the assertion does not satisfy the circuit.", "Try again; check that the prover and its CRS loaded."],
           [c("policy"), <>The account refused a valid proof; <code>revert</code> names the error. The SDK also refuses early with <code>FeeTooHigh</code> or <code>PaymentSheetRequired</code> when it can tell in advance.</>, <>See <A href="#account-errors">Account errors</A>.</>],
           [c("relay"), "The relayer refused or could not be reached, simulation reverted with an error outside POLICY_REVERTS (such as TokenTransferFailed), or the transaction reverted on-chain.", <>See <A href="#relayer-errors">Relayer errors</A>.</>],

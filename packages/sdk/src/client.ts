@@ -41,6 +41,7 @@ import {
   createPasskey,
   getAssertion,
   getSpcAssertion,
+  prfCheck,
   randomChallenge,
   recoverPublicKeys,
   spcAvailability,
@@ -102,6 +103,16 @@ export class VeraKeyError extends Error {
     this.name = "VeraKeyError";
   }
 }
+
+/**
+ * Why `unlock` refuses a passkey this browser knows: it returned another PRF secret than before, which
+ * would open other accounts. Some password managers answer the same passkey with another secret through
+ * another route, such as a phone's QR code instead of the manager on this device.
+ */
+export const PRF_SECRET_CHANGED =
+  "This passkey returned a different secret than it did before in this browser, so it would open different " +
+  "accounts. Unlock it the way you did before: for example through the password manager on this device " +
+  "instead of a phone's QR code, or the other way round.";
 
 /** Contract errors that mean "valid proof, but the account's policy says no". */
 export const POLICY_REVERTS = new Set([
@@ -270,7 +281,10 @@ export class VeraKeyClient {
     } catch (error) {
       throw describeWebAuthnError(error);
     }
-    const passkey = toStoredPasskey(created.credentialId, created.publicKey, label, created.payment);
+    const passkey: StoredPasskey = {
+      ...toStoredPasskey(created.credentialId, created.publicKey, label, created.payment),
+      ...(created.prfSecret ? { prfCheck: await prfCheck(created.prfSecret) } : {}),
+    };
     this.store.save(passkey);
     if (!created.prfSecret) return { passkey, session: null };
     const session = { passkey, publicKey: created.publicKey, prfSecret: created.prfSecret };
@@ -279,7 +293,8 @@ export class VeraKeyClient {
 
   /**
    * Unlocks a passkey with one user-verified assertion that evaluates PRF. On a device that has not
-   * seen this passkey, the public key is recovered from the assertion itself.
+   * seen this passkey, the public key is recovered from the assertion itself. A passkey this browser
+   * knows must return the same PRF secret as before, or the unlock is refused (`PRF_SECRET_CHANGED`).
    */
   async unlock(passkey?: StoredPasskey): Promise<Session> {
     return this.startSession(await this.authenticate(passkey));
@@ -302,7 +317,9 @@ export class VeraKeyClient {
       throw describeWebAuthnError(error);
     }
     const prfSecret = assertion.prfSecret!;
+    const check = await prfCheck(prfSecret);
     let stored = this.store.get(assertion.credentialId);
+    if (stored?.prfCheck !== undefined && stored.prfCheck !== check) throw new VeraKeyError("device", PRF_SECRET_CHANGED);
     if (!stored) {
       const publicKey = await this.recoverPublicKey(
         await webauthnDigest(assertion.authenticatorData, assertion.clientDataJSON),
@@ -310,7 +327,10 @@ export class VeraKeyClient {
         prfSecret,
         assertion.credentialId
       );
-      stored = toStoredPasskey(assertion.credentialId, publicKey, "Passkey on this device");
+      stored = { ...toStoredPasskey(assertion.credentialId, publicKey, "Passkey on this device"), prfCheck: check };
+      this.store.save(stored);
+    } else if (stored.prfCheck === undefined) {
+      stored = { ...stored, prfCheck: check };
       this.store.save(stored);
     }
     return { passkey: stored, publicKey: publicKeyOf(stored), prfSecret };
