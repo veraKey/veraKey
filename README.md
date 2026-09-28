@@ -93,6 +93,63 @@ Sepolia policy for new accounts:
 - a relayer fee of at most 0.25 USDG (0.02 is charged);
 - a 2-minute change delay and a 5-minute recovery delay (demo values).
 
+## Architecture
+
+The numbered path is a payment: the passkey signs, the browser proves, the relayer submits, and the account on
+Arbitrum checks the proof and its policy before it pays. A site that uses Sign in with VeraKey opens VeraKey's popup
+and checks every sign-in and payment on its own server. An auditor checks a disclosure against its own verifier.
+
+```mermaid
+flowchart TB
+  subgraph others["Another site"]
+    page["A site's page<br/>&lt;SignInWithVeraKey /&gt;"]
+    server["That site's server<br/>createVeraKeyServer"]
+  end
+
+  auditor["An auditor<br/>/app/verify"]
+
+  subgraph device["Your device"]
+    app["VeraKey app and<br/>Sign in popup<br/>on verakey.xyz"]
+    passkey["Passkey<br/>Face ID, Touch ID or PIN<br/>with its PRF secret"]
+    prover["Noir circuit and<br/>UltraHonk prover<br/>bb.js, in the browser"]
+    stays["Never leaves the device:<br/>the public key, the signature<br/>and the PRF secret"]
+  end
+
+  subgraph relayer["VeraKey relayer"]
+    relay["Simulates and submits<br/>for a capped USDG fee;<br/>deploys accounts gasless"]
+  end
+
+  subgraph arbitrum["Arbitrum Sepolia"]
+    factory["VeraKeyFactory<br/>Stylus"]
+    account["VeraKeyAccount<br/>one per app<br/>Stylus, EIP-1167 clone"]
+    verifier["HonkVerifier<br/>Solidity, UltraHonk"]
+    usdg["USDG<br/>Paxos"]
+    link["LinkHonkVerifier<br/>disclosures"]
+    kernel["Kernel or Nexus<br/>account, ERC-4337"]
+    validator["VeraKeyValidator<br/>ERC-7579 module"]
+  end
+
+  page <-- "sign in, pay:<br/>popup + postMessage" --> app
+  page --> server
+  app -- "1 · sign this action" --> passkey
+  passkey -- "2 · signature,<br/>PRF secret" --> prover
+  passkey ~~~ stays
+  prover -- "3 · proof, nullifier,<br/>clientDataJSON" --> relay
+  relay -- "4 · pay()" --> account
+  relay -- "createAccount()" --> factory
+  factory -. "clone" .-> account
+  account -- "5 · verify the proof" --> verifier
+  account -- "6 · transfer" --> usdg
+  kernel -- "user ops" --> validator
+  validator -- "verify" --> verifier
+  server -- "eth_call verify,<br/>Paid events" --> arbitrum
+  prover -. "disclosure package" .-> auditor
+  auditor -- "eth_call verify" --> link
+
+  classDef note stroke-dasharray: 4 3
+  class stays note
+```
+
 ## How it works
 
 ```text
