@@ -272,7 +272,7 @@ Nothing on-chain connects a user's accounts in different apps. When someone need
 - 18 circuit tests (`nargo test`: 11 for the authorization circuit, 7 for the link circuit);
 - 44 Rust unit tests and 9 property tests (`contracts/stylus/core`, 2,000 cases each);
 - 36 Foundry tests for the ERC-7579 validator, with real proofs;
-- 117 SDK unit tests (`pnpm test`), the integration kit's routes, cookies, session and React button among them;
+- 123 SDK unit tests (`pnpm test`), the integration kit's routes, cookies, session and React button and the passkey identity guard among them;
 - 75 end-to-end tests (`packages/sdk/test/e2e`). They deploy the real contracts to a nitro devnode and use real proofs:
   - 44 cover the account: front-running, replay, cross-account and cross-chain proofs, tampered proofs, caps, fees, the new-recipient cap, freezing, timelocks, the payment sheet, backup owners, the guardian and recovery;
   - 7 replay the internal audit's attacks;
