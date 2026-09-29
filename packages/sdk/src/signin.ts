@@ -249,6 +249,9 @@ async function checkSignIn(
   check("Proof commits to this sign-in",
     result.publicInputs.every((value, i) => isHex(value) && BigInt(value) === BigInt(expected[i])),
     "the proof's public inputs are not this sign-in's");
+  // Everything above needs no chain. Stop here when it failed: the proof's eth_call alone costs about 700k gas, and a
+  // crafted sign-in must not make the site's server pay for it.
+  if (!checks.every(c => c.ok)) return refuse();
 
   if (!options.skipOnChainProof) {
     const onChain = await options.publicClient

@@ -135,6 +135,7 @@ export const POLICY_REVERTS = new Set([
   "PaymentSheetRequired",
   "TooManyPendingChanges",
   "CannotVetoGuardianChange",
+  "ChangeAlreadyPending",
 ]);
 
 export interface AccountState {

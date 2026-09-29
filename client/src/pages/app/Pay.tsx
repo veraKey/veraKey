@@ -6,6 +6,7 @@ import { COMPACT_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { appByKey } from "@/lib/apps";
 import { formatUsdg, parseUsdg, shortHex } from "@/lib/format";
 import { activity } from "@/lib/history";
+import { leftToday } from "@/lib/limits";
 import { useVeraKey } from "@/state/VeraKeyProvider";
 import type { ReceiptData } from "./components";
 import { PROOF_BYTES, PayDesktop, PayMobile, type PayViewProps } from "./PayView";
@@ -35,7 +36,7 @@ export function Pay() {
   const to = (recipient || merchant || "") as Address;
   const units = parseUsdg(amount);
   const fee = config ? BigInt(config.relayer.fee) : 0n;
-  const remainingToday = account && account.deployed ? account.dailyCap - account.spentToday : null;
+  const remainingToday = account && account.deployed ? leftToday(account.dailyCap, account.spentToday) : null;
   const perTxCap = account?.deployed ? account.perTxCap : config ? BigInt(config.policy.perTxCap) : 0n;
 
   const problem = useMemo(() => {

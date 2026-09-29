@@ -180,6 +180,28 @@ describe("createVeraKeyServer: sign-in", () => {
     expect(response.headers.getSetCookie()).toEqual(["__Host-verakey-session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure"]);
   });
 
+  it("signing out ends the session for every copy of its cookie", async () => {
+    const { server, session } = await signIn();
+    expect((await server.handle(request("POST", "sign-out", { cookie: session }))).status).toBe(200);
+    // A copy of the cookie (another tab, a leaked header, a shared computer) no longer signs anyone in.
+    expect(await server.getPlayer({ headers: { cookie: session } })).toBeNull();
+    expect(await (await server.handle(request("GET", "session", { cookie: session }))).json()).toMatchObject({ player: null });
+  });
+
+  it("ends a session once its passkey no longer owns the account", async () => {
+    const owns = { now: true };
+    const base = chain({ deployed: true });
+    const client = {
+      ...base,
+      readContract: async (args: { functionName: string }) => (args.functionName === "isOwner" ? owns.now : base.readContract(args as never)),
+    } as unknown as PublicClient;
+    const { server, session } = await signIn(kit({ publicClient: client }));
+    expect(await server.getPlayer({ headers: { cookie: session } })).toEqual(PLAYER);
+    owns.now = false; // e.g. a recovery replaced the passkey that signed in
+    vi.setSystemTime((NOW + 601) * 1000);
+    expect(await server.getPlayer({ headers: { cookie: session } })).toBeNull();
+  });
+
   it("uses plain cookie names, without Secure, on http localhost", async () => {
     const response = await kit({ origin: "http://localhost:5192" }).handle(
       new Request("http://localhost:5192/api/verakey/nonce", { method: "POST", headers: { origin: "http://localhost:5192" } })
@@ -234,6 +256,26 @@ describe("createVeraKeyServer: payments", () => {
     expect(paid).toEqual([{ player: PLAYER, hash: HASH, to: MERCHANT, amount: 1_000_000n, fee: 20_000n }]);
     expect((await pay(server, session, { amount: "1000000", hash: HASH })).status).toBe(409);
     expect(paid).toHaveLength(1);
+  });
+
+  it("checks one payment at a time per player, so a player cannot pile up slow checks", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => (release = resolve));
+    const log = paidLog(ACCOUNT, MERCHANT, 1_000_000n, 20_000n);
+    const slow = {
+      ...paymentChain(),
+      getTransactionReceipt: async () => {
+        await gate;
+        return { status: "success", logs: [log] };
+      },
+    } as unknown as PublicClient;
+    const { server, session } = await signIn(shop({ publicClient: slow }));
+    const first = pay(server, session, { amount: "1000000", hash: HASH });
+    const second = await Promise.race([pay(server, session, { amount: "1000000", hash: HASH }), new Promise(r => setTimeout(() => r("still waiting"), 200))]);
+    expect(second).not.toBe("still waiting");
+    expect((second as Response).status).toBe(429);
+    release();
+    expect((await first).status).toBe(200);
   });
 
   it("finds a payment by the nonce of a payment the popup was sending", async () => {

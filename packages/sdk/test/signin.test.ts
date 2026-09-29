@@ -149,6 +149,18 @@ describe("verifySignIn", () => {
   it("refuses a nonce this site did not issue", async () => {
     expect(failed(await verify(await signedIn(), { nonce: `0x${"22".repeat(32)}` }))).toEqual(["Carries the nonce you issued"]);
   });
+  it("does not touch the chain once a check that needs no chain has failed", async () => {
+    // The on-chain proof check is an eth_call of ~700k gas: a crafted sign-in must not make the site's server pay for it.
+    let calls = 0;
+    const counting = {
+      readContract: async () => (calls++, true),
+      getCode: async () => (calls++, undefined),
+    } as unknown as PublicClient;
+    const verdict = await verify(await signedIn(), { nonce: `0x${"22".repeat(32)}`, client: counting });
+    expect(verdict.valid).toBe(false);
+    expect(failed(verdict)).toEqual(["Carries the nonce you issued"]);
+    expect(calls).toBe(0);
+  });
   it("tolerates a device clock up to a minute off, and names the clock beyond that", async () => {
     expect((await verify(await signedIn({ issuedAt: NOW - 330, expiresAt: NOW - 30 }))).valid).toBe(true);
     const late = await verify(await signedIn({ issuedAt: NOW - 361, expiresAt: NOW - 61 }));

@@ -2,6 +2,7 @@ import { createPublicClient, defineChain, http, isAddress, isHex, type Address, 
 import { base64UrlDecode, base64UrlEncode, bytesToHex } from "./bytes";
 import { isAllowedRequesterOrigin } from "./connect";
 import type { VeraKeyDeployment } from "./deployments";
+import { veraKeyAccountAbi } from "./abi";
 import { hmacKey, mac, macValid, parseCookies, serializeCookie } from "./kit/cookies";
 import { findPayment, verifyPayment, verifySignIn, type SignInCheck, type SignInResult, type VeraKeyPlayer } from "./signin";
 
@@ -26,6 +27,11 @@ export interface VeraKeyStore {
   /** Without `ttlSeconds`, the claim is kept for good. */
   claim(key: string, ttlSeconds?: number): Promise<boolean>;
   release(key: string): Promise<void>;
+  /**
+   * Whether `key` is claimed now. With it, signing out ends the session for every copy of its cookie; a store without
+   * it can only clear the cookie in the browser that signs out.
+   */
+  has?(key: string): Promise<boolean>;
 }
 
 export interface VeraKeyServerOptions {
@@ -43,6 +49,12 @@ export interface VeraKeyServerOptions {
   publicClient?: PublicClient;
   /** How long a session lasts, in seconds; default 7 days. */
   sessionTtlSeconds?: number;
+  /**
+   * How often, in seconds, a session checks on-chain that its passkey still owns the account (default 600). A passkey
+   * a recovery removed then stops being signed in within this time. 0 checks on every request; Infinity never. A
+   * failed RPC call keeps the session and asks again on the next request.
+   */
+  ownerCheckSeconds?: number;
   /** Where the kit remembers used nonces and accepted payments; default in memory, for one process. */
   store?: VeraKeyStore;
   /** Runs after a sign-in verifies, before the session starts. Throw to refuse: the message reaches the page. */
@@ -59,10 +71,18 @@ export interface VeraKeyServer {
   getPlayer(request: Request | { headers: Record<string, string | string[] | undefined> }): Promise<VeraKeyPlayer | null>;
 }
 
+/** A signed-in player's session: its random id is what signing out revokes. */
+interface Session {
+  player: VeraKeyPlayer;
+  sid: string;
+  exp: number;
+}
+
 const NONCE_TTL_SECONDS = 300;
 /** A little longer than a nonce lives, so a replay within its lifetime always finds the claim. */
 const NONCE_CLAIM_SECONDS = 360;
 const DEFAULT_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
+const DEFAULT_OWNER_CHECK_SECONDS = 600;
 const MAX_BODY_BYTES = 64 * 1024;
 /** How often, and how far apart, the payment route asks again about a transaction its node does not know yet. */
 const RECEIPT_RETRIES = 5;
@@ -127,6 +147,10 @@ export function memoryStore(): VeraKeyStore {
     async release(key) {
       until.delete(key);
     },
+    async has(key) {
+      const expiry = until.get(key);
+      return expiry !== undefined && expiry > Date.now();
+    },
   };
 }
 
@@ -152,6 +176,10 @@ function checkOptions(options: VeraKeyServerOptions): void {
   if (!deploymentOk) throw new TypeError("deployment is malformed: use ARBITRUM_SEPOLIA from @verakey/sdk/deployments, or the same fields");
   const ttl = options.sessionTtlSeconds;
   if (ttl !== undefined && (!Number.isSafeInteger(ttl) || ttl <= 0)) throw new TypeError("sessionTtlSeconds must be a positive whole number");
+  const every = options.ownerCheckSeconds;
+  if (every !== undefined && (typeof every !== "number" || Number.isNaN(every) || every < 0)) {
+    throw new TypeError("ownerCheckSeconds must be 0 or more (Infinity never checks)");
+  }
 }
 
 export function createVeraKeyServer(options: VeraKeyServerOptions): VeraKeyServer {
@@ -190,13 +218,20 @@ export function createVeraKeyServer(options: VeraKeyServerOptions): VeraKeyServe
     return (await macValid(await key, `verakey-nonce|${origin}|${nonce}|${expiresAt}`, tag)) ? nonce : null;
   }
 
-  async function readSession(header: string | null): Promise<VeraKeyPlayer | null> {
+  const ownerCheck = options.ownerCheckSeconds ?? DEFAULT_OWNER_CHECK_SECONDS;
+  /** When each session (by id) last saw its passkey own the account on-chain, and whether it still did. */
+  const ownerSeen = new Map<string, { at: number; owner: boolean }>();
+  /** Players with a payment check running: one at a time each, so nobody can pile up slow checks. */
+  const paying = new Set<string>();
+
+  /** A signed, unexpired session cookie, whether or not it was signed out or its passkey still owns the account. */
+  async function decodeSession(header: string | null): Promise<Session | null> {
     const value = parseCookies(header).get(SESSION_COOKIE) ?? "";
     const dot = value.indexOf(".");
     if (dot <= 0) return null;
     const payload = value.slice(0, dot);
     if (!(await macValid(await key, `verakey-session|${origin}|${payload}`, value.slice(dot + 1)))) return null;
-    let data: { v?: unknown; id?: unknown; account?: unknown; exp?: unknown };
+    let data: { v?: unknown; id?: unknown; account?: unknown; sid?: unknown; exp?: unknown };
     try {
       data = JSON.parse(new TextDecoder().decode(base64UrlDecode(payload)));
     } catch {
@@ -204,12 +239,47 @@ export function createVeraKeyServer(options: VeraKeyServerOptions): VeraKeyServe
     }
     if (data.v !== 1 || typeof data.id !== "string" || !isHex(data.id) || data.id.length !== 66) return null;
     if (typeof data.account !== "string" || !isAddress(data.account, { strict: false })) return null;
+    if (typeof data.sid !== "string" || !/^[0-9a-f]{32}$/.test(data.sid)) return null;
     if (typeof data.exp !== "number" || data.exp <= nowSeconds()) return null;
-    return { id: data.id, account: data.account };
+    return { player: { id: data.id as Hex, account: data.account as Address }, sid: data.sid, exp: data.exp };
+  }
+
+  /** The request's session, unless it was signed out or its passkey no longer owns the account. */
+  async function readSession(header: string | null): Promise<Session | null> {
+    const session = await decodeSession(header);
+    if (!session) return null;
+    if (store.has && (await store.has(`signout:${session.sid}`))) return null;
+    return (await stillOwner(session)) ? session : null;
+  }
+
+  /**
+   * Whether the session's passkey still owns the account, asked on-chain at most every `ownerCheck` seconds. A failed
+   * RPC call keeps the session and asks again next time.
+   */
+  async function stillOwner(session: Session): Promise<boolean> {
+    if (!Number.isFinite(ownerCheck)) return true;
+    const now = nowSeconds();
+    const seen = ownerSeen.get(session.sid);
+    if (seen && (!seen.owner || now - seen.at < ownerCheck)) return seen.owner;
+    let owner: boolean;
+    try {
+      const code = await publicClient.getCode({ address: session.player.account });
+      // An account not deployed yet has had no owner changes: the passkey that signed in still owns it.
+      owner = !code || code === "0x" ||
+        (await publicClient.readContract({ address: session.player.account, abi: veraKeyAccountAbi, functionName: "isOwner", args: [session.player.id] })) === true;
+    } catch {
+      return true;
+    }
+    ownerSeen.set(session.sid, { at: now, owner });
+    if (ownerSeen.size > 10_000) for (const [sid, entry] of ownerSeen) if (now - entry.at > sessionTtl) ownerSeen.delete(sid);
+    return owner;
   }
 
   async function sessionCookie(player: VeraKeyPlayer): Promise<string> {
-    const body = JSON.stringify({ v: 1, id: player.id, account: player.account, exp: nowSeconds() + sessionTtl });
+    const sid = bytesToHex(crypto.getRandomValues(new Uint8Array(16))).slice(2);
+    // verifySignIn just checked on-chain that this passkey owns the account.
+    ownerSeen.set(sid, { at: nowSeconds(), owner: true });
+    const body = JSON.stringify({ v: 1, id: player.id, account: player.account, sid, exp: nowSeconds() + sessionTtl });
     const payload = base64UrlEncode(new TextEncoder().encode(body));
     return cookie(SESSION_COOKIE, `${payload}.${await mac(await key, `verakey-session|${origin}|${payload}`)}`, sessionTtl, "Lax");
   }
@@ -233,7 +303,7 @@ export function createVeraKeyServer(options: VeraKeyServerOptions): VeraKeyServe
 
   const routes: Record<string, (request: Request) => Promise<Response>> = {
     "GET session": async request =>
-      json(200, { verakeyUrl: deployment.origin, merchant: merchant ?? null, player: await readSession(request.headers.get("cookie")) }),
+      json(200, { verakeyUrl: deployment.origin, merchant: merchant ?? null, player: (await readSession(request.headers.get("cookie")))?.player ?? null }),
 
     "POST nonce": async request => {
       requireOrigin(request);
@@ -267,47 +337,62 @@ export function createVeraKeyServer(options: VeraKeyServerOptions): VeraKeyServe
 
     "POST sign-out": async request => {
       requireOrigin(request);
+      // Ends the session everywhere: every copy of its cookie (another tab, a leaked header) stops working, not only
+      // the one this browser clears.
+      const session = await decodeSession(request.headers.get("cookie"));
+      if (session) await store.claim(`signout:${session.sid}`, Math.max(1, session.exp - nowSeconds()));
       return json(200, {}, [cookie(SESSION_COOKIE, "", 0, "Lax")]);
     },
 
     "POST payment": async request => {
       requireOrigin(request);
-      const player = await readSession(request.headers.get("cookie"));
-      if (!player) throw new HttpError(401, "Sign in first.");
+      const session = await readSession(request.headers.get("cookie"));
+      if (!session) throw new HttpError(401, "Sign in first.");
       if (!merchant) throw new HttpError(404, "This site takes no payments.");
-      const { amount, hash, nonce } = ((await readBody(request)) ?? {}) as { amount?: unknown; hash?: unknown; nonce?: unknown };
-      if (typeof amount !== "string" || !/^[1-9][0-9]{0,38}$/.test(amount)) {
-        throw new HttpError(400, "amount must be a whole number of USDG base units, as a string.");
-      }
-      let found: Hex | null;
-      if (typeof hash === "string" && isHex(hash) && hash.length === 66) found = hash;
-      else if (typeof nonce === "string" && /^[0-9]{1,20}$/.test(nonce)) {
-        found = await findPayment({ publicClient, account: player.account, nonce: BigInt(nonce) });
-      } else throw new HttpError(400, "Send the payment's hash, or the nonce of a payment the popup was sending.");
-      if (!found) throw new HttpError(400, "No payment was found.");
-      const verify = () => verifyPayment(found!, { publicClient, account: player.account, to: merchant, amount: BigInt(amount) });
-      let verdict = await verify();
-      // A node behind the one the relayer sent to may not know the transaction yet: ask again for a few seconds.
-      const unknown = () => verdict.checks.length === 1 && verdict.checks[0].detail === "not found";
-      for (let tries = 0; tries < RECEIPT_RETRIES && unknown(); tries++) {
-        await new Promise(resolve => setTimeout(resolve, RECEIPT_RETRY_MS));
-        verdict = await verify();
-      }
-      if (!verdict.valid) throw new HttpError(400, "The payment did not verify.", verdict.checks);
-      const claim = `payment:${found.toLowerCase()}`;
-      if (!(await store.claim(claim))) throw new HttpError(409, "This payment was already accepted.");
-      const payment: VerifiedPayment = { player, hash: found, to: merchant, amount: BigInt(amount), fee: verdict.fee ?? 0n };
-      let result: unknown;
+      const { player } = session;
+      if (paying.has(player.id)) throw new HttpError(429, "A payment for this player is being checked. Try again in a moment.");
+      paying.add(player.id);
       try {
-        result = await options.onPayment?.(payment, request);
-      } catch (error) {
-        // The payment stays the player's: let them try again once the site is back.
-        await store.release(claim);
-        throw new HttpError(400, messageOf(error));
+        return await acceptPayment(request, player, merchant);
+      } finally {
+        paying.delete(player.id);
       }
-      return json(200, { hash: found, amount, fee: payment.fee.toString(), result: result ?? null });
     },
   };
+
+  async function acceptPayment(request: Request, player: VeraKeyPlayer, merchant: Address): Promise<Response> {
+    const { amount, hash, nonce } = ((await readBody(request)) ?? {}) as { amount?: unknown; hash?: unknown; nonce?: unknown };
+    if (typeof amount !== "string" || !/^[1-9][0-9]{0,38}$/.test(amount)) {
+      throw new HttpError(400, "amount must be a whole number of USDG base units, as a string.");
+    }
+    let found: Hex | null;
+    if (typeof hash === "string" && isHex(hash) && hash.length === 66) found = hash;
+    else if (typeof nonce === "string" && /^[0-9]{1,20}$/.test(nonce)) {
+      found = await findPayment({ publicClient, account: player.account, nonce: BigInt(nonce) });
+    } else throw new HttpError(400, "Send the payment's hash, or the nonce of a payment the popup was sending.");
+    if (!found) throw new HttpError(400, "No payment was found.");
+    const verify = () => verifyPayment(found!, { publicClient, account: player.account, to: merchant, amount: BigInt(amount) });
+    let verdict = await verify();
+    // A node behind the one the relayer sent to may not know the transaction yet: ask again for a few seconds.
+    const unknown = () => verdict.checks.length === 1 && verdict.checks[0].detail === "not found";
+    for (let tries = 0; tries < RECEIPT_RETRIES && unknown(); tries++) {
+      await new Promise(resolve => setTimeout(resolve, RECEIPT_RETRY_MS));
+      verdict = await verify();
+    }
+    if (!verdict.valid) throw new HttpError(400, "The payment did not verify.", verdict.checks);
+    const claim = `payment:${found.toLowerCase()}`;
+    if (!(await store.claim(claim))) throw new HttpError(409, "This payment was already accepted.");
+    const payment: VerifiedPayment = { player, hash: found, to: merchant, amount: BigInt(amount), fee: verdict.fee ?? 0n };
+    let result: unknown;
+    try {
+      result = await options.onPayment?.(payment, request);
+    } catch (error) {
+      // The payment stays the player's: let them try again once the site is back.
+      await store.release(claim);
+      throw new HttpError(400, messageOf(error));
+    }
+    return json(200, { hash: found, amount, fee: payment.fee.toString(), result: result ?? null });
+  }
 
   async function handle(request: Request): Promise<Response> {
     const route = new URL(request.url).pathname.split("/").filter(Boolean).at(-1) ?? "";
@@ -329,7 +414,7 @@ export function createVeraKeyServer(options: VeraKeyServerOptions): VeraKeyServe
       typeof (headers as Headers).get === "function"
         ? (headers as Headers).get("cookie")
         : [(headers as Record<string, string | string[] | undefined>).cookie ?? []].flat().join("; ");
-    return readSession(header || null);
+    return (await readSession(header || null))?.player ?? null;
   }
 
   return { handle, getPlayer };
