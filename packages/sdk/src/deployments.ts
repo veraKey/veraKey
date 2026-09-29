@@ -15,7 +15,7 @@ export interface VeraKeyDeployment extends SignInDeployment {
 }
 
 /**
- * VeraKey on Arbitrum Sepolia for https://verakey.xyz, deployed 2026-09-27. A redeploy changes these values
+ * VeraKey on Arbitrum Sepolia for https://verakey.xyz, deployed 2026-09-29. A redeploy changes these values
  * and ships in a new SDK version.
  */
 export const ARBITRUM_SEPOLIA: VeraKeyDeployment = Object.freeze({
@@ -24,7 +24,7 @@ export const ARBITRUM_SEPOLIA: VeraKeyDeployment = Object.freeze({
   rpcUrl: "https://sepolia-rollup.arbitrum.io/rpc",
   origin: "https://verakey.xyz",
   rpIdHash: "0x57bea8798cb14a63fbde043755cfe53f5f7c3ed90da0d3cbbbbfee14af74c88c",
-  factory: "0xbaac250f9f1b07651c121e314bccc6fa4c64e55c",
+  factory: "0x3b570f82108f16bb9e59b409b618d6cb422757b7",
   honkVerifier: "0x6158Fc3c9F78f78eA780f30ab3E8515AD04Bd834",
   usdg: "0xFFC95faa3d63Cde504a05B567C600B78C0b41892",
 });
