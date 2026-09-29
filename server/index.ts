@@ -32,6 +32,7 @@ const visitors = new VisitorKeys();
 const perIp = new RateLimiter(Number(process.env.API_REQUESTS_PER_IP_PER_MINUTE ?? 30), 60_000);
 // Weighted by the calls in a batch: this is upstream work, and the relayer sends its own transactions through the same node.
 const rpcPerIp = new RateLimiter(900, 60_000);
+const rpcForEveryone = new RateLimiter(Number(process.env.RPC_CALLS_PER_MINUTE ?? 3_000), 60_000);
 
 /** Read-only JSON-RPC methods the browser may use through /api/rpc. */
 const RPC_METHODS = new Set([
@@ -68,7 +69,7 @@ const perAccount = new RateLimiter(12, 60_000);
 // Creating an account costs the relayer gas and takes no proof: cap it per visitor, not only per
 // (attacker-chosen) nullifier, and for everyone together, so no number of visitors can empty the relayer.
 const accountsPerIp = new RateLimiter(Number(process.env.ACCOUNTS_PER_IP_PER_DAY ?? 10), DAY_MS);
-const newAccountsPerDay = new RateLimiter(Number(process.env.NEW_ACCOUNTS_PER_DAY ?? 500), DAY_MS);
+const newAccountsPerDay = new RateLimiter(Number(process.env.NEW_ACCOUNTS_PER_DAY ?? 100), DAY_MS);
 // FAUCET_ACCOUNTS_PER_IP only exists so automated end-to-end runs against a local devnode can fund more
 // than three accounts a day; the public deployment keeps the default.
 const faucetPerIp = new RateLimiter(Number(process.env.FAUCET_ACCOUNTS_PER_IP ?? 3), DAY_MS);
@@ -127,7 +128,11 @@ app.post("/api/rpc", async (req, res) => {
   if (calls.length === 0 || calls.length > MAX_RPC_BATCH || !calls.every(allowedRpcCall)) {
     return void res.status(400).json({ jsonrpc: "2.0", id: null, error: { code: -32601, message: "Method not allowed" } });
   }
-  if (!rpcPerIp.take(`rpc:${visitors.key(req.ip)}`, calls.length)) return void res.status(429).json({ error: "Too many requests." });
+  // Per visitor, then for everyone together: many visitors (e.g. the /64s of one routed /48) must not get the
+  // relayer's own RPC access throttled, which it needs to relay.
+  if (!rpcPerIp.take(`rpc:${visitors.key(req.ip)}`, calls.length) || !rpcForEveryone.take("all", calls.length)) {
+    return void res.status(429).json({ error: "Too many requests." });
+  }
   try {
     const upstream = await fetch(upstreamRpc, {
       method: "POST",
@@ -160,7 +165,7 @@ app.post(
   "/api/accounts",
   route(async (req, res) => {
     const { appId, nullifier } = req.body ?? {};
-    if (!perAccount.take(`create:${nullifier}`)) throw new RelayError(429, "Too many requests for this account.");
+    if (!perAccount.take(`create:${String(nullifier).toLowerCase()}`)) throw new RelayError(429, "Too many requests for this account.");
     const created = await relayer.createAccount(appId, nullifier, () => {
       if (!accountsPerIp.take(`accounts:${visitors.key(req.ip)}`)) {
         throw new RelayError(429, "Too many new accounts from this visitor today.");
@@ -176,7 +181,7 @@ app.post(
 app.post(
   "/api/relay",
   route(async (req, res) => {
-    if (!perAccount.take(`relay:${req.body?.account}`)) throw new RelayError(429, "Too many requests for this account.");
+    if (!perAccount.take(`relay:${String(req.body?.account).toLowerCase()}`)) throw new RelayError(429, "Too many requests for this account.");
     res.json({ hash: await relayer.relay(req.body) });
   })
 );

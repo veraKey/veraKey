@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Address, Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { ActionKind, VeraKeyProver, ZERO_HASH, appIdFromName, changeDataHash, changePayload, computeNullifier, erc20Abi } from "../../src";
+import { ActionKind, VeraKeyProver, ZERO_HASH, appIdFromName, changeDataHash, changePayload, computeNullifier, erc20Abi, veraKeyAccountAbi } from "../../src";
 import { USDG, VirtualPasskey, authorize, deployment, fieldHex, publicClient, type Owner } from "./harness";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
@@ -66,11 +66,16 @@ const pendingNonce = () => publicClient.getTransactionCount({ address: relayerAd
 const usdgBalance = (who: Address) =>
   publicClient.readContract({ address: deployment.contracts.usdg, abi: erc20Abi, functionName: "balanceOf", args: [who] });
 
-/** Starts the relayer against the local devnode with `env`; resolves once it answers. */
-async function startRelayer(env: Record<string, string>): Promise<{ url: string; stop: () => void }> {
+/**
+ * Starts the relayer against the local devnode with `env` and its data in `dir`; resolves once it answers. `stop(true)`
+ * keeps the data, for a restart.
+ */
+async function startRelayer(
+  env: Record<string, string>,
+  dir = mkdtempSync(path.join(tmpdir(), "verakey-relayer-"))
+): Promise<{ url: string; stop: (keepData?: boolean) => void }> {
   const port = await freePort();
   const url = `http://127.0.0.1:${port}`;
-  const dir = mkdtempSync(path.join(tmpdir(), "verakey-relayer-"));
   const child = spawn(process.execPath, ["--import", "tsx", "server/index.ts"], {
     cwd: ROOT,
     env: { ...process.env, VERAKEY_NETWORK: "local", PORT: String(port), VERAKEY_DATA_DIR: dir, ...env },
@@ -85,7 +90,13 @@ async function startRelayer(env: Record<string, string>): Promise<{ url: string;
     if (attempt > 150 || child.exitCode !== null) throw new Error(`relayer did not start:\n${log}`);
     await new Promise(r => setTimeout(r, 200));
   }
-  return { url, stop: () => { child.kill(); rmSync(dir, { recursive: true, force: true }); } };
+  return {
+    url,
+    stop: (keepData = false) => {
+      child.kill();
+      if (!keepData) rmSync(dir, { recursive: true, force: true });
+    },
+  };
 }
 
 let stopRelayer: () => void = () => {};
@@ -204,6 +215,45 @@ describe("relayer: Sign in with VeraKey", () => {
 /** A nullifier no earlier run has used: accounts persist on the devnode, and an existing one is never deployed again. */
 const freshNullifier = () => BigInt(generatePrivateKey()) % 2n ** 250n;
 
+type Relayed = "pay" | "scheduleChange" | "restrict" | "cancelChange";
+
+/** A new account with its own passkey, created and funded through the relayer at `base`, and a way to act on it. */
+async function newAccount(tag: string, ip: string, base = baseUrl) {
+  const ownApp = appIdFromName(`relayer-e2e-${tag}-${Date.now()}`);
+  const passkey = await VirtualPasskey.create();
+  const me: Owner = { passkey, nullifier: await computeNullifier(prover.barretenberg, passkey.publicKey, passkey.prfSecret, ownApp) };
+  const created = await api(ip, "POST", "/accounts", { appId: fieldHex(ownApp), nullifier: fieldHex(me.nullifier) }, base);
+  expect(created.status, JSON.stringify(created.body)).toBe(200);
+  await publicClient.waitForTransactionReceipt({ hash: created.body.hash as Hex });
+  const mine = created.body.account as Address;
+  const funded = await api(ip, "POST", "/faucet", { account: mine }, base);
+  expect(funded.status, JSON.stringify(funded.body)).toBe(200);
+  await publicClient.waitForTransactionReceipt({ hash: funded.body.hash as Hex });
+  /** A relay request for `functionName`, approved with this account's passkey and the relayer's fee. */
+  const request = async (functionName: Relayed, opts: { to?: Address; amount?: bigint; change?: { kind: number; payload: Hex }; changeId?: Hex } = {}) => {
+    const deadline = BigInt(Math.floor(Date.now() / 1000)) + 300n;
+    const kind = { pay: ActionKind.Pay, scheduleChange: ActionKind.ScheduleChange, restrict: ActionKind.Restrict, cancelChange: ActionKind.CancelChange }[functionName];
+    const target = opts.to ?? "0x0000000000000000000000000000000000000000";
+    const amount = opts.amount ?? 0n;
+    const dataHash = opts.change ? changeDataHash(opts.change.kind as never, opts.change.payload) : (opts.changeId ?? ZERO_HASH);
+    const auth = await authorize(prover, me, ownApp, mine, { kind, target, amount, dataHash, fee, deadline });
+    const tail = [fee, deadline, fieldHex(me.nullifier), auth.clientDataJSON, auth.proof];
+    const args =
+      functionName === "pay" ? [target, amount, ...tail]
+      : functionName === "cancelChange" ? [opts.changeId!, ...tail]
+      : [opts.change!.kind, opts.change!.payload, ...tail];
+    return { account: mine, functionName, args: args as unknown[] };
+  };
+  return { mine, request };
+}
+
+/** Relays `body` as the visitor `ip`, and waits for its transaction when the relayer sent one. */
+async function relayed(ip: string, body: unknown, base = baseUrl) {
+  const response = await api(ip, "POST", "/relay", body, base);
+  if (response.status === 200) await publicClient.waitForTransactionReceipt({ hash: response.body.hash as Hex });
+  return response;
+}
+
 // Regression tests for the whole-system audit of 2026-09-29 (NM2-002, NM2-003, NM2-001's relayer side, I-3).
 describe("relayer: abuse limits (audit 2026-09-29)", () => {
   it("the faucet pays each account once, even to concurrent requests (NM2-003)", async () => {
@@ -250,43 +300,33 @@ describe("relayer: abuse limits (audit 2026-09-29)", () => {
     expect(await pendingNonce()).toBe(nonce + 1);
   });
 
-  it("safety actions whose fee the account waives are relayed a limited number of times (NM2-001)", async () => {
-    const ownApp = appIdFromName(`relayer-e2e-safety-${Date.now()}`);
-    const passkey = await VirtualPasskey.create();
-    const me: Owner = { passkey, nullifier: await computeNullifier(prover.barretenberg, passkey.publicKey, passkey.prfSecret, ownApp) };
-    const created = await api("10.0.6.1", "POST", "/accounts", { appId: fieldHex(ownApp), nullifier: fieldHex(me.nullifier) });
-    await publicClient.waitForTransactionReceipt({ hash: created.body.hash as Hex });
-    const mine = created.body.account as Address;
-    const funded = await api("10.0.6.1", "POST", "/faucet", { account: mine });
-    await publicClient.waitForTransactionReceipt({ hash: funded.body.hash as Hex });
+  it("past the day's cap, junk costs an account nothing, changes that do nothing are limited, and freezing and cancelling always go through (NM2-001)", async () => {
+    const { mine, request } = await newAccount("safety", "10.0.6.1");
     const maxFee = BigInt(deployment.policy.maxFee!);
-    const restrict = async (change: { kind: number; payload: Hex }) => {
-      const deadline = BigInt(Math.floor(Date.now() / 1000)) + 300n;
-      const auth = await authorize(prover, me, ownApp, mine, {
-        kind: ActionKind.Restrict, target: "0x0000000000000000000000000000000000000000", amount: 0n,
-        dataHash: changeDataHash(change.kind as never, change.payload), fee, deadline,
-      });
-      return api("10.0.6.2", "POST", "/relay", {
-        account: mine, functionName: "restrict",
-        args: [change.kind, change.payload, fee, deadline, fieldHex(me.nullifier), auth.clientDataJSON, auth.proof],
-      });
-    };
-    const settle = async (response: { status: number; body: Record<string, any> }) => {
-      expect(response.status, JSON.stringify(response.body)).toBe(200);
-      await publicClient.waitForTransactionReceipt({ hash: response.body.hash as Hex });
-    };
-    // The day allows one maxFee, and a payment spends it.
-    await settle(await restrict(changePayload.setLimits(maxFee, maxFee)));
-    const deadline = BigInt(Math.floor(Date.now() / 1000)) + 300n;
-    const amount = maxFee - 2n * fee;
-    const auth = await authorize(prover, me, ownApp, mine, { kind: ActionKind.Pay, target: recipient, amount, dataHash: ZERO_HASH, fee, deadline });
-    await settle(await api("10.0.6.2", "POST", "/relay", {
-      account: mine, functionName: "pay", args: [recipient, amount, fee, deadline, fieldHex(me.nullifier), auth.clientDataJSON, auth.proof],
-    }));
-    // Past the cap the account waives the fee: the relayer still sends the first freeze, then refuses more today.
-    await settle(await restrict(changePayload.freeze()));
-    const again = await restrict(changePayload.freeze());
-    expect(again.status, JSON.stringify(again.body)).toBe(429);
+    const ok = (response: { status: number; body: Record<string, any> }) => expect(response.status, JSON.stringify(response.body)).toBe(200);
+    // The day allows one maxFee: a restrict, a scheduled change and a payment spend it.
+    ok(await relayed("10.0.6.2", await request("restrict", { change: changePayload.setLimits(maxFee, maxFee) })));
+    ok(await relayed("10.0.6.2", await request("scheduleChange", { change: changePayload.setLimits(2n * maxFee, 2n * maxFee) })));
+    const pending = (await publicClient.readContract({ address: mine, abi: veraKeyAccountAbi, functionName: "pendingChangeIds" })) as readonly Hex[];
+    const changeId = pending.find(id => BigInt(id) !== 0n)!;
+    ok(await relayed("10.0.6.2", await request("pay", { to: recipient, amount: maxFee - 3n * fee })));
+    // Past the cap the account waives these fees. A request that fails simulation never counts against the account.
+    const noChange = await request("restrict", { change: changePayload.setLimits(maxFee, maxFee) });
+    const proof = noChange.args.at(-1) as Hex;
+    const junk = { ...noChange, args: [...noChange.args.slice(0, -1), `${proof.slice(0, -2)}${proof.endsWith("00") ? "01" : "00"}`] };
+    for (const ip of ["10.0.6.3", "10.0.6.4"]) expect((await relayed(ip, junk)).status).toBe(422);
+    // A restrict that changes nothing counts: this relayer sends one a day per account.
+    ok(await relayed("10.0.6.2", noChange));
+    const limited = await relayed("10.0.6.2", await request("restrict", { change: changePayload.setLimits(maxFee, maxFee) }));
+    expect(limited.status).toBe(429);
+    expect(limited.body.error).toMatch(/today's share/);
+    // Defending the account never counts: cancelling a waiting change, and a freeze.
+    ok(await relayed("10.0.6.2", await request("cancelChange", { changeId })));
+    ok(await relayed("10.0.6.2", await request("restrict", { change: changePayload.freeze() })));
+    // Freezing a frozen account with nothing waiting changes nothing, and counts.
+    const refrozen = await relayed("10.0.6.2", await request("restrict", { change: changePayload.freeze() }));
+    expect(refrozen.status).toBe(429);
+    expect(refrozen.body.error).toMatch(/today's share/);
   });
 });
 
@@ -307,6 +347,53 @@ describe("relayer: daily budgets for everyone (NM2-002)", () => {
       expect((await api("10.0.7.5", "POST", "/faucet", { account: second.body.account }, budgeted.url)).status).toBe(429);
     } finally {
       budgeted.stop();
+    }
+  });
+});
+
+describe("relayer: a daily gas budget (review 2026-09-29)", () => {
+  it("stops what the relayer pays for at the day's gas budget, but never a freeze", async () => {
+    // Enough for an account and its demo USDG, not for a payment after them.
+    const budgeted = await startRelayer({ RELAY_GAS_PER_DAY: "1200000" });
+    try {
+      const { request } = await newAccount("gas", "10.0.8.1", budgeted.url);
+      const payment = await relayed("10.0.8.2", await request("pay", { to: recipient, amount: USDG(0.1) }), budgeted.url);
+      expect(payment.status, JSON.stringify(payment.body)).toBe(429);
+      expect(payment.body.error).toMatch(/today's gas/);
+      const freeze = await relayed("10.0.8.2", await request("restrict", { change: changePayload.freeze() }), budgeted.url);
+      expect(freeze.status, JSON.stringify(freeze.body)).toBe(200);
+    } finally {
+      budgeted.stop();
+    }
+  });
+
+  it("remembers only the faucet grants it made, across a restart", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "verakey-relayer-"));
+    const first = await startRelayer({ FAUCET_GRANTS_PER_DAY: "1" }, dir);
+    let accounts: Address[] = [];
+    let statuses: number[] = [];
+    try {
+      for (const i of [1, 2]) {
+        const created = await api(`10.0.9.${i}`, "POST", "/accounts", { appId: fieldHex(appId), nullifier: fieldHex(freshNullifier()) }, first.url);
+        expect(created.status, JSON.stringify(created.body)).toBe(200);
+        await publicClient.waitForTransactionReceipt({ hash: created.body.hash as Hex });
+        accounts.push(created.body.account);
+      }
+      const grants = await Promise.all(accounts.map((account, i) => api(`10.0.9.${10 + i}`, "POST", "/faucet", { account }, first.url)));
+      statuses = grants.map(grant => grant.status);
+      expect([...statuses].sort()).toEqual([200, 429]);
+      await publicClient.waitForTransactionReceipt({ hash: grants[statuses.indexOf(200)].body.hash as Hex });
+    } finally {
+      first.stop(true);
+    }
+    const second = await startRelayer({ FAUCET_GRANTS_PER_DAY: "5" }, dir);
+    try {
+      const refused = await api("10.0.9.20", "POST", "/faucet", { account: accounts[statuses.indexOf(429)] }, second.url);
+      expect(refused.status, JSON.stringify(refused.body)).toBe(200);
+      expect((await api("10.0.9.21", "POST", "/faucet", { account: accounts[statuses.indexOf(200)] }, second.url)).status).toBe(409);
+      await publicClient.waitForTransactionReceipt({ hash: refused.body.hash as Hex });
+    } finally {
+      second.stop();
     }
   });
 });
