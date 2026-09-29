@@ -108,7 +108,7 @@ export function Onboarding() {
         <div style={{ display: "grid", gap: 10, marginTop: 20 }}>
           {passkeys.length > 0 && (
             <button className="vk-btn vk-btn-primary vk-btn-lg" disabled={!!busy || blocked} onClick={() => run("unlock", () => unlock())}>
-              {busy === "unlock" ? <span className="vk-spinner" /> : <KeyRound size={16} />} Unlock with passkey
+              {busy === "unlock" ? <span className="vk-spinner" /> : <KeyRound size={16} />}<span>Unlock with passkey</span>
             </button>
           )}
           <button
@@ -117,7 +117,7 @@ export function Onboarding() {
             onClick={() => run("create", () => register(passkeys.length ? `Passkey ${passkeys.length + 1}` : "My passkey"))}
           >
             {busy === "create" ? <span className="vk-spinner" /> : <Fingerprint size={16} />}
-            {passkeys.length ? "Create another passkey" : "Create passkey"}
+            <span>{passkeys.length ? "Create another passkey" : "Create passkey"}</span>
           </button>
           {passkeys.length === 0 && (
             <button className="vk-btn vk-btn-quiet" disabled={!!busy || blocked} onClick={() => run("unlock", () => unlock())}>

@@ -82,7 +82,7 @@ function AccountCard({ app, state }: { app: DemoApp; state?: AccountState }) {
       <div className="vk-account-actions">
         {state && !state.deployed ? (
           <button className="vk-btn vk-btn-ghost" disabled={!!busy} onClick={() => act("deploy")}>
-            {busy === "deploy" ? <span className="vk-spinner" /> : <Rocket size={13} />} Deploy
+            {busy === "deploy" ? <span className="vk-spinner" /> : <Rocket size={13} />}<span>Deploy</span>
           </button>
         ) : (
           <Link href={`/app/pay?from=${app.key}`} className="vk-btn vk-btn-primary" style={{ textDecoration: "none" }}>
@@ -90,7 +90,7 @@ function AccountCard({ app, state }: { app: DemoApp; state?: AccountState }) {
           </Link>
         )}
         <button className="vk-btn vk-btn-ghost" disabled={!!busy || !state} onClick={() => act("fund")}>
-          {busy === "fund" ? <span className="vk-spinner" /> : <Coins size={13} />} Demo USDG
+          {busy === "fund" ? <span className="vk-spinner" /> : <Coins size={13} />}<span>Demo USDG</span>
         </button>
         <button className="vk-btn vk-btn-ghost" disabled={!state} onClick={() => setReceiving(open => !open)}>
           <ArrowDownLeft size={13} /> Receive

@@ -101,7 +101,7 @@ export function Disclose() {
               ))}
             </div>
             <button className="vk-btn vk-btn-primary vk-btn-lg" disabled={busy || !audience.trim() || !nonceValid || !client} onClick={create}>
-              {busy ? <span className="vk-spinner" /> : <Link2 size={16} />} Approve disclosure with passkey
+              {busy ? <span className="vk-spinner" /> : <Link2 size={16} />}<span>Approve disclosure with passkey</span>
             </button>
           </div>
         </div>

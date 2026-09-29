@@ -52,7 +52,7 @@ export function Code({ lang = "text", title, children }: { lang?: Lang; title?: 
       <figcaption>
         <span>{title ?? LANG_LABEL[lang]}</span>
         <button type="button" onClick={copy} aria-label="Copy code">
-          {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? "Copied" : "Copy"}
+          {copied ? <Check size={13} /> : <Copy size={13} />}<span>{copied ? "Copied" : "Copy"}</span>
         </button>
       </figcaption>
       <pre>

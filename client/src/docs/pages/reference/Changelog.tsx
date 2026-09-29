@@ -6,6 +6,16 @@ export default function ChangelogPage() {
     <>
       <p>Newest first. Each entry is one step of the build.</p>
 
+      <H2>2026-09-29</H2>
+      <ul>
+        <li>
+          <strong>Translated pages keep working:</strong> with Chrome's page translation on, the app stopped on an error
+          screen as soon as a button showed its spinner, and the landing page did within seconds, as its payment preview
+          plays by itself. Button labels now sit apart from their spinners, the preview is left untranslated, and a page
+          no longer stops when the translator has swapped out text the page still changes.
+        </li>
+      </ul>
+
       <H2>2026-09-28</H2>
       <ul>
         <li>

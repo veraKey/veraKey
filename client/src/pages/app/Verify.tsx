@@ -123,7 +123,7 @@ export function Verify() {
             </label>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button className="vk-btn vk-btn-primary" disabled={busy || !text.trim() || !audience.trim() || !nonceValid || !client} onClick={verify}>
-                {busy ? <span className="vk-spinner" /> : <FileCheck2 size={14} />} Verify
+                {busy ? <span className="vk-spinner" /> : <FileCheck2 size={14} />}<span>Verify</span>
               </button>
               <label className="vk-btn vk-btn-ghost" style={{ cursor: "pointer" }}>
                 <Upload size={14} /> Open file

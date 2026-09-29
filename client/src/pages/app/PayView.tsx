@@ -129,7 +129,7 @@ export function PayDesktop(props: PayViewProps) {
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button className="vk-btn vk-btn-primary vk-btn-lg" style={{ flex: 1 }} disabled={busy || !!props.problem} onClick={props.onSubmit}>
-                {busy ? <span className="vk-spinner" /> : <ScanFace size={17} />} Approve with passkey
+                {busy ? <span className="vk-spinner" /> : <ScanFace size={17} />}<span>Approve with passkey</span>
               </button>
               <button className="vk-btn vk-btn-ghost vk-btn-lg" disabled={busy} onClick={props.onTryOverCap} title="Shows that a valid proof is still bound by policy">
                 Try over the cap
@@ -195,7 +195,7 @@ export function PayMobile(props: PayViewProps) {
       </div>
 
       <button className="vk-btn vk-btn-primary vk-btn-lg vk-mpay-cta" disabled={busy || !!props.problem} onClick={props.onSubmit}>
-        {busy ? <span className="vk-spinner" /> : <ScanFace size={18} />} Approve with passkey
+        {busy ? <span className="vk-spinner" /> : <ScanFace size={18} />}<span>Approve with passkey</span>
       </button>
       <div className="vk-mpay-links">
         <button className="vk-btn vk-btn-quiet" disabled={busy} onClick={() => setEditingRecipient(open => !open)}>Pay someone else</button>

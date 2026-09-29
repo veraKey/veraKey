@@ -2,6 +2,7 @@
 // Both screens render the app's own views (AppTop, AppNav, PayDesktop, PayMobile) with a scripted
 // payment, so the hero shows exactly what /app/pay shows. Only the iOS frame and the passkey sheet are
 // drawn here: on a real phone the system draws them. The numbers are measured; the payment is not real.
+// The screens are translate="no": a page translator swaps the text React updates, so they would stop playing.
 import type { ProofState } from "@verakey/sdk/client";
 import { BatteryFull, Check, KeyRound, Lock, LockKeyhole, RotateCw, ScanFace, Signal, Wifi } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
@@ -151,7 +152,7 @@ export function HeroShowcase() {
       </p>
       <div className="showcase-glow" aria-hidden="true" />
 
-      <div className="showcase-browser" aria-hidden="true" inert>
+      <div className="showcase-browser" aria-hidden="true" inert translate="no">
         <div className="browser-bar">
           <span className="browser-dots"><i /><i /><i /></span>
           <span className="browser-url"><Lock size={10} /> verakey.xyz<span>/app/pay</span></span>
@@ -170,7 +171,7 @@ export function HeroShowcase() {
         </div>
       </div>
 
-      <div className="showcase-phone" aria-hidden="true" inert>
+      <div className="showcase-phone" aria-hidden="true" inert translate="no">
         <div ref={screen} className="phone-screen">
           <div className="phone-canvas" style={screenScale}>
             <div className="vk-app vk-compact phone-app">
@@ -197,7 +198,7 @@ export function HeroShowcase() {
       </div>
 
       {phase === "relaying" && (
-        <span className="showcase-packet" aria-hidden="true"><LockKeyhole size={11} /> proof · {PROOF_BYTES.toLocaleString("en-US")} B · no key</span>
+        <span className="showcase-packet" aria-hidden="true" translate="no"><LockKeyhole size={11} /> proof · {PROOF_BYTES.toLocaleString("en-US")} B · no key</span>
       )}
       <p className="showcase-caption" aria-hidden="true">The app's own /app/pay views, playing one payment · proof time measured in desktop Chrome</p>
     </div>

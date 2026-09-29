@@ -104,7 +104,7 @@ export function Recovery() {
                   belong to the same person across apps either.
                 </p>
                 <button className="vk-btn vk-btn-primary" disabled={action.busy || backupBusy} onClick={() => addBackup()}>
-                  {backupBusy ? <span className="vk-spinner" /> : <UserPlus size={15} />} Create a backup passkey and add it
+                  {backupBusy ? <span className="vk-spinner" /> : <UserPlus size={15} />}<span>Create a backup passkey and add it</span>
                 </button>
                 {others.map(p => (
                   <button key={p.credentialId} className="vk-btn vk-btn-ghost" disabled={action.busy || backupBusy} onClick={() => addBackup(p)}>
