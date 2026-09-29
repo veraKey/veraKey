@@ -19,11 +19,15 @@ import { privateKeyToAccount } from "viem/accounts";
 import { erc20Abi, veraKeyAccountAbi, veraKeyFactoryAbi } from "../packages/sdk/src/abi";
 import { RELAYABLE_FUNCTIONS, type RelayRequest } from "../shared/api";
 import type { ServerConfig } from "./config";
-import { Mutex } from "./rate-limit";
+import { Mutex, RateLimiter } from "./rate-limit";
 
 const BN254_R = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001n;
 /** Refuse anything that would need more gas than a proof-authorized account call (~1.1M). */
 const MAX_GAS = 2_500_000n;
+/** Safety actions: never refused by the account's caps, so past the day's cap the account waives their fee. */
+const SAFETY_ACTIONS = new Set(["restrict", "cancelChange", "cancelRecovery"]);
+/** How long an account stays busy after its transaction was sent, at most (normally until it is in a block). */
+const IN_FLIGHT_TIMEOUT_MS = 60_000;
 
 export class RelayError extends Error {
   constructor(
@@ -53,6 +57,13 @@ export class Relayer {
   private readonly sendLock = new Mutex();
   private readonly faucetFile: string;
   private readonly funded: Set<string>;
+  /** Accounts with a relayed transaction not yet in a block: a copy sent meanwhile would only revert at the relayer's cost. */
+  private readonly inFlight = new Set<string>();
+  /** Safety actions relayed per account and UTC day with their fee waived (the relayer pays their gas unpaid). */
+  private readonly unpaidSafetyActions = new RateLimiter(
+    Number(process.env.UNPAID_SAFETY_ACTIONS_PER_ACCOUNT_PER_DAY ?? 10),
+    24 * 60 * 60_000
+  );
 
   constructor(private readonly config: ServerConfig) {
     const net = config.network;
@@ -112,7 +123,15 @@ export class Relayer {
       throw new RelayError(502, "The RPC endpoint could not simulate the transaction.");
     }
     return this.sendLock.run(async () => {
-      const gas = await this.publicClient.estimateContractGas({ ...prepared.request, account: this.wallet.account });
+      let gas: bigint;
+      try {
+        gas = await this.publicClient.estimateContractGas({ ...prepared.request, account: this.wallet.account });
+      } catch (error) {
+        // The state moved since the simulation (e.g. the same action just landed): refuse it like a failed simulation.
+        const revert = revertNameOf(error);
+        if (revert) throw new RelayError(422, `Simulation reverted: ${revert}`, revert);
+        throw new RelayError(502, "The RPC endpoint could not estimate the transaction's gas.");
+      }
       if (gas > MAX_GAS) throw new RelayError(422, "Transaction needs too much gas.");
       return this.wallet.writeContract({ ...prepared.request, gas: (gas * 12n) / 10n } as never);
     });
@@ -164,34 +183,78 @@ export class Relayer {
       throw new RelayError(402, "The signed relayer fee is too low.");
     }
     await this.assertOurAccount(body.account);
-    // Optional random delay before broadcasting (RELAY_JITTER_MAX_MS), so submission times say less about
-    // which requests arrived together. Off by default: it adds latency and only helps alongside real
-    // traffic or several relayers. It never changes what is submitted.
-    const jitter = Number(process.env.RELAY_JITTER_MAX_MS ?? 0);
-    if (jitter > 0) await new Promise(resolve => setTimeout(resolve, randomInt(0, jitter)));
-    return this.submit({ address: body.account, abi: veraKeyAccountAbi, functionName: body.functionName, args } as never);
+    // One transaction per account at a time, until it is in a block: a copy of the same request (or another action
+    // for the same nonce) would pass its simulation meanwhile and then revert at the relayer's cost.
+    const busy = body.account.toLowerCase();
+    if (this.inFlight.has(busy)) {
+      throw new RelayError(409, "Another transaction for this account is on its way. Try again in a moment.");
+    }
+    this.inFlight.add(busy);
+    let hash: Hex;
+    try {
+      if (fee >= 0 && SAFETY_ACTIONS.has(body.functionName)) await this.limitUnpaidSafetyAction(body.account, args[fee] as bigint);
+      // Optional random delay before broadcasting (RELAY_JITTER_MAX_MS), so submission times say less about
+      // which requests arrived together. Off by default: it adds latency and only helps alongside real
+      // traffic or several relayers. It never changes what is submitted.
+      const jitter = Number(process.env.RELAY_JITTER_MAX_MS ?? 0);
+      if (jitter > 0) await new Promise(resolve => setTimeout(resolve, randomInt(0, jitter)));
+      hash = await this.submit({ address: body.account, abi: veraKeyAccountAbi, functionName: body.functionName, args } as never);
+    } catch (error) {
+      this.inFlight.delete(busy);
+      throw error;
+    }
+    void this.publicClient
+      .waitForTransactionReceipt({ hash, timeout: IN_FLIGHT_TIMEOUT_MS })
+      .catch(() => undefined)
+      .finally(() => this.inFlight.delete(busy));
+    return hash;
   }
 
-  /** Sends the demo amount of USDG to a new account, once per account. */
-  async faucet(account: unknown): Promise<Hex> {
+  /**
+   * Past the day's cap an account waives a safety action's fee, so the relayer would pay its gas for nothing. It still
+   * relays them, since they are how owners defend an account, but only a few per account and UTC day.
+   */
+  private async limitUnpaidSafetyAction(account: Address, fee: bigint) {
+    const [, dailyCap, spentToday] = (await this.publicClient.readContract({
+      address: account, abi: veraKeyAccountAbi, functionName: "policy",
+    })) as readonly [bigint, bigint, bigint, bigint, boolean];
+    if (spentToday + fee > dailyCap && !this.unpaidSafetyActions.take(account.toLowerCase())) {
+      throw new RelayError(
+        429,
+        "This account has spent today's cap, so it pays no fee for this action, and the relayer has sent today's share of those for it. Submit it yourself, or try again tomorrow."
+      );
+    }
+  }
+
+  /** Sends the demo amount of USDG to a new account, once per account. `beforeGrant` runs only when it will send. */
+  async faucet(account: unknown, beforeGrant: () => void = () => {}): Promise<Hex> {
     if (typeof account !== "string" || !isAddress(account)) throw new RelayError(400, "Invalid account.");
     await this.assertOurAccount(account);
-    if (this.funded.has(account.toLowerCase())) throw new RelayError(409, "This account already received demo USDG.");
-    const amount = BigInt(this.config.network.relayer.faucetAmount);
-    const usdg = this.config.network.contracts.usdg;
-    if (!this.config.mintableUsdg) {
-      const treasury = await this.publicClient.readContract({ address: usdg, abi: erc20Abi, functionName: "balanceOf", args: [this.address] });
-      if (treasury < amount) throw new RelayError(503, "The demo faucet is out of USDG. Try again later.");
+    const key = account.toLowerCase();
+    if (this.funded.has(key)) throw new RelayError(409, "This account already received demo USDG.");
+    // Reserved before the first await, so a concurrent request for the same account gets 409 instead of a second grant.
+    this.funded.add(key);
+    let hash: Hex;
+    try {
+      beforeGrant();
+      const amount = BigInt(this.config.network.relayer.faucetAmount);
+      const usdg = this.config.network.contracts.usdg;
+      if (!this.config.mintableUsdg) {
+        const treasury = await this.publicClient.readContract({ address: usdg, abi: erc20Abi, functionName: "balanceOf", args: [this.address] });
+        if (treasury < amount) throw new RelayError(503, "The demo faucet is out of USDG. Try again later.");
+      }
+      hash = this.config.mintableUsdg
+        ? await this.submit({
+            address: usdg,
+            abi: [{ type: "function", name: "mint", stateMutability: "nonpayable", inputs: [{ name: "to", type: "address" }, { name: "value", type: "uint256" }], outputs: [] }],
+            functionName: "mint",
+            args: [account, amount],
+          } as never)
+        : await this.submit({ address: usdg, abi: erc20Abi, functionName: "transfer", args: [account, amount] } as never);
+    } catch (error) {
+      this.funded.delete(key);
+      throw error;
     }
-    const hash = this.config.mintableUsdg
-      ? await this.submit({
-          address: usdg,
-          abi: [{ type: "function", name: "mint", stateMutability: "nonpayable", inputs: [{ name: "to", type: "address" }, { name: "value", type: "uint256" }], outputs: [] }],
-          functionName: "mint",
-          args: [account, amount],
-        } as never)
-      : await this.submit({ address: usdg, abi: erc20Abi, functionName: "transfer", args: [account, amount] } as never);
-    this.funded.add(account.toLowerCase());
     writeFileSync(this.faucetFile, JSON.stringify([...this.funded], null, 1));
     return hash;
   }

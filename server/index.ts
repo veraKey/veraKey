@@ -26,8 +26,11 @@ if (feeRecipient && feeRecipient.toLowerCase() !== relayer.address.toLowerCase()
   console.warn(`Fees go to ${feeRecipient}, not to this relayer (${relayer.address}).`);
 }
 
+const DAY_MS = 24 * 60 * 60_000;
+// Visitors are counted by address, an IPv6 one by its /64 (see VisitorKeys), so rotating addresses does not reset them.
 const visitors = new VisitorKeys();
 const perIp = new RateLimiter(Number(process.env.API_REQUESTS_PER_IP_PER_MINUTE ?? 30), 60_000);
+// Weighted by the calls in a batch: this is upstream work, and the relayer sends its own transactions through the same node.
 const rpcPerIp = new RateLimiter(900, 60_000);
 
 /** Read-only JSON-RPC methods the browser may use through /api/rpc. */
@@ -36,14 +39,40 @@ const RPC_METHODS = new Set([
   "eth_getTransactionByHash", "eth_getTransactionReceipt", "eth_getTransactionCount", "eth_estimateGas",
   "eth_gasPrice", "eth_maxPriorityFeePerGas", "eth_feeHistory", "eth_getLogs", "net_version",
 ]);
+/** The app never batches; a batch only multiplies upstream work. */
+const MAX_RPC_BATCH = 10;
+/** The widest log query the app makes (a scheduled change's payload, ~7 hours of Arbitrum blocks). */
+const MAX_LOG_BLOCKS = 100_000n;
+
+/** A log query must name the contracts it reads and a bounded block range, or one request could scan the chain. */
+function boundedLogQuery(params: unknown): boolean {
+  const filter = Array.isArray(params) ? (params[0] as Record<string, unknown> | undefined) : undefined;
+  if (!filter || typeof filter !== "object") return false;
+  const address = filter.address;
+  if (!(typeof address === "string" || (Array.isArray(address) && address.length > 0 && address.length <= 10))) return false;
+  if (typeof filter.blockHash === "string") return true;
+  const block = (value: unknown) => (typeof value === "string" && /^0x[0-9a-fA-F]{1,16}$/.test(value) ? BigInt(value) : null);
+  const from = block(filter.fromBlock);
+  const to = block(filter.toBlock);
+  return from !== null && to !== null && to >= from && to - from <= MAX_LOG_BLOCKS;
+}
+
+function allowedRpcCall(call: unknown): boolean {
+  const { method, params } = (call ?? {}) as { method?: unknown; params?: unknown };
+  if (typeof method !== "string" || !RPC_METHODS.has(method)) return false;
+  return method !== "eth_getLogs" || boundedLogQuery(params);
+}
+
 const upstreamRpc = config.upstreamRpcUrl;
 const perAccount = new RateLimiter(12, 60_000);
 // Creating an account costs the relayer gas and takes no proof: cap it per visitor, not only per
-// (attacker-chosen) nullifier.
-const accountsPerIp = new RateLimiter(Number(process.env.ACCOUNTS_PER_IP_PER_DAY ?? 10), 24 * 60 * 60_000);
+// (attacker-chosen) nullifier, and for everyone together, so no number of visitors can empty the relayer.
+const accountsPerIp = new RateLimiter(Number(process.env.ACCOUNTS_PER_IP_PER_DAY ?? 10), DAY_MS);
+const newAccountsPerDay = new RateLimiter(Number(process.env.NEW_ACCOUNTS_PER_DAY ?? 500), DAY_MS);
 // FAUCET_ACCOUNTS_PER_IP only exists so automated end-to-end runs against a local devnode can fund more
 // than three accounts a day; the public deployment keeps the default.
-const faucetPerIp = new RateLimiter(Number(process.env.FAUCET_ACCOUNTS_PER_IP ?? 3), 24 * 60 * 60_000);
+const faucetPerIp = new RateLimiter(Number(process.env.FAUCET_ACCOUNTS_PER_IP ?? 3), DAY_MS);
+const faucetGrantsPerDay = new RateLimiter(Number(process.env.FAUCET_GRANTS_PER_DAY ?? 20), DAY_MS);
 
 const app = express();
 app.disable("x-powered-by");
@@ -94,11 +123,11 @@ app.use("/api", express.json({ limit: "64kb" }));
 // Browser reads go through the relayer origin: the CSP stays 'self'-only, the upstream RPC (and any
 // provider key) stays server-side, and nodes without CORS headers still work.
 app.post("/api/rpc", async (req, res) => {
-  if (!rpcPerIp.take(`rpc:${visitors.key(req.ip)}`)) return void res.status(429).json({ error: "Too many requests." });
   const calls = Array.isArray(req.body) ? req.body : [req.body];
-  if (calls.length > 20 || calls.some(c => !c || typeof c.method !== "string" || !RPC_METHODS.has(c.method))) {
+  if (calls.length === 0 || calls.length > MAX_RPC_BATCH || !calls.every(allowedRpcCall)) {
     return void res.status(400).json({ jsonrpc: "2.0", id: null, error: { code: -32601, message: "Method not allowed" } });
   }
+  if (!rpcPerIp.take(`rpc:${visitors.key(req.ip)}`, calls.length)) return void res.status(429).json({ error: "Too many requests." });
   try {
     const upstream = await fetch(upstreamRpc, {
       method: "POST",
@@ -136,6 +165,9 @@ app.post(
       if (!accountsPerIp.take(`accounts:${visitors.key(req.ip)}`)) {
         throw new RelayError(429, "Too many new accounts from this visitor today.");
       }
+      if (!newAccountsPerDay.take("all")) {
+        throw new RelayError(429, "The relayer has created as many accounts as it will today. Try again tomorrow.");
+      }
     });
     res.json(created);
   })
@@ -153,7 +185,10 @@ app.post(
   "/api/faucet",
   route(async (req, res) => {
     if (!faucetPerIp.take(`faucet:${visitors.key(req.ip)}`)) throw new RelayError(429, `The faucet allows ${process.env.FAUCET_ACCOUNTS_PER_IP ?? 3} accounts per day per visitor.`);
-    res.json({ hash: await relayer.faucet(req.body?.account) });
+    const hash = await relayer.faucet(req.body?.account, () => {
+      if (!faucetGrantsPerDay.take("all")) throw new RelayError(429, "The demo faucet has given out today's USDG. Try again tomorrow.");
+    });
+    res.json({ hash });
   })
 );
 

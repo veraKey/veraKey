@@ -5,6 +5,9 @@
 #   scripts/deploy.sh local            # nitro devnode on 127.0.0.1:8649 (scripts/devnode.sh up), test USDG
 #   scripts/deploy.sh sepolia --check  # checks keys, origin, balances and toolchain; sends nothing
 #   scripts/deploy.sh sepolia          # Arbitrum Sepolia, real Paxos USDG, keys from .env
+#   REUSE_VERIFIERS=1 scripts/deploy.sh sepolia
+#                                      # keeps the verifiers and the validator of deployments/sepolia.json (checked
+#                                      # against these circuits and this origin); deploys a new account and factory
 #
 # Required in .env for sepolia (see .env.example): DEPLOYER_PRIVATE_KEY, RELAYER_PRIVATE_KEY,
 # VERAKEY_RP_ID, VERAKEY_ORIGIN.
@@ -175,20 +178,43 @@ stylus_deploy() { # <package> [constructor args...] -> deployed address
     | sed 's/\x1b\[[0-9;]*m//g' | tee -a /dev/stderr | awk '/deployed code at address:/{print $NF}' | tail -1
 }
 
-echo "==> HonkVerifier"
-VERIFIER=$(forge_deploy script/DeployVerifier.s.sol:DeployVerifier)
-[ -n "$VERIFIER" ] || { echo "verifier deployment failed" >&2; exit 1; }
-echo "    $VERIFIER"
+REUSE=${REUSE_VERIFIERS:-0}
+if [ "$REUSE" = 1 ]; then
+  # The verifiers and the validator hold no account state and do not change when the account does: keep the deployed
+  # ones, after checking they verify these circuits for this relying party.
+  PREVIOUS="$ROOT/deployments/$NETWORK.json"
+  [ -f "$PREVIOUS" ] || { echo "REUSE_VERIFIERS=1 needs deployments/$NETWORK.json" >&2; exit 1; }
+  previous() { node -e 'const d = require(process.argv[1]); const v = process.argv[2].split(".").reduce((o, k) => o?.[k], d); if (!v) process.exit(1); console.log(v)' "$PREVIOUS" "$1"; }
+  VERIFIER=$(previous contracts.honkVerifier)
+  LINK_VERIFIER=$(previous contracts.linkVerifier)
+  VALIDATOR=$(previous contracts.veraKeyValidator)
+  [ "$(previous circuitVkHash)" = "0x$(xxd -p "$ROOT/circuits/webauthn/target/vk_hash" | tr -d '\n')" ] \
+    || { echo "the deployed HonkVerifier verifies another circuit: deploy without REUSE_VERIFIERS" >&2; exit 1; }
+  [ "$(previous linkCircuitVkHash)" = "0x$(xxd -p "$ROOT/circuits/link/target/vk_hash" | tr -d '\n')" ] \
+    || { echo "the deployed LinkHonkVerifier verifies another circuit: deploy without REUSE_VERIFIERS" >&2; exit 1; }
+  [ "$(previous rpIdHash)" = "$RP_ID_HASH" ] && [ "$(previous origin)" = "$ORIGIN" ] \
+    || { echo "the deployed validator serves another relying party: deploy without REUSE_VERIFIERS" >&2; exit 1; }
+  for address in "$VERIFIER" "$LINK_VERIFIER" "$VALIDATOR"; do
+    [ "$(cast code "$address" --rpc-url "$RPC")" != 0x ] || { echo "no code at $address" >&2; exit 1; }
+  done
+  echo "==> HonkVerifier, VeraKeyValidator, LinkHonkVerifier: reused from deployments/$NETWORK.json"
+  echo "    $VERIFIER $VALIDATOR $LINK_VERIFIER"
+else
+  echo "==> HonkVerifier"
+  VERIFIER=$(forge_deploy script/DeployVerifier.s.sol:DeployVerifier)
+  [ -n "$VERIFIER" ] || { echo "verifier deployment failed" >&2; exit 1; }
+  echo "    $VERIFIER"
 
-echo "==> VeraKeyValidator (ERC-7579 module for Kernel / Nexus accounts)"
-VALIDATOR=$(forge_deploy script/DeployValidator.s.sol:DeployValidator --sig "run(address,bytes32,string)" "$VERIFIER" "$RP_ID_HASH" "$ORIGIN")
-[ -n "$VALIDATOR" ] || { echo "validator deployment failed" >&2; exit 1; }
-echo "    $VALIDATOR"
+  echo "==> VeraKeyValidator (ERC-7579 module for Kernel / Nexus accounts)"
+  VALIDATOR=$(forge_deploy script/DeployValidator.s.sol:DeployValidator --sig "run(address,bytes32,string)" "$VERIFIER" "$RP_ID_HASH" "$ORIGIN")
+  [ -n "$VALIDATOR" ] || { echo "validator deployment failed" >&2; exit 1; }
+  echo "    $VALIDATOR"
 
-echo "==> LinkHonkVerifier (consent-to-link disclosures)"
-LINK_VERIFIER=$(forge_deploy script/DeployLinkVerifier.s.sol:DeployLinkVerifier)
-[ -n "$LINK_VERIFIER" ] || { echo "link verifier deployment failed" >&2; exit 1; }
-echo "    $LINK_VERIFIER"
+  echo "==> LinkHonkVerifier (consent-to-link disclosures)"
+  LINK_VERIFIER=$(forge_deploy script/DeployLinkVerifier.s.sol:DeployLinkVerifier)
+  [ -n "$LINK_VERIFIER" ] || { echo "link verifier deployment failed" >&2; exit 1; }
+  echo "    $LINK_VERIFIER"
+fi
 
 if [ "$NETWORK" = local ]; then
   echo "==> TestUSDG (local only)"
@@ -291,7 +317,7 @@ sourcify() { # <address> <path:Contract> [abi-encoded constructor args]
     echo "    warn  Sourcify did not verify $2; retry: (cd contracts/evm && forge verify-contract $1 $2 --verifier sourcify --chain $CHAIN ${extra[*]})"
   fi
 }
-if [ "$NETWORK" != local ]; then
+if [ "$NETWORK" != local ] && [ "$REUSE" != 1 ]; then
   echo "==> Sourcify"
   sourcify "$VERIFIER" src/HonkVerifier.sol:HonkVerifier
   sourcify "$LINK_VERIFIER" src/LinkHonkVerifier.sol:LinkHonkVerifier
