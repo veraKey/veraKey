@@ -103,8 +103,9 @@ Each invariant below names where it is enforced and which tests exercise it:
     - with the payment sheet required, the browser (not the page) shows payee and total, and the account checks them.
 - **The relayer.**
   - It cannot move funds or change what was signed. It could refuse to relay, but anyone can submit the calldata instead (a third party is not paid the fee).
-  - It relays only for accounts whose code is the EIP-1167 clone of this deployment's implementation, caps each transaction at 2.5M gas, sends one transaction per account at a time, and limits new accounts and faucet grants per visitor and per day for everyone, so look-alike contracts and rotating addresses cannot drain its gas.
-  - A visitor is one IPv4 address or one IPv6 /64. The RPC proxy takes batches of at most 10 calls, and log queries only with an address and at most 100,000 blocks.
+  - It relays only for accounts whose code is the EIP-1167 clone of this deployment's implementation, caps each transaction at 2.5M gas, sends one transaction per account at a time, limits new accounts and faucet grants per visitor and per day for everyone, and spends at most a daily gas budget, so look-alike contracts, rotating addresses and fees paid in test USDG cannot drain its gas.
+  - It never refuses a freeze or a cancel for a budget: each undoes something that cost whoever made it, and whoever stole a passkey must not be able to use up what the owner needs.
+  - A visitor is one IPv4 address or one IPv6 /64. The RPC proxy takes batches of at most 10 calls, 3,000 calls a minute for everyone, and log queries only with an address and at most 100,000 blocks.
   - It sees request metadata (IP, timing).
   - Mitigations:
     - rate-limit keys are a daily-rotated HMAC of the address, kept in memory only;
@@ -137,7 +138,7 @@ Each invariant below names where it is enforced and which tests exercise it:
 - **Fees while frozen.**
   - A thief who can make the passkey sign can still spend the account's funds on fees: up to `maxFee` per approval, paid only to the relayer, and never past the day's cap, beyond which these fees are waived.
   - That is griefing, not theft.
-  - The relayer sends at most 10 such fee-free actions per account and UTC day; anyone can submit more themselves.
+  - The relayer never refuses a freeze or a cancel for its budgets, and sends at most 10 other fee-free restricts per account a day.
 - **After a recovery the owner cannot rebuild the old guardian card.**
   - The guardian salt comes from the old passkey's PRF.
   - The guardian must keep its card, and the owner should name a guardian again after recovering.
@@ -194,11 +195,13 @@ A third internal review on 2026-09-29 ran Nemesis over the whole system: the con
 | Severity | Finding | Fix |
 |---|---|---|
 | Medium | Freezing, restricting and cancelling are never refused because of the caps, and each paid up to `maxFee`, so a stolen passkey could burn the whole balance on fees | Past the day's cap their fee is waived: a day never spends more than its cap (invariant 2) |
-| Medium | The relayer counted visitors by their full address, so rotating IPv6 addresses gave unlimited new accounts, faucet grants and RPC calls | Visitors are counted by /64, new accounts and faucet grants have a daily budget for everyone, and the RPC proxy refuses large batches and unbounded log queries |
+| Medium | The relayer counted visitors by their full address, so rotating IPv6 addresses gave unlimited new accounts, faucet grants and RPC calls | Visitors are counted by /64; the relayer's gas, new accounts, faucet grants and RPC calls have a budget for everyone; and the RPC proxy refuses large batches and unbounded log queries |
 | Low | Concurrent faucet requests for one account were each paid | The faucet reserves the account before it sends |
 | Low | A kit session could not be revoked: signing out only cleared the cookie in that browser, and a passkey a recovery removed stayed signed in for up to seven days | Signing out ends every copy of the session, and a session checks every 10 minutes that its passkey still owns the account |
-| Low | A crafted sign-in made the site's server run the on-chain proof check, and one player could pile up slow payment checks | `verifySignIn` stops before any RPC call once a local check fails; one payment check runs at a time per player |
+| Low | A malformed sign-in still made the site's server run the on-chain proof check, and one player could pile up slow payment checks | `verifySignIn` stops before any RPC call once a local check fails; one payment check runs at a time per player. A well-formed sign-in with a bad proof still costs one check, so sites rate-limit the kit's routes |
 | Low | The same owner change twice, or removals that together would leave no owner, could be scheduled; the extra one could never apply and kept a pending slot | They are refused when they are scheduled (invariant 6) |
+
+Before release, a separate review of these fixes found three more gaps, fixed the same day: requests with a bad proof could use up the relayer's allowance for an account's fee-free restricts, and so block the owner's freeze; payments paid for in demo USDG could still empty the relayer's ETH; and a slow chain could hold a kit session's owner check for up to 40 seconds. Now nothing counts before it simulates, a freeze or a cancel is never refused for a budget, the relayer has a daily gas budget (`RELAY_GAS_PER_DAY`), and an owner check takes two seconds at most.
 
 ## Reporting
 

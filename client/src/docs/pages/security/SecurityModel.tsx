@@ -223,9 +223,10 @@ export default function SecurityModelPage() {
       <p>
         It cannot move funds or change what was signed. It could refuse to relay, but anyone can submit the same calldata
         instead (a third party is not paid the fee). It relays only for accounts whose code is the EIP-1167 clone of this
-        deployment's implementation, caps each transaction at 2.5M gas, sends one transaction per account at a time, and
-        limits new accounts and faucet grants per visitor and per day for everyone, so look-alike contracts and rotating
-        addresses cannot drain its gas. It counts an IPv6 visitor by its /64. It sees request metadata (IP, timing): its
+        deployment's implementation, caps each transaction at 2.5M gas, sends one transaction per account at a time,
+        limits new accounts and faucet grants per visitor and per day for everyone, and spends at most a daily gas budget,
+        so look-alike contracts, rotating addresses and fees paid in test USDG cannot drain its gas. It never refuses a
+        freeze or a cancel for a budget. It counts an IPv6 visitor by its /64. It sees request metadata (IP, timing): its
         rate-limit keys are a daily-rotated HMAC of the address kept in memory, and it can add a random delay before
         broadcasting.
       </p>

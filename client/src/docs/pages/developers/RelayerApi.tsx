@@ -97,13 +97,13 @@ export default function RelayerApiPage() {
         <li>the signed fee is at least the relayer's fee (else 402);</li>
         <li>the account's code is the EIP-1167 clone of this deployment's implementation, and the account belongs to this factory;</li>
         <li>no other transaction for the account is still on its way (else 409): one at a time, until it is in a block;</li>
-        <li>
-          for <code>restrict</code>, <code>cancelChange</code> and <code>cancelRecovery</code> whose fee would go past the
-          account's daily cap, so the account waives all or part of it, that the account has not used its 10 such relays
-          today (else 429);
-        </li>
         <li>the call succeeds in simulation, and again when its gas is estimated (else 422 with the contract error's name);</li>
-        <li>it needs at most 2.5 million gas.</li>
+        <li>it needs at most 2.5 million gas;</li>
+        <li>
+          it fits the relayer's daily limits (else 429): the gas the relayer spends in a day, and 10 relays a day per
+          account of a <code>restrict</code> whose fee the account waives past its daily cap. Cancelling a change or a
+          recovery, and a freeze that stops payments or cancels waiting changes, never count against them.
+        </li>
       </ol>
       <p>
         Nothing that fails a check is ever broadcast. An optional random delay can separate arrival and
@@ -162,18 +162,22 @@ eth_feeHistory eth_getLogs net_version
         rows={[
           ["API requests per visitor (not /api/rpc)", "30 per minute"],
           ["RPC calls per visitor (each call of a batch counts)", "900 per minute"],
+          ["RPC calls for everyone", "3,000 per minute"],
           ["Requests per account (relay) or nullifier (accounts)", "12 per minute"],
           ["New accounts per visitor", "10 per day"],
-          ["New accounts for everyone", "500 per day"],
+          ["New accounts for everyone", "100 per day"],
           ["Faucet requests per visitor", "3 per day"],
           ["Faucet grants for everyone", "20 per day"],
-          ["Fee-free safety actions per account", "10 per day"],
+          ["Restricts per account whose fee the account waives, other than a freeze", "10 per day"],
+          ["Gas the relayer spends, for everyone", "100 million per day"],
         ]}
       />
       <p>
         A visitor is one IPv4 address, or one IPv6 /64: a machine usually holds a whole /64, so rotating addresses inside
-        it does not reset its limits. The daily budgets for everyone keep any number of visitors from emptying the
-        relayer's gas or the faucet.
+        it does not reset its limits. The budgets for everyone bound what any number of visitors can make the relayer
+        spend in a day, since fees paid in test USDG do not pay for its ETH. Cancelling a change or a recovery, and a
+        freeze that stops payments or cancels waiting changes, are never refused for a budget: each undoes something
+        that cost whoever made it, and whoever stole a passkey must not be able to use up what the owner needs.
       </p>
       <Callout kind="security" title="No raw IP addresses">
         A visitor is an HMAC-SHA256 of its address under a random secret that rotates every UTC day, kept in memory only.

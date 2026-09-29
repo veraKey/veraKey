@@ -401,7 +401,7 @@ export default function Home() {
                 <ul className="hero-facts">
                   <li><Check size={13} /> Live on Arbitrum Sepolia</li>
                   <li><Check size={13} /> 1.9 s proof in your browser</li>
-                  <li><Check size={13} /> 85 end-to-end tests</li>
+                  <li><Check size={13} /> 87 end-to-end tests</li>
                 </ul>
               </div>
             </div>

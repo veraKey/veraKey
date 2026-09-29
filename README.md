@@ -276,14 +276,14 @@ Nothing on-chain connects a user's accounts in different apps. When someone need
 - 18 circuit tests (`nargo test`: 11 for the authorization circuit, 7 for the link circuit);
 - 47 Rust unit tests and 10 property tests (`contracts/stylus/core`, 2,000 cases each);
 - 36 Foundry tests for the ERC-7579 validator, with real proofs;
-- 130 SDK unit tests (`pnpm test`), the integration kit's routes, cookies, sessions and React button and the passkey identity guard among them;
+- 138 SDK unit tests (`pnpm test`), the integration kit's routes, cookies, sessions and React button and the passkey identity guard among them;
 - 11 server unit tests (`pnpm test:server`): the relayer's visitor keys, IPv6 counted by /64, and the old domain's redirect;
-- 85 end-to-end tests (`packages/sdk/test/e2e`). They deploy the real contracts to a nitro devnode and use real proofs:
+- 87 end-to-end tests (`packages/sdk/test/e2e`). They deploy the real contracts to a nitro devnode and use real proofs:
   - 44 cover the account: front-running, replay, cross-account and cross-chain proofs, tampered proofs, caps, fees, the new-recipient cap, freezing, timelocks, the payment sheet, backup owners, the guardian and recovery;
   - 11 replay the internal audits' attacks;
   - 10 cover disclosures;
   - 5 cover Sign in with VeraKey;
-  - 15 drive the relayer over HTTP: its limits, the faucet under concurrent requests, the RPC proxy's bounds and one transaction per account.
+  - 17 drive the relayer over HTTP: its limits and daily budgets, the faucet under concurrent requests and across restarts, the RPC proxy's bounds and one transaction per account.
 - A browser workflow (`scripts/browser-e2e.mjs`) drives the app in headless Chrome with a virtual passkey, on desktop, on mobile and through the payment sheet:
   - it registers, funds and pays;
   - it runs into the new-recipient cap;
@@ -331,7 +331,7 @@ pnpm test:server                    # relayer unit tests
 
 scripts/devnode.sh up               # nitro devnode on :8649, upgraded to ArbOS 61 (multi-fragment Stylus)
 scripts/deploy.sh local             # verifiers, validator, test USDG, account implementation, factories
-pnpm test:e2e                       # 85 end-to-end tests with real proofs
+pnpm test:e2e                       # 87 end-to-end tests with real proofs
 pnpm sdk:pack                       # build and pack @verakey/sdk, check the tarball from a fresh project
 pnpm sdk:publish:github             # the checked tarball to GitHub Packages too (GH_TOKEN with write:packages)
 pnpm dev                            # relayer on :3090, app on http://localhost:5190

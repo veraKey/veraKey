@@ -21,17 +21,20 @@ export default function ChangelogPage() {
         </li>
         <li>
           <strong>The relayer spends less on attackers:</strong> a visitor on IPv6 is counted by its /64, which one
-          machine usually holds whole; new accounts and faucet grants have daily budgets for everyone; the RPC proxy
-          takes batches of at most 10 calls and only bounded log queries; each account has one transaction in flight at a
-          time; and safety actions whose fee the account waives are relayed at most 10 times a day per account. See{" "}
-          <A href="/docs/build/relayer-api#rate-limits">Relayer API</A>.
+          machine usually holds whole; the gas the relayer spends, new accounts, faucet grants and RPC calls have budgets
+          for everyone; the RPC proxy takes batches of at most 10 calls and only bounded log queries; each account has one
+          transaction in flight at a time; and a restrict whose fee the account waives is relayed at most 10 times a day
+          per account. Nothing counts against a limit before it simulates, and a freeze or a cancel is never refused for
+          a budget. See <A href="/docs/build/relayer-api#rate-limits">Relayer API</A>.
         </li>
         <li>
           <strong>SDK 0.2.3, sessions the kit can end:</strong> signing out ends every copy of the session cookie, a
           session checks every 10 minutes that its passkey still owns the account (<code>ownerCheckSeconds</code>), the
           payment route checks one payment per player at a time, <code>verifySignIn</code> no longer reads the chain once
-          a check that needs no chain has failed, and <code>ChangeAlreadyPending</code> is a <code>policy</code> error.
-          See <A href="/docs/build/sign-in#use-the-kit">Use the kit</A>.
+          a check that needs no chain has failed, and <code>ChangeAlreadyPending</code> is a <code>policy</code> error. An
+          owner check waits two seconds at most, and <code>RelayerClient.relay</code> waits out a busy account (409) for up
+          to ten seconds. Sessions from 0.2.2 carry no session id, so players sign in once more after the upgrade. See{" "}
+          <A href="/docs/build/sign-in#use-the-kit">Use the kit</A>.
         </li>
         <li>
           <strong>Translated pages keep working:</strong> with Chrome's page translation on, the app stopped on an error

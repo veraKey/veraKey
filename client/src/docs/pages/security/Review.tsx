@@ -18,10 +18,10 @@ export default function ReviewPage() {
         <li>18 circuit tests: 11 for the authorization circuit, 7 for the link circuit;</li>
         <li>47 unit tests and 10 property tests of 2,000 cases each for the account's logic;</li>
         <li>36 tests for the ERC-7579 validator, with real proofs;</li>
-        <li>130 unit tests for the SDK, the integration kit among them;</li>
+        <li>138 unit tests for the SDK, the integration kit among them;</li>
         <li>
-          85 end-to-end tests that deploy the real contracts to a local Arbitrum Nitro node and use real proofs: 44 for the
-          account, 11 that replay the audits' attacks, 10 for disclosures, 5 for Sign in with VeraKey and 15 that drive the
+          87 end-to-end tests that deploy the real contracts to a local Arbitrum Nitro node and use real proofs: 44 for the
+          account, 11 that replay the audits' attacks, 10 for disclosures, 5 for Sign in with VeraKey and 17 that drive the
           relayer over HTTP;
         </li>
         <li>
@@ -135,7 +135,7 @@ export default function ReviewPage() {
           [
             <Badge key="s" tone="orange">Medium</Badge>,
             "The relayer counted visitors by their full address, so rotating IPv6 addresses gave unlimited new accounts, faucet grants and RPC calls.",
-            "Visitors are counted by /64, new accounts and faucet grants have a daily budget for everyone, and the RPC proxy refuses large batches and unbounded log queries.",
+            "Visitors are counted by /64; the relayer's gas, new accounts, faucet grants and RPC calls have a budget for everyone; and the RPC proxy refuses large batches and unbounded log queries.",
           ],
           [
             <Badge key="s">Low</Badge>,
@@ -149,8 +149,8 @@ export default function ReviewPage() {
           ],
           [
             <Badge key="s">Low</Badge>,
-            "A crafted sign-in made the site's server run the on-chain proof check, and one player could pile up slow payment checks.",
-            "verifySignIn stops before any RPC call once a local check fails; one payment check runs at a time per player.",
+            "A malformed sign-in still made the site's server run the on-chain proof check, and one player could pile up slow payment checks.",
+            "verifySignIn stops before any RPC call once a local check fails; one payment check runs at a time per player. A well-formed sign-in with a bad proof still costs one check, so sites rate-limit the kit's routes.",
           ],
           [
             <Badge key="s">Low</Badge>,
@@ -159,6 +159,13 @@ export default function ReviewPage() {
           ],
         ]}
       />
+      <p>
+        Before release, a separate review of these fixes found three more gaps, fixed the same day: requests with a bad
+        proof could use up the relayer's allowance for an account's fee-free restricts, and so block the owner's freeze;
+        payments paid for in demo USDG could still empty the relayer's ETH; and a slow chain could hold a kit session's
+        owner check for up to 40 seconds. Now nothing counts before it simulates, a freeze or a cancel is never refused
+        for a budget, the relayer has a daily gas budget, and an owner check takes two seconds at most.
+      </p>
 
       <H2>Accepted risks</H2>
       <ul>
@@ -176,8 +183,8 @@ export default function ReviewPage() {
         <li>
           <strong>Fees while frozen.</strong> A thief who can make the passkey sign can still spend the account's funds on
           fees: up to <code>maxFee</code> per approval, paid only to the relayer, and never past the day's cap, beyond which
-          these fees are waived. That is griefing, not theft. The relayer sends a few such fee-free actions per account and
-          day; anyone can submit more themselves.
+          these fees are waived. That is griefing, not theft. The relayer never refuses a freeze or a cancel for its
+          budgets, and sends at most 10 other fee-free restricts per account and day.
         </li>
         <li>
           <strong>After a recovery the owner cannot rebuild the old guardian card.</strong> The guardian salt comes from the

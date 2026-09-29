@@ -121,7 +121,8 @@ const vera = new VeraKeyClient(config); // config: VeraKeyConfig
         <li>
           <code>new RelayerClient(baseUrl)</code> with <code>createAccount(appId, nullifier)</code>,{" "}
           <code>relay(account, functionName, args)</code> and <code>faucet(account)</code>. Failures throw{" "}
-          <code>RelayerError</code> with <code>status</code> and <code>revert</code>.
+          <code>RelayerError</code> with <code>status</code> and <code>revert</code>. While another transaction for the
+          same account is on its way (409), <code>relay</code> asks again every second, for up to ten seconds.
         </li>
       </ul>
 
@@ -359,9 +360,9 @@ interface DisclosedAccount {
         stack
         head={["Export", "Signature", "What it does"]}
         rows={methods([
-          ["createVeraKeyServer", "({ origin, deployment, secret, merchant?, rpcUrl?, publicClient?, sessionTtlSeconds?, ownerCheckSeconds?, store?, onSignIn?, onPayment? }): VeraKeyServer", "The kit's routes: session, nonce, sign-in, sign-out and payment. secret (at least 32 bytes) signs the session cookie; sessionTtlSeconds defaults to 7 days. ownerCheckSeconds (default 600) is how often a session checks on-chain that its passkey still owns the account; a failed check keeps the session and asks again. Signing out ends the session for every copy of its cookie when the store has has(). One payment check runs at a time per player. onSignIn and onPayment refuse by throwing. Throws at once on a malformed origin, secret, merchant, deployment or duration."],
+          ["createVeraKeyServer", "({ origin, deployment, secret, merchant?, rpcUrl?, publicClient?, sessionTtlSeconds?, ownerCheckSeconds?, store?, onSignIn?, onPayment? }): VeraKeyServer", "The kit's routes: session, nonce, sign-in, sign-out and payment. secret (at least 32 bytes) signs the session cookie; sessionTtlSeconds defaults to 7 days. ownerCheckSeconds (default 600) is how often a session checks on-chain that its passkey still owns the account, one check per session at a time; a chain that fails or takes more than two seconds keeps the session and is asked again a minute later. Signing out ends the session for every copy of its cookie when the store has has(); a store that cannot answer keeps the session. One payment check runs at a time per player. onSignIn and onPayment refuse by throwing. Throws at once on a malformed origin, secret, merchant, deployment or duration."],
           ["VeraKeyServer.handle", "(request: Request): Promise<Response>", "Answers the route named by the last segment of the request's path: for Next.js route handlers, Hono and any Fetch API server."],
-          ["VeraKeyServer.getPlayer", "(request): Promise<{ id, account } | null>", "The signed-in player of a request, from its session cookie; takes a Fetch Request or an Express request."],
+          ["VeraKeyServer.getPlayer", "(request): Promise<{ id, account } | null>", "The signed-in player of a request, from its session cookie; takes a Fetch Request or an Express request. It asks the store whether the session was signed out and, every ownerCheckSeconds, the chain."],
           ["toExpress", "(server: VeraKeyServer): middleware", 'Mounts the kit in Express: app.use("/api/verakey", toExpress(verakey)).'],
           ["memoryStore", "(): VeraKeyStore", "The default store: each nonce and payment is accepted once per process, and a signed-out session stays revoked there. Pass your own { claim, release, has? } in production; without has(), signing out only clears the cookie in that browser."],
           ["ARBITRUM_SEPOLIA", "VeraKeyDeployment", "The Arbitrum Sepolia deployment, from @verakey/sdk/deployments: name, chainId, rpcUrl, origin, rpIdHash, factory, honkVerifier, usdg. A deployment you write yourself needs the same fields."],

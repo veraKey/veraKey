@@ -101,7 +101,12 @@ function Shop() {
         <li>
           Sessions are cookies signed with <code>secret</code>: changing it signs every player out. Every 10 minutes (
           <code>ownerCheckSeconds</code>), a session checks on-chain that its passkey still owns the account, so a
-          passkey that a recovery or an owner change removed stops being signed in.
+          passkey that a recovery or an owner change removed stops being signed in. A chain that does not answer within
+          two seconds keeps the session, and is asked again a minute later.
+        </li>
+        <li>
+          Sessions from SDK 0.2.2 and earlier carry no session id, so after upgrading to 0.2.3 each player signs in once
+          more.
         </li>
       </ul>
 
