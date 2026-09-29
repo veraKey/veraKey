@@ -1,5 +1,5 @@
-// Regression tests for the internal audit of 2026-09-24 (Nemesis: Feynman and state-inconsistency passes),
-// on the real contracts with real proofs. Each test reproduces a finding's attack and expects the fix.
+// Regression tests for the internal audits of 2026-09-24 and 2026-09-29 (Nemesis: Feynman and state-inconsistency
+// passes), on the real contracts with real proofs. Each test reproduces a finding's attack and expects the fix.
 //
 //   pnpm --filter @verakey/sdk exec vitest run --config vitest.e2e.config.ts test/e2e/audit.e2e.test.ts
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -13,6 +13,7 @@ import {
   changeDataHash,
   changePayload,
   computeNullifier,
+  erc20Abi,
   guardianCommitment,
   veraKeyAccountAbi,
   veraKeyFactoryAbi,
@@ -140,8 +141,8 @@ describe("NM-001: the caps never stop the owners from defending the account", ()
     await send(call(ctx, "cancelChange", { changeId: pending.changeId }));
     await send(call(ctx, "restrict", { change: changePayload.freeze() }));
     expect((await read<readonly [bigint, boolean, Hex, boolean]>(ctx, "protections"))[1]).toBe(true);
-    // Their fees still count toward the day's spending.
-    expect((await read<readonly [bigint, bigint, bigint, bigint, boolean]>(ctx, "policy"))[2]).toBe(dailyCap + 2n * FEE);
+    // With the day's cap spent, their fees are waived (NM2-001): the day never spends more than its cap.
+    expect((await read<readonly [bigint, bigint, bigint, bigint, boolean]>(ctx, "policy"))[2]).toBe(dailyCap);
     await waitForChainTime(pending.eta);
     expect(await revertName(publicClient.simulateContract({
       address: ctx.account, abi: veraKeyAccountAbi, functionName: "applyChange", args: [pending.changeId, addThief.kind, addThief.payload], account: devAccount,
@@ -223,6 +224,57 @@ describe("NM-003, NM-004, NM-005: what the timelock accepts", () => {
     const stranger = await computeNullifier(prover.barretenberg, strangerKey.publicKey, strangerKey.prfSecret, ctx.appId);
     expect(await revertName(call(ctx, "scheduleChange", { change: changePayload.addOwner(fieldHex(ctx.owner.nullifier)) }))).toBe("AlreadyOwner");
     expect(await revertName(call(ctx, "scheduleChange", { change: changePayload.removeOwner(fieldHex(stranger)) }))).toBe("NotOwner");
+    expect(await revertName(call(ctx, "scheduleChange", { change: changePayload.removeOwner(fieldHex(ctx.owner.nullifier)) }))).toBe("LastOwner");
+  });
+});
+
+// Regression tests for the whole-system audit of 2026-09-29 (Nemesis, second round).
+describe("NM2-001: safety fees never push a day past its cap", () => {
+  it("a passkey holder cannot burn the balance on fees: past the cap, freezing costs nothing", async () => {
+    const maxFee = BigInt(deployment.policy.maxFee!);
+    const ctx = await newAccount("fee-burn", USDG(10));
+    const start = await publicClient.readContract({ address: usdg, abi: erc20Abi, functionName: "balanceOf", args: [ctx.account] });
+    // The day now allows exactly one maxFee.
+    await send(call(ctx, "restrict", { change: changePayload.setLimits(maxFee, maxFee), fee: maxFee }));
+    // Freezing again and again still works, but charges nothing once the day's cap is spent.
+    for (let i = 0; i < 3; i++) await send(call(ctx, "restrict", { change: changePayload.freeze(), fee: maxFee }));
+    const [, dailyCap, spent] = await read<readonly [bigint, bigint, bigint, bigint, boolean]>(ctx, "policy");
+    expect(dailyCap).toBe(maxFee);
+    expect(spent).toBe(maxFee);
+    const end = await publicClient.readContract({ address: usdg, abi: erc20Abi, functionName: "balanceOf", args: [ctx.account] });
+    expect(start - end).toBe(maxFee);
+    expect((await read<readonly [bigint, boolean, Hex, boolean]>(ctx, "protections"))[1]).toBe(true);
+  });
+
+  it("within the cap, a safety action still pays its fee", async () => {
+    const ctx = await newAccount("fee-within", USDG(5));
+    await send(call(ctx, "restrict", { change: changePayload.freeze() }));
+    expect((await read<readonly [bigint, bigint, bigint, bigint, boolean]>(ctx, "policy"))[2]).toBe(FEE);
+    expect(await publicClient.readContract({ address: usdg, abi: erc20Abi, functionName: "balanceOf", args: [ctx.account] })).toBe(USDG(5) - FEE);
+  });
+});
+
+describe("NM2-006: a change that could never apply cannot hold a pending slot", () => {
+  it("the same change cannot be scheduled twice", async () => {
+    const ctx = await newAccount("duplicate", USDG(5));
+    const otherKey = await VirtualPasskey.create();
+    const other = await computeNullifier(prover.barretenberg, otherKey.publicKey, otherKey.prfSecret, ctx.appId);
+    await schedule(ctx, changePayload.addOwner(fieldHex(other)));
+    expect(await revertName(call(ctx, "scheduleChange", { change: changePayload.addOwner(fieldHex(other)) }))).toBe("ChangeAlreadyPending");
+    await schedule(ctx, changePayload.setLimits(USDG(5), USDG(20)));
+    expect(await revertName(call(ctx, "scheduleChange", { change: changePayload.setLimits(USDG(5), USDG(20)) }))).toBe("ChangeAlreadyPending");
+  });
+
+  it("two removals cannot leave the account without an owner", async () => {
+    const ctx = await newAccount("removals", USDG(5));
+    const backupKey = await VirtualPasskey.create();
+    const backup = await computeNullifier(prover.barretenberg, backupKey.publicKey, backupKey.prfSecret, ctx.appId);
+    const add = changePayload.addOwner(fieldHex(backup));
+    const added = await schedule(ctx, add);
+    await waitForChainTime(added.eta);
+    await apply(ctx, added.changeId, add);
+    expect(await read<bigint>(ctx, "ownerCount")).toBe(2n);
+    await schedule(ctx, changePayload.removeOwner(fieldHex(backup)));
     expect(await revertName(call(ctx, "scheduleChange", { change: changePayload.removeOwner(fieldHex(ctx.owner.nullifier)) }))).toBe("LastOwner");
   });
 });

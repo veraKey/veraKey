@@ -122,4 +122,6 @@ interface IVeraKeyAccount  {
     error AlreadyOwner();
 
     error TokenTransferFailed();
+
+    error ChangeAlreadyPending();
 }

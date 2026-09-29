@@ -47,6 +47,33 @@ proptest! {
         }
     }
 
+    /// Safety actions (freeze, restrict, cancel) are never refused, and their fees never push a day past its cap:
+    /// mixing payments and safety fees in any order, one UTC day never spends more than the daily cap, and a safety
+    /// action never charges more than the fee it signed.
+    #[test]
+    fn safety_fees_never_push_a_day_past_its_cap(
+        per_tx in 1u64..1_000_000_000,
+        extra in 0u64..5_000_000_000,
+        steps in prop::collection::vec((any::<bool>(), 0u64..2_000_000_000), 1..60),
+        day in 0u64..40_000,
+    ) {
+        let (per_tx, daily) = (U256::from(per_tx), U256::from(per_tx + extra));
+        let mut window = Window::default();
+        for (i, (is_fee, amount)) in steps.iter().enumerate() {
+            let now = day * SECONDS_PER_DAY + i as u64;
+            let amount = U256::from(*amount);
+            if *is_fee {
+                let (next, charged) = spending::charge_fee(daily, window, now, amount);
+                prop_assert!(charged <= amount);
+                prop_assert_eq!(next.spent, window.spent + charged);
+                window = next;
+            } else if let Ok(next) = spending::spend(per_tx, daily, window, now, amount) {
+                window = next;
+            }
+            prop_assert!(window.spent <= daily);
+        }
+    }
+
     /// A new UTC day starts from zero.
     #[test]
     fn the_window_resets_on_the_next_day(per_tx in 1u64..1_000_000, spent in 0u64..1_000_000, day in 0u64..40_000) {

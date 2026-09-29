@@ -760,6 +760,11 @@ export const veraKeyAccountAbi = [
   },
   {
     "type": "error",
+    "name": "ChangeAlreadyPending",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "ChangeNotReady",
     "inputs": [
       {

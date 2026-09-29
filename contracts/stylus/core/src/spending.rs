@@ -36,13 +36,15 @@ pub fn spend(
     }
 }
 
-/// Records `amount` (a fee) in the window at `now` without refusing it, whatever the caps: freezing,
-/// restricting and cancelling must work even when the day's cap is spent. The account stores the day's
-/// spending as a `u128`, so the total saturates there.
-pub fn record(window: Window, now: u64, amount: U256) -> Window {
+/// Charges a safety action's fee at `now`. Freezing, restricting and cancelling must work even when the day's
+/// cap is spent, so they are never refused; instead, the part of `fee` past `daily_cap` is waived. A day's
+/// spending, fees included, therefore never passes the daily cap, and a stolen passkey cannot burn the balance
+/// on fees. Returns the new window and the part of `fee` to pay (possibly zero).
+pub fn charge_fee(daily_cap: U256, window: Window, now: u64, fee: U256) -> (Window, U256) {
     let today = now / SECONDS_PER_DAY;
     let already = if window.day == today { window.spent } else { U256::ZERO };
-    Window { day: today, spent: already.saturating_add(amount).min(U256::from(u128::MAX)) }
+    let charged = fee.min(daily_cap.saturating_sub(already));
+    (Window { day: today, spent: already + charged }, charged)
 }
 
 #[cfg(test)]
@@ -84,14 +86,32 @@ mod tests {
     }
 
     #[test]
-    fn recording_a_fee_never_refuses_it() {
-        // Already over the cap: the fee is still recorded, so payments see it.
-        assert_eq!(record(Window { day: 1, spent: u(25) }, DAY + 5, u(3)), Window { day: 1, spent: u(28) });
-        // A new UTC day starts from zero.
-        assert_eq!(record(Window { day: 1, spent: u(25) }, 2 * DAY, u(3)), Window { day: 2, spent: u(3) });
-        // The account stores the day's spending as a u128: saturate there instead of overflowing.
-        let full = U256::from(u128::MAX);
-        assert_eq!(record(Window { day: 1, spent: full }, DAY, u(1)).spent, full);
+    fn a_safety_fee_within_the_cap_is_charged_in_full() {
+        let (w, charged) = charge_fee(u(25), Window { day: 1, spent: u(10) }, DAY + 5, u(3));
+        assert_eq!((w, charged), (Window { day: 1, spent: u(13) }, u(3)));
+    }
+
+    #[test]
+    fn a_safety_fee_is_charged_only_up_to_the_cap() {
+        // 2 left today: only 2 of the 3 are charged, and the day stops at its cap.
+        let (w, charged) = charge_fee(u(25), Window { day: 1, spent: u(23) }, DAY + 5, u(3));
+        assert_eq!((w, charged), (Window { day: 1, spent: u(25) }, u(2)));
+    }
+
+    #[test]
+    fn a_safety_fee_past_the_cap_is_waived_not_refused() {
+        // The cap is spent: the action still goes through, and it charges nothing.
+        let (w, charged) = charge_fee(u(25), Window { day: 1, spent: u(25) }, DAY + 5, u(3));
+        assert_eq!((w, charged), (Window { day: 1, spent: u(25) }, u(0)));
+        // A cap lowered below today's spending waives it too, without lowering what was spent.
+        let (w, charged) = charge_fee(u(10), Window { day: 1, spent: u(25) }, DAY + 5, u(3));
+        assert_eq!((w, charged), (Window { day: 1, spent: u(25) }, u(0)));
+    }
+
+    #[test]
+    fn a_safety_fee_on_a_new_day_starts_from_zero() {
+        let (w, charged) = charge_fee(u(25), Window { day: 1, spent: u(25) }, 2 * DAY, u(3));
+        assert_eq!((w, charged), (Window { day: 2, spent: u(3) }, u(3)));
     }
 
     #[test]

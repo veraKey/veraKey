@@ -9,8 +9,9 @@
 //! - the account only moves USDG, through `transfer`, and every payment plus its fee is capped per
 //!   transaction and per UTC day. Safety actions (restrict, cancelling a change or a recovery) are never
 //!   refused because of the caps, so a thief who spends the day's cap cannot stop the owners from
-//!   freezing or vetoing; their fee, at most `maxFee`, still counts toward the day's spending. The
-//!   per-transaction cap never drops below `maxFee`, so every fee stays payable;
+//!   freezing or vetoing. Their fee, at most `maxFee`, counts toward the day's spending, and the part past
+//!   the day's cap is waived, so a day never spends more than its cap and a stolen passkey cannot burn the
+//!   balance on fees. The per-transaction cap never drops below `maxFee`, so every fee stays payable;
 //! - fees go only to the factory's `feeRecipient` and never exceed `maxFee`, so whoever submits a
 //!   transaction cannot turn a fee into a payment to themselves (not even from a frozen account);
 //! - the first payment to a recipient that is neither known (paid before) nor allowlisted is capped
@@ -23,7 +24,8 @@
 //!   ten minutes;
 //! - loosening configuration changes are scheduled with a proof and applied only after a timelock;
 //!   owners and the guardian can cancel them, and at most `MAX_PENDING` wait at once, listed on-chain
-//!   so an owner on any device can see them. Tightening changes (freeze, lower limits, enable the
+//!   so an owner on any device can see them. A change is refused when it could never apply: the same
+//!   change already waiting, or owner removals that would leave no owner. Tightening changes (freeze, lower limits, enable the
 //!   allowlist, remove a recipient, require the payment sheet) apply immediately through `restrict`;
 //! - the guardian is stored as a salted commitment, so it stays private until it acts; it can
 //!   freeze the account and replace all owners after a recovery delay, which any owner can cancel.
@@ -112,6 +114,7 @@ sol! {
     error LastOwner();
     error AlreadyOwner();
     error TokenTransferFailed();
+    error ChangeAlreadyPending();
 }
 
 #[derive(SolidityError)]
@@ -145,6 +148,7 @@ pub enum AccountError {
     LastOwner(LastOwner),
     AlreadyOwner(AlreadyOwner),
     TokenTransferFailed(TokenTransferFailed),
+    ChangeAlreadyPending(ChangeAlreadyPending),
 }
 
 impl From<spending::SpendError> for AccountError {
@@ -379,21 +383,25 @@ impl VeraKeyAccount {
         )?)
     }
 
-    /// `window.spent` fits a `u128`: payments never exceed the daily cap, and `spending::record` saturates.
+    /// `window.spent` fits a `u128`: payments and safety fees never take a day past the daily cap.
     fn record_spend(&mut self, window: spending::Window) {
         self.spend_day.set(U64::from(window.day));
         self.spent_today.set(u256_to_u128(window.spent));
     }
 
     /// Safety actions (restrict, cancelling a change or a recovery) are never refused because of the caps,
-    /// or a thief who spends the day's cap would stop the owners from freezing and vetoing. Their fee,
-    /// at most `max_fee` (checked in `authorize`), still counts toward the day's spending.
-    fn record_fee(&mut self, fee: U256) {
+    /// or a thief who spends the day's cap would stop the owners from freezing and vetoing. Their fee, at
+    /// most `max_fee` (checked in `authorize`), counts toward the day's spending, and the part past the
+    /// day's cap is waived: a day never spends more than its cap, so a stolen passkey cannot burn the
+    /// balance on fees. Returns the part of `fee` to pay.
+    fn charge_fee(&mut self, fee: U256) -> U256 {
         let window = spending::Window {
             day: self.spend_day.get().to::<u64>(),
             spent: u128_to_u256(self.spent_today.get()),
         };
-        self.record_spend(spending::record(window, self.now(), fee));
+        let (window, charged) = spending::charge_fee(u128_to_u256(self.daily_cap.get()), window, self.now(), fee);
+        self.record_spend(window);
+        charged
     }
 
     /// The largest fee any action may carry.
@@ -402,8 +410,10 @@ impl VeraKeyAccount {
     }
 
     /// A change can be scheduled only if it could apply: a valid payload, a per-transaction cap that
-    /// still covers the largest fee, and owner changes that fit the current owners. A freeze never
-    /// waits: it goes through `restrict`.
+    /// still covers the largest fee, owner changes that fit the current owners, and not the same change
+    /// again while it waits. Owner removals already waiting count too, so removals can never leave the
+    /// account without an owner: a change that could never apply would only hold one of the pending slots.
+    /// A freeze never waits: it goes through `restrict`.
     fn check_schedule(&self, change_kind: u8, payload: &[u8]) -> Result<(), AccountError> {
         if change_kind == change::FREEZE
             || !change::is_valid(change_kind, payload)
@@ -411,10 +421,27 @@ impl VeraKeyAccount {
         {
             return Err(AccountError::InvalidChange(InvalidChange {}));
         }
+        let data_hash = change_data_hash(change_kind, payload);
+        let mut pending_removals = 0u64;
+        for index in 0..MAX_PENDING {
+            let id = self.pending_id(index);
+            if id == B256::ZERO {
+                continue;
+            }
+            let pending = self.pending.getter(id);
+            if pending.payload_hash.get() == data_hash {
+                return Err(AccountError::ChangeAlreadyPending(ChangeAlreadyPending {}));
+            }
+            if pending.change_kind.get().to::<u8>() == change::REMOVE_OWNER {
+                pending_removals += 1;
+            }
+        }
         match change_kind {
             change::ADD_OWNER if self.owner(B256::from_slice(payload)) => Err(AccountError::AlreadyOwner(AlreadyOwner {})),
             change::REMOVE_OWNER if !self.owner(B256::from_slice(payload)) => Err(AccountError::NotOwner(NotOwner {})),
-            change::REMOVE_OWNER if self.owner_count.get().to::<u64>() <= 1 => Err(AccountError::LastOwner(LastOwner {})),
+            change::REMOVE_OWNER if self.owner_count.get().to::<u64>() <= 1 + pending_removals => {
+                Err(AccountError::LastOwner(LastOwner {}))
+            }
             _ => Ok(()),
         }
     }
@@ -812,13 +839,13 @@ impl VeraKeyAccount {
             &proof,
             None,
         )?;
-        self.record_fee(fee);
+        let charged = self.charge_fee(fee);
         self.apply(change_kind, &payload)?;
         if change_kind == change::FREEZE {
             self.cancel_pending_changes(false);
         }
 
-        self.pay_fee(fee)?;
+        self.pay_fee(charged)?;
         log(self.vm(), Restricted {
             restrictionId: restriction_id,
             changeKind: change_kind,
@@ -888,9 +915,9 @@ impl VeraKeyAccount {
             &proof,
             None,
         )?;
-        self.record_fee(fee);
+        let charged = self.charge_fee(fee);
         self.clear_pending(change_id);
-        self.pay_fee(fee)?;
+        self.pay_fee(charged)?;
         log(self.vm(), ChangeCancelled { changeId: change_id });
         Ok(())
     }
@@ -986,9 +1013,9 @@ impl VeraKeyAccount {
             &proof,
             None,
         )?;
-        self.record_fee(fee);
+        let charged = self.charge_fee(fee);
         self.clear_recovery();
-        self.pay_fee(fee)?;
+        self.pay_fee(charged)?;
         log(self.vm(), RecoveryCancelled {
             newNullifier: pending,
         });
