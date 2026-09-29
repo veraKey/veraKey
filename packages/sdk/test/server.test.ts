@@ -202,6 +202,80 @@ describe("createVeraKeyServer: sign-in", () => {
     expect(await server.getPlayer({ headers: { cookie: session } })).toBeNull();
   });
 
+  /** A chain that behaves until `rpc.down`, then fails (or hangs) every owner check, counting them. */
+  function flakyChain(mode: "fail" | "hang" | "slow") {
+    const rpc = { down: false, calls: 0, waiting: [] as (() => void)[] };
+    const base = chain({ deployed: true });
+    const client = {
+      ...base,
+      readContract: async (args: { functionName: string }) => {
+        if (!rpc.down || args.functionName !== "isOwner") return base.readContract(args as never);
+        rpc.calls++;
+        if (mode === "fail") throw new Error("the RPC failed");
+        await new Promise<void>(resolve => rpc.waiting.push(resolve));
+        return true;
+      },
+    } as unknown as PublicClient;
+    return { rpc, client };
+  }
+
+  it("asks a chain that fails about the owner once a minute, not on every request", async () => {
+    const { rpc, client } = flakyChain("fail");
+    const { server, session } = await signIn(kit({ publicClient: client }));
+    rpc.down = true;
+    vi.setSystemTime((NOW + 601) * 1000);
+    // The chain did not answer: the session stays, and the failure is remembered.
+    expect(await server.getPlayer({ headers: { cookie: session } })).toEqual(PLAYER);
+    expect(await server.getPlayer({ headers: { cookie: session } })).toEqual(PLAYER);
+    expect(rpc.calls).toBe(1);
+    vi.setSystemTime((NOW + 601 + 61) * 1000);
+    expect(await server.getPlayer({ headers: { cookie: session } })).toEqual(PLAYER);
+    expect(rpc.calls).toBe(2);
+  });
+
+  it("runs one owner check per session at a time, however many requests arrive", async () => {
+    const { rpc, client } = flakyChain("slow");
+    const { server, session } = await signIn(kit({ publicClient: client }));
+    rpc.down = true;
+    vi.setSystemTime((NOW + 601) * 1000);
+    const answers = Promise.all([1, 2, 3].map(() => server.getPlayer({ headers: { cookie: session } })));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    rpc.waiting.forEach(release => release());
+    expect(await answers).toEqual([PLAYER, PLAYER, PLAYER]);
+    expect(rpc.calls).toBe(1);
+  });
+
+  it("waits a few seconds at most for a chain that does not answer, and keeps the session", async () => {
+    const { rpc, client } = flakyChain("hang");
+    const { server, session } = await signIn(kit({ publicClient: client }));
+    rpc.down = true;
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime((NOW + 601) * 1000);
+    const player = server.getPlayer({ headers: { cookie: session } });
+    // Let the cookie check run until the owner check waits on the chain, then let the clock run.
+    while (rpc.calls === 0) await new Promise(resolve => setImmediate(resolve));
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(await player).toEqual(PLAYER);
+  });
+
+  it("clears this browser's cookie even when the store cannot record the sign-out", async () => {
+    const store = memoryStore();
+    const { server, session } = await signIn(kit({
+      store: { ...store, claim: async (key, ttl) => (key.startsWith("signout:") ? Promise.reject(new Error("the store is down")) : store.claim(key, ttl)) },
+    }));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const response = await server.handle(request("POST", "sign-out", { cookie: session }));
+    expect(response.status).toBe(200);
+    expect(response.headers.getSetCookie()).toEqual(["__Host-verakey-session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure"]);
+  });
+
+  it("keeps a session when the store cannot say whether it was signed out", async () => {
+    const store = memoryStore();
+    const { server, session } = await signIn(kit({ store: { ...store, has: async () => Promise.reject(new Error("the store is down")) } }));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await server.getPlayer({ headers: { cookie: session } })).toEqual(PLAYER);
+  });
+
   it("uses plain cookie names, without Secure, on http localhost", async () => {
     const response = await kit({ origin: "http://localhost:5192" }).handle(
       new Request("http://localhost:5192/api/verakey/nonce", { method: "POST", headers: { origin: "http://localhost:5192" } })

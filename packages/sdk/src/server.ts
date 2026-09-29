@@ -29,7 +29,7 @@ export interface VeraKeyStore {
   release(key: string): Promise<void>;
   /**
    * Whether `key` is claimed now. With it, signing out ends the session for every copy of its cookie; a store without
-   * it can only clear the cookie in the browser that signs out.
+   * it can only clear the cookie in the browser that signs out. When it throws, the session is kept.
    */
   has?(key: string): Promise<boolean>;
 }
@@ -52,7 +52,8 @@ export interface VeraKeyServerOptions {
   /**
    * How often, in seconds, a session checks on-chain that its passkey still owns the account (default 600). A passkey
    * a recovery removed then stops being signed in within this time. 0 checks on every request; Infinity never. A
-   * failed RPC call keeps the session and asks again on the next request.
+   * session has one check at a time. A chain that fails, or takes more than two seconds, keeps the session and is
+   * asked again a minute later (or sooner, when this is shorter).
    */
   ownerCheckSeconds?: number;
   /** Where the kit remembers used nonces and accepted payments; default in memory, for one process. */
@@ -83,6 +84,12 @@ const NONCE_TTL_SECONDS = 300;
 const NONCE_CLAIM_SECONDS = 360;
 const DEFAULT_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 const DEFAULT_OWNER_CHECK_SECONDS = 600;
+/** How long one on-chain owner check may take before the session is kept without its answer. */
+const OWNER_CHECK_TIMEOUT_MS = 2_000;
+/** After a check the chain did not answer, when to ask again (at most ownerCheckSeconds). */
+const OWNER_RETRY_SECONDS = 60;
+/** Sessions whose owner check the kit remembers at once; the oldest are forgotten, and simply checked again. */
+const MAX_OWNER_ENTRIES = 10_000;
 const MAX_BODY_BYTES = 64 * 1024;
 /** How often, and how far apart, the payment route asks again about a transaction its node does not know yet. */
 const RECEIPT_RETRIES = 5;
@@ -219,8 +226,11 @@ export function createVeraKeyServer(options: VeraKeyServerOptions): VeraKeyServe
   }
 
   const ownerCheck = options.ownerCheckSeconds ?? DEFAULT_OWNER_CHECK_SECONDS;
-  /** When each session (by id) last saw its passkey own the account on-chain, and whether it still did. */
-  const ownerSeen = new Map<string, { at: number; owner: boolean }>();
+  /** Whether each session's (by id) passkey still owned the account on-chain, and when to ask the chain again. */
+  const ownerSeen = new Map<string, { owner: boolean; next: number }>();
+  /** Owner checks under way, one per session, which every request for that session waits on. */
+  const ownerChecks = new Map<string, Promise<boolean>>();
+  let storeFailureLogged = false;
   /** Players with a payment check running: one at a time each, so nobody can pile up slow checks. */
   const paying = new Set<string>();
 
@@ -248,37 +258,72 @@ export function createVeraKeyServer(options: VeraKeyServerOptions): VeraKeyServe
   async function readSession(header: string | null): Promise<Session | null> {
     const session = await decodeSession(header);
     if (!session) return null;
-    if (store.has && (await store.has(`signout:${session.sid}`))) return null;
+    if (await signedOut(session)) return null;
     return (await stillOwner(session)) ? session : null;
   }
 
+  /** Whether the session was signed out. A store that cannot answer keeps the session, as a kit without `has` would. */
+  async function signedOut(session: Session): Promise<boolean> {
+    if (!store.has) return false;
+    try {
+      return await store.has(`signout:${session.sid}`);
+    } catch (error) {
+      if (!storeFailureLogged) console.error("VeraKey: the store could not say whether a session was signed out; keeping it", error);
+      storeFailureLogged = true;
+      return false;
+    }
+  }
+
+  function rememberOwner(sid: string, owner: boolean, next: number) {
+    ownerSeen.delete(sid);
+    if (ownerSeen.size >= MAX_OWNER_ENTRIES) ownerSeen.delete(ownerSeen.keys().next().value!);
+    ownerSeen.set(sid, { owner, next });
+  }
+
   /**
-   * Whether the session's passkey still owns the account, asked on-chain at most every `ownerCheck` seconds. A failed
-   * RPC call keeps the session and asks again next time.
+   * Whether the session's passkey still owns the account, asked on-chain at most every `ownerCheck` seconds, one check
+   * per session at a time. A chain that fails or takes more than two seconds keeps the session, and is asked again
+   * a minute later rather than on every request.
    */
   async function stillOwner(session: Session): Promise<boolean> {
     if (!Number.isFinite(ownerCheck)) return true;
-    const now = nowSeconds();
     const seen = ownerSeen.get(session.sid);
-    if (seen && (!seen.owner || now - seen.at < ownerCheck)) return seen.owner;
-    let owner: boolean;
-    try {
-      const code = await publicClient.getCode({ address: session.player.account });
-      // An account not deployed yet has had no owner changes: the passkey that signed in still owns it.
-      owner = !code || code === "0x" ||
-        (await publicClient.readContract({ address: session.player.account, abi: veraKeyAccountAbi, functionName: "isOwner", args: [session.player.id] })) === true;
-    } catch {
-      return true;
+    if (seen && (!seen.owner || nowSeconds() < seen.next)) return seen.owner;
+    let check = ownerChecks.get(session.sid);
+    if (!check) {
+      check = checkOwner(session).finally(() => ownerChecks.delete(session.sid));
+      ownerChecks.set(session.sid, check);
     }
-    ownerSeen.set(session.sid, { at: now, owner });
-    if (ownerSeen.size > 10_000) for (const [sid, entry] of ownerSeen) if (now - entry.at > sessionTtl) ownerSeen.delete(sid);
-    return owner;
+    return check;
+  }
+
+  async function checkOwner({ sid, player }: Session): Promise<boolean> {
+    const now = nowSeconds();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const owner = await Promise.race([
+        (async () => {
+          const code = await publicClient.getCode({ address: player.account });
+          // An account not deployed yet has had no owner changes: the passkey that signed in still owns it.
+          return !code || code === "0x" ||
+            (await publicClient.readContract({ address: player.account, abi: veraKeyAccountAbi, functionName: "isOwner", args: [player.id] })) === true;
+        })(),
+        new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error("timed out")), OWNER_CHECK_TIMEOUT_MS))),
+      ]);
+      rememberOwner(sid, owner, now + ownerCheck);
+      return owner;
+    } catch {
+      rememberOwner(sid, true, now + Math.min(OWNER_RETRY_SECONDS, ownerCheck));
+      return true;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async function sessionCookie(player: VeraKeyPlayer): Promise<string> {
     const sid = bytesToHex(crypto.getRandomValues(new Uint8Array(16))).slice(2);
     // verifySignIn just checked on-chain that this passkey owns the account.
-    ownerSeen.set(sid, { at: nowSeconds(), owner: true });
+    if (Number.isFinite(ownerCheck)) rememberOwner(sid, true, nowSeconds() + ownerCheck);
     const body = JSON.stringify({ v: 1, id: player.id, account: player.account, sid, exp: nowSeconds() + sessionTtl });
     const payload = base64UrlEncode(new TextEncoder().encode(body));
     return cookie(SESSION_COOKIE, `${payload}.${await mac(await key, `verakey-session|${origin}|${payload}`)}`, sessionTtl, "Lax");
@@ -340,7 +385,14 @@ export function createVeraKeyServer(options: VeraKeyServerOptions): VeraKeyServe
       // Ends the session everywhere: every copy of its cookie (another tab, a leaked header) stops working, not only
       // the one this browser clears.
       const session = await decodeSession(request.headers.get("cookie"));
-      if (session) await store.claim(`signout:${session.sid}`, Math.max(1, session.exp - nowSeconds()));
+      if (session) {
+        try {
+          await store.claim(`signout:${session.sid}`, Math.max(1, session.exp - nowSeconds()));
+        } catch (error) {
+          // This browser is still signed out; only other copies of its cookie stay valid until they expire.
+          console.error("VeraKey: the store could not record a sign-out", error);
+        }
+      }
       return json(200, {}, [cookie(SESSION_COOKIE, "", 0, "Lax")]);
     },
 

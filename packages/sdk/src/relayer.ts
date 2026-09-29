@@ -21,6 +21,10 @@ export type RelayableFunction =
   | "cancelRecovery"
   | "executeRecovery";
 
+/** How often, and how far apart, `relay` asks again while the account's previous transaction is on its way. */
+const BUSY_RETRIES = 10;
+const BUSY_RETRY_MS = 1_000;
+
 /** Thin client for the gasless relayer HTTP API (`server/` in this repo). */
 export class RelayerClient {
   constructor(private readonly baseUrl: string) {}
@@ -42,8 +46,19 @@ export class RelayerClient {
     return this.post("/accounts", { appId, nullifier });
   }
 
-  relay(account: Address, functionName: RelayableFunction, args: readonly unknown[]): Promise<{ hash: Hex }> {
-    return this.post("/relay", { account, functionName, args });
+  /**
+   * Relays one call. While the relayer is still sending another transaction for the same account it answers 409 and
+   * sends nothing, so this waits a moment and asks again, for up to about ten seconds.
+   */
+  async relay(account: Address, functionName: RelayableFunction, args: readonly unknown[]): Promise<{ hash: Hex }> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.post("/relay", { account, functionName, args });
+      } catch (error) {
+        if (!(error instanceof RelayerError) || error.status !== 409 || attempt >= BUSY_RETRIES) throw error;
+        await new Promise(resolve => setTimeout(resolve, BUSY_RETRY_MS));
+      }
+    }
   }
 
   faucet(account: Address): Promise<{ hash: Hex }> {
