@@ -23,11 +23,11 @@ export default function ContractReferencePage() {
         head={["Function", "Caller", "What it does"]}
         rows={[
           [c("pay(address to, uint256 amount, …proof)"), "Owner's proof", "Pays amount USDG to to, and the fee to the fee recipient."],
-          [c("scheduleChange(uint8 change_kind, bytes payload, …proof) → bytes32"), "Owner's proof", "Schedules a change; returns its id. It applies after the change delay; a change to the guardian waits the recovery delay too. A freeze, or an owner change that could never apply, is refused."],
-          [c("restrict(uint8 change_kind, bytes payload, …proof) → bytes32"), "Owner's proof", "Applies a tightening change at once; a freeze also cancels the scheduled changes. Never refused because of the caps."],
+          [c("scheduleChange(uint8 change_kind, bytes payload, …proof) → bytes32"), "Owner's proof", "Schedules a change; returns its id. It applies after the change delay; a change to the guardian waits the recovery delay too. A freeze, an owner change that could never apply, or a change identical to one already waiting, is refused."],
+          [c("restrict(uint8 change_kind, bytes payload, …proof) → bytes32"), "Owner's proof", "Applies a tightening change at once; a freeze also cancels the scheduled changes. Never refused because of the caps: past the day's cap its fee is waived."],
           [c("applyChange(bytes32 change_id, uint8 change_kind, bytes payload)"), "Anyone", "Applies a scheduled change whose delay has passed, with the exact kind and payload scheduled."],
-          [c("cancelChange(bytes32 change_id, …proof)"), "Owner's proof", "Cancels a scheduled change. Never refused because of the caps."],
-          [c("cancelRecovery(…proof)"), "Owner's proof", "Cancels a pending recovery. Never refused because of the caps."],
+          [c("cancelChange(bytes32 change_id, …proof)"), "Owner's proof", "Cancels a scheduled change. Never refused because of the caps: past the day's cap its fee is waived."],
+          [c("cancelRecovery(…proof)"), "Owner's proof", "Cancels a pending recovery. Never refused because of the caps: past the day's cap its fee is waived."],
           [c("guardianFreeze(bytes32 salt)"), "Guardian", "Freezes the account and cancels every scheduled change except changes to the guardian."],
           [c("guardianCancelChange(bytes32 change_id, bytes32 salt)"), "Guardian", "Vetoes a scheduled change, except a change to the guardian."],
           [c("initiateRecovery(bytes32 new_nullifier, bytes32 salt)"), "Guardian", "Starts replacing every owner with new_nullifier after the recovery delay."],

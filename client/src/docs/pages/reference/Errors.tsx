@@ -8,8 +8,9 @@ const ACCOUNT_ERRORS: [string, ReactNode, ReactNode][] = [
   ["AlreadyInitialized()", "initialize was called on an account that is already set up, or on the implementation, which locks itself.", "Nothing to do: the factory initializes each account once."],
   ["AlreadyOwner()", "An AddOwner change names a nullifier that is already an owner.", "Nothing to do; that passkey already controls the account."],
   ["CannotVetoGuardianChange()", "The guardian tried to cancel a change to the guardian itself.", "By design: such a change waits the change delay plus the recovery delay instead."],
+  ["ChangeAlreadyPending()", "scheduleChange got the same kind and payload as a change that is already waiting.", "Nothing to do: apply the waiting change when it is ready, or cancel it first."],
   ["ChangeNotReady(uint64 eta)", "applyChange came before the change's timelock ended.", <>Apply it at or after <code>eta</code> (Unix seconds).</>],
-  ["DailyCapExceeded()", "Today's spending plus this amount and fee is above the daily cap. Days are UTC days. Only payments and scheduled changes can hit it; freezing and cancelling never do.", "Wait for the next UTC day, or raise the cap with a scheduled change."],
+  ["DailyCapExceeded()", "Today's spending plus this amount and fee is above the daily cap. Days are UTC days. Only payments and scheduled changes can hit it; freezing and cancelling never do, and past the cap their fee is waived.", "Wait for the next UTC day, or raise the cap with a scheduled change."],
   ["DeadlineExpired()", "The authorization's deadline passed before the transaction was mined.", "Approve the action again. The SDK signs deadlines 5 minutes ahead."],
   ["DeadlineTooFar()", "The deadline is more than 10 minutes away.", <>Use a deadline within <code>MAX_DEADLINE_WINDOW</code> (600 seconds).</>],
   ["FeeTooHigh(uint256 maxFee)", <>The signed fee is above the account's <code>maxFee</code>.</>, "Sign a lower fee. A relayer that asks more than maxFee cannot serve this account."],
@@ -19,7 +20,7 @@ const ACCOUNT_ERRORS: [string, ReactNode, ReactNode][] = [
   ["InvalidConfig()", "initialize got an invalid configuration: an app id or owner nullifier outside the field, a zero address, an empty or over-long origin, a per-payment cap of zero or above the daily cap, a maximum fee above the per-payment cap, or a delay over 30 days.", "Deploy the factory with a valid configuration."],
   ["InvalidProof()", "The verifier rejected the proof for the public inputs the account computed.", "Prove again. Check that the rpId, the app id and the nullifier match this account."],
   ["InvalidRecipient()", "The recipient is the zero address or the account itself.", "Pay another address."],
-  ["LastOwner()", "A RemoveOwner change would remove the only owner.", "Add another owner first."],
+  ["LastOwner()", "A RemoveOwner change would remove the only owner, counting the removals already scheduled.", "Add another owner first, or cancel a scheduled removal."],
   ["NewPayeeCapExceeded(uint256 cap)", <>A first payment to a recipient that was never paid and is not allowlisted is above <code>cap</code>.</>, "Send at most cap first, or allowlist the recipient or raise the cap with a scheduled change."],
   ["NoRecovery()", "executeRecovery or a cancel found no pending recovery.", "Nothing to do."],
   ["NotGuardian()", "The caller and salt do not match the stored guardian commitment, or no guardian is set.", "Call from the guardian's address with the salt on its guardian card."],
@@ -46,7 +47,7 @@ export default function ErrorsPage() {
   return (
     <>
       <p>
-        When a call reverts in simulation, the relayer answers 422 and names the contract error in <code>revert</code>, and
+        When a call reverts in simulation or gas estimation, the relayer answers 422 and names the contract error in <code>revert</code>, and
         the SDK passes it on as <code>VeraKeyError.revert</code>. Nothing is sent to the chain.
       </p>
 
@@ -93,15 +94,15 @@ export default function ErrorsPage() {
         stack
         head={["Status", "When", "What to do"]}
         rows={[
-          ["400", "An unsupported function, arguments that do not match the ABI, an app id or nullifier outside the field, a contract that is not a VeraKey account, or an account of another deployment. /api/rpc answers 400 for a method it does not proxy.", "Fix the request; relay only to accounts of this deployment."],
+          ["400", "An unsupported function, arguments that do not match the ABI, an app id or nullifier outside the field, a contract that is not a VeraKey account, or an account of another deployment. /api/rpc answers 400 for a method it does not proxy, a batch of more than 10, or a log query without an address or a bounded block range.", "Fix the request; relay only to accounts of this deployment."],
           ["402", "The signed fee is below the relayer's fee.", <>Sign at least <code>relayer.fee</code> from <code>/api/config</code>.</>],
           ["404", "The account is not deployed.", <>Create it first: <code>POST /api/accounts</code> or <code>ensureAccount</code>.</>],
-          ["409", "The faucet already funded this account.", "Nothing to do."],
+          ["409", "The faucet already funded this account, or another transaction for this account is still on its way.", "Nothing to do, or send again once the first one is in a block."],
           ["413", "A bytes argument is larger than 16 KiB.", "Send a real proof and client data."],
-          ["422", <>The call reverts in simulation (<code>revert</code> names the error), or it needs more than 2.5M gas.</>, <>See <A href="#account-errors">Account errors</A>.</>],
-          ["429", "A rate limit: requests per visitor per minute, requests per account, new accounts per visitor per day, or faucet grants per visitor per day.", "Wait and try again."],
+          ["422", <>The call reverts in simulation or gas estimation (<code>revert</code> names the error), or it needs more than 2.5M gas.</>, <>See <A href="#account-errors">Account errors</A>.</>],
+          ["429", "A rate limit: requests per visitor per minute, requests per account, new accounts per visitor per day, or faucet grants per visitor per day. Or a daily budget: new accounts or faucet grants for everyone, or safety actions whose fee the account waives (10 per account).", "Wait and try again, or submit a waived safety action yourself."],
           ["500", "An unexpected relayer error.", "Try again; check the relayer's logs."],
-          ["502", "The RPC endpoint could not simulate the call, or is unavailable.", "Try again later."],
+          ["502", "The RPC endpoint could not simulate or estimate the call, or is unavailable.", "Try again later."],
           ["503", "The demo faucet is out of USDG.", "Try again later."],
         ]}
       />

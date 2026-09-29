@@ -54,8 +54,9 @@ await pay({ amount: 1_000_000n }); // 1 USDG to your merchant
 
 The kit binds each nonce to the browser that asked for it, verifies every sign-in and payment on your server,
 keeps the session in a signed cookie, and accepts each payment once (in memory by default: pass a durable
-`store` in production). React is an optional peer dependency; without React, `VeraKeySession` from
-`@verakey/sdk/session` does the same in any page.
+`store` in production). Signing out ends every copy of the session, and a session checks every 10 minutes
+(`ownerCheckSeconds`) that its passkey still owns the account. React is an optional peer dependency; without
+React, `VeraKeySession` from `@verakey/sdk/session` does the same in any page.
 
 ## Sign in with VeraKey
 

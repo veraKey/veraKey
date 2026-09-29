@@ -38,8 +38,8 @@ export default function RelayerApiPage() {
     "honkVerifier": "0x6158Fc3c9F78f78eA780f30ab3E8515AD04Bd834",
     "linkVerifier": "0x8d5CF3023DA9a9257D680eb1bF3832df10CCe291",
     "veraKeyValidator": "0x42aEc9C527280e8E3E3B90135FA7C007274b4fdE",
-    "accountImplementation": "0xfab5e61aece00c0399cc3d186b154ae194156d0d",
-    "factory": "0xbaac250f9f1b07651c121e314bccc6fa4c64e55c",
+    "accountImplementation": "0xfb14e3accc7a1296ecb2b6003f935566fbd5f8c6",
+    "factory": "0x3b570f82108f16bb9e59b409b618d6cb422757b7",
     "factoryAlt": "",
     "usdg": "0xFFC95faa3d63Cde504a05B567C600B78C0b41892"
   },
@@ -50,7 +50,7 @@ export default function RelayerApiPage() {
   },
   "relayer": { "address": "0x6D377a3927df664FDA9946Aa0E6fb8F707844fA8", "fee": "20000", "faucetAmount": "5000000" },
   "circuitVkHash": "0x16378935c4dee31e952a8c42d2f20d4d5dbd00ee2e8225a1eb16e908caf37f12",
-  "configHash": "0xe00ba16d1ea81d6a62721f9230dfb109f065f569198cec2c375bdd57bdb132e2"
+  "configHash": "0xda38b760b0e8178c9a64cff2e28e76f150b3c751c4b22430cbac80b7fd15677e"
 }
 `}</Code>
       <p>
@@ -96,7 +96,13 @@ export default function RelayerApiPage() {
         <li>the arguments match the function's ABI, and each <code>bytes</code> argument is at most 16 KiB;</li>
         <li>the signed fee is at least the relayer's fee (else 402);</li>
         <li>the account's code is the EIP-1167 clone of this deployment's implementation, and the account belongs to this factory;</li>
-        <li>the call succeeds in simulation (else 422 with the contract error's name);</li>
+        <li>no other transaction for the account is still on its way (else 409): one at a time, until it is in a block;</li>
+        <li>
+          for <code>restrict</code>, <code>cancelChange</code> and <code>cancelRecovery</code> whose fee would go past the
+          account's daily cap, so the account waives all or part of it, that the account has not used its 10 such relays
+          today (else 429);
+        </li>
+        <li>the call succeeds in simulation, and again when its gas is estimated (else 422 with the contract error's name);</li>
         <li>it needs at most 2.5 million gas.</li>
       </ol>
       <p>
@@ -109,14 +115,15 @@ export default function RelayerApiPage() {
 { "account": "0x…" }
 `}</Code>
       <p>
-        Sends the demo amount (5 USDG) to a deployed VeraKey account of this deployment, once per account. Responds{" "}
-        <code>{"{ \"hash\": \"0x…\" }"}</code>, 409 if the account was already funded, or 503 when the treasury is empty.
+        Sends the demo amount (5 USDG) to a deployed VeraKey account of this deployment, once per account, even to
+        concurrent requests. Responds <code>{"{ \"hash\": \"0x…\" }"}</code>, 409 if the account was already funded, 429
+        when the visitor or the faucet has reached today's limit, or 503 when the treasury is empty.
       </p>
 
       <H2>POST /api/rpc</H2>
       <p>
         A JSON-RPC 2.0 proxy for reads, so browsers never need the RPC provider's URL or key. It accepts one request or a
-        batch of up to 20, and only these methods:
+        batch of up to 10, counted as that many requests, and only these methods:
       </p>
       <Code lang="text">{`
 eth_chainId eth_blockNumber eth_call eth_getCode eth_getBalance eth_getBlockByNumber eth_getTransactionByHash
@@ -124,8 +131,10 @@ eth_getTransactionReceipt eth_getTransactionCount eth_estimateGas eth_gasPrice e
 eth_feeHistory eth_getLogs net_version
 `}</Code>
       <p>
-        Any other method gets <code>{"{ \"error\": { \"code\": -32601, \"message\": \"Method not allowed\" } }"}</code> with
-        status 400.
+        <code>eth_getLogs</code> must name the contracts it reads (<code>address</code>, at most 10) and either a block
+        hash or a range of at most 100,000 blocks whose ends are block numbers, not tags such as <code>latest</code>. Any
+        other method, or an unbounded log query, gets{" "}
+        <code>{"{ \"error\": { \"code\": -32601, \"message\": \"Method not allowed\" } }"}</code> with status 400.
       </p>
 
       <H2>Errors</H2>
@@ -136,12 +145,12 @@ eth_feeHistory eth_getLogs net_version
           ["400", "A malformed request; arguments that do not match the ABI; not a VeraKey account; an account of another deployment"],
           ["402", "The signed relayer fee is too low"],
           ["404", "The account is not deployed"],
-          ["409", "The faucet already funded this account"],
+          ["409", "The faucet already funded this account; another transaction for this account is still on its way"],
           ["413", "A bytes argument is larger than 16 KiB"],
-          ["422", "The call reverts in simulation (revert holds the contract error, e.g. PerTxCapExceeded), or needs too much gas"],
-          ["429", "A rate limit was hit"],
+          ["422", "The call reverts in simulation or gas estimation (revert holds the contract error, e.g. PerTxCapExceeded), or needs too much gas"],
+          ["429", "A rate limit or a daily budget was reached"],
           ["500", "An unexpected relayer error"],
-          ["502", "The RPC endpoint could not simulate the call, or is unavailable"],
+          ["502", "The RPC endpoint could not simulate or estimate the call, or is unavailable"],
           ["503", "The demo faucet is out of USDG"],
         ]}
       />
@@ -152,15 +161,22 @@ eth_feeHistory eth_getLogs net_version
         head={["Limit", "Value"]}
         rows={[
           ["API requests per visitor (not /api/rpc)", "30 per minute"],
-          ["RPC requests per visitor", "900 per minute"],
+          ["RPC calls per visitor (each call of a batch counts)", "900 per minute"],
           ["Requests per account (relay) or nullifier (accounts)", "12 per minute"],
           ["New accounts per visitor", "10 per day"],
+          ["New accounts for everyone", "500 per day"],
           ["Faucet requests per visitor", "3 per day"],
+          ["Faucet grants for everyone", "20 per day"],
+          ["Fee-free safety actions per account", "10 per day"],
         ]}
       />
+      <p>
+        A visitor is one IPv4 address, or one IPv6 /64: a machine usually holds a whole /64, so rotating addresses inside
+        it does not reset its limits. The daily budgets for everyone keep any number of visitors from emptying the
+        relayer's gas or the faucet.
+      </p>
       <Callout kind="security" title="No raw IP addresses">
-        A visitor is an HMAC-SHA256 of the IP address under a random secret that rotates every UTC day, kept in memory
-        only.
+        A visitor is an HMAC-SHA256 of its address under a random secret that rotates every UTC day, kept in memory only.
       </Callout>
     </>
   );

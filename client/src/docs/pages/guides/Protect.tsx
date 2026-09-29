@@ -30,7 +30,7 @@ export default function ProtectGuide() {
         to the current caps, the button says <strong>Lower now</strong> and they apply immediately. Otherwise it says{" "}
         <strong>Set caps</strong>, and the change is scheduled. The per-payment cap cannot go below the largest fee (0.25
         USDG on Arbitrum Sepolia). And a spent cap never stops you: freezing and cancelling work even when today's cap is
-        used up.
+        used up, and they never spend past it, because the part of their fee beyond the cap is waived.
       </p>
 
       <H2>The new-recipient cap</H2>

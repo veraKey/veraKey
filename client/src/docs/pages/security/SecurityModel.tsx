@@ -16,12 +16,15 @@ const INVARIANTS: [string, ReactNode, ReactNode][] = [
     <>
       A payment plus its fee, and the fee of a scheduled change, count against the per-payment and daily caps. Freezing,
       restricting and cancelling a change or a recovery are never refused because of the caps, so a thief who spends the
-      day's cap cannot stop the owners; their fee, at most <code>maxFee</code>, still counts toward the day's spending.
-      The per-payment cap never drops below <code>maxFee</code>.
+      day's cap cannot stop the owners. Their fee, at most <code>maxFee</code>, counts toward the day's spending, and the
+      part past the day's cap is waived: a day never spends more than its cap, so a stolen passkey cannot burn the
+      balance on fees. The per-payment cap never drops below <code>maxFee</code>.
     </>,
     <>
       e2e: policy; audit: <code>with the day's cap spent, the owner still vetoes a waiting change and freezes</code>,{" "}
-      <code>the per-payment cap can't drop below the largest fee</code>; prop: <code>a_day_never_spends_more_than_its_caps</code>
+      <code>the per-payment cap can't drop below the largest fee</code>,{" "}
+      <code>a passkey holder cannot burn the balance on fees</code>; prop: <code>a_day_never_spends_more_than_its_caps</code>,{" "}
+      <code>safety_fees_never_push_a_day_past_its_cap</code>
     </>,
   ],
   [
@@ -63,10 +66,12 @@ const INVARIANTS: [string, ReactNode, ReactNode][] = [
       <code>restrict</code> applies at once only a freeze, lower limits, enabling the allowlist, removing a recipient or
       requiring the payment sheet. Owners, the guardian, unfreezing, higher limits and dropping the payment sheet wait for
       the change delay; a change to the guardian also waits the recovery delay. A change that could never apply (adding an
-      existing owner, removing a non-owner or the last owner) is refused when it is scheduled.
+      existing owner, removing a non-owner or the last owner, the same change already waiting, or removals that together
+      would leave no owner) is refused when it is scheduled.
     </>,
     <>
-      e2e: <code>restrict_tightens_at_once_and_refuses_to_loosen</code>; prop:{" "}
+      e2e: <code>restrict_tightens_at_once_and_refuses_to_loosen</code>; audit: <code>the same change cannot be scheduled twice</code>,{" "}
+      <code>two removals cannot leave the account without an owner</code>; prop:{" "}
       <code>restrictive_limits_never_loosen</code>, <code>control_changes_are_never_restrictive</code>
     </>,
   ],
@@ -218,9 +223,11 @@ export default function SecurityModelPage() {
       <p>
         It cannot move funds or change what was signed. It could refuse to relay, but anyone can submit the same calldata
         instead (a third party is not paid the fee). It relays only for accounts whose code is the EIP-1167 clone of this
-        deployment's implementation, caps each transaction at 2.5M gas and limits new accounts per visitor, so look-alike
-        contracts cannot drain its gas. It sees request metadata (IP, timing): its rate-limit keys are a daily-rotated HMAC of
-        the IP kept in memory, and it can add a random delay before broadcasting.
+        deployment's implementation, caps each transaction at 2.5M gas, sends one transaction per account at a time, and
+        limits new accounts and faucet grants per visitor and per day for everyone, so look-alike contracts and rotating
+        addresses cannot drain its gas. It counts an IPv6 visitor by its /64. It sees request metadata (IP, timing): its
+        rate-limit keys are a daily-rotated HMAC of the address kept in memory, and it can add a random delay before
+        broadcasting.
       </p>
       <H3>The USDG issuer</H3>
       <p>Paxos can freeze any single account. This is by design: VeraKey is unlinkable, not anonymous.</p>

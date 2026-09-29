@@ -3,7 +3,7 @@
 **Status.**
 - VeraKey is a testnet preview on Arbitrum Sepolia.
 - The circuits and contracts have **not had an independent audit**.
-- Two internal reviews have been done, the second a Nemesis audit of the contracts and circuits, and their findings are fixed (see "Internal review" below). They do not replace an audit.
+- Three internal reviews have been done: two on 2026-09-24, the second a Nemesis audit of the contracts and circuits, and a Nemesis audit of the whole system on 2026-09-29. Their findings are fixed (see "Internal review" below). They do not replace an audit.
 
 ## What must always hold
 
@@ -20,9 +20,10 @@ Each invariant below names where it is enforced and which tests exercise it:
    - Tests: `e2e` authorization binding (origin, type, other account, other chain, tampered proof, replay, deadlines).
 2. **Every payment is capped, and the caps never stop the owners from defending the account.**
    - A payment plus its fee, and the fee of a scheduled change, count against the per-payment and daily caps.
-   - Freezing, restricting and cancelling a change or a recovery are never refused because of the caps, so a thief who spends the day's cap cannot stop the owners. Their fee, at most `maxFee`, still counts toward the day's spending.
+   - Freezing, restricting and cancelling a change or a recovery are never refused because of the caps, so a thief who spends the day's cap cannot stop the owners.
+   - Their fee, at most `maxFee`, counts toward the day's spending, and the part past the day's cap is waived: a day never spends more than its cap, so a stolen passkey cannot burn the balance on fees.
    - The per-payment cap never drops below `maxFee`, so every fee stays payable.
-   - Tests: `e2e` policy, audit (with the day's cap spent, the owner still vetoes a waiting change and freezes; the per-payment cap can't drop below the largest fee); `prop` a_day_never_spends_more_than_its_caps.
+   - Tests: `e2e` policy, audit (with the day's cap spent, the owner still vetoes a waiting change and freezes; the per-payment cap can't drop below the largest fee; a passkey holder cannot burn the balance on fees); `prop` a_day_never_spends_more_than_its_caps, safety_fees_never_push_a_day_past_its_cap.
 3. **Fees cannot be redirected.**
    - Every fee goes to the factory's `feeRecipient` (the relayer) and is at most `maxFee` (0.25 USDG on Sepolia). Both are bound into the account address.
    - So whoever submits a transaction, or whoever tricks a user into approving one, cannot turn the signed fee into a payment to themselves, not even from a frozen account.
@@ -45,7 +46,8 @@ Each invariant below names where it is enforced and which tests exercise it:
      - remove a recipient;
      - require the payment sheet.
    - Owners, the guardian, unfreezing, raised limits and dropping the payment sheet always wait for the change delay.
-   - Tests: `e2e` restrict_tightens_at_once_and_refuses_to_loosen; `prop` restrictive_limits_never_loosen, control_changes_are_never_restrictive.
+   - A change that could never apply is refused when it is scheduled, so it cannot hold one of the eight pending slots: adding an existing owner, removing a non-owner or the last owner, the same change already waiting, or removals that together would leave no owner.
+   - Tests: `e2e` restrict_tightens_at_once_and_refuses_to_loosen, audit (owner changes that could never apply are refused when they are scheduled; the same change cannot be scheduled twice; two removals cannot leave the account without an owner); `prop` restrictive_limits_never_loosen, control_changes_are_never_restrictive.
 7. **Scheduled changes are visible from any device.**
    - At most 8 changes wait at once.
    - They are listed on-chain (`pendingChangeIds`, `pendingChange`). The app reads them from there and flags any not scheduled from this browser.
@@ -101,10 +103,11 @@ Each invariant below names where it is enforced and which tests exercise it:
     - with the payment sheet required, the browser (not the page) shows payee and total, and the account checks them.
 - **The relayer.**
   - It cannot move funds or change what was signed. It could refuse to relay, but anyone can submit the calldata instead (a third party is not paid the fee).
-  - It relays only for accounts whose code is the EIP-1167 clone of this deployment's implementation, caps each transaction at 2.5M gas, and rate-limits new accounts per visitor, so look-alike contracts cannot drain its gas.
+  - It relays only for accounts whose code is the EIP-1167 clone of this deployment's implementation, caps each transaction at 2.5M gas, sends one transaction per account at a time, and limits new accounts and faucet grants per visitor and per day for everyone, so look-alike contracts and rotating addresses cannot drain its gas.
+  - A visitor is one IPv4 address or one IPv6 /64. The RPC proxy takes batches of at most 10 calls, and log queries only with an address and at most 100,000 blocks.
   - It sees request metadata (IP, timing).
   - Mitigations:
-    - rate-limit keys are a daily-rotated HMAC of the IP, kept in memory only;
+    - rate-limit keys are a daily-rotated HMAC of the address, kept in memory only;
     - an optional random delay before broadcasting;
     - several relayers or oblivious HTTP are on the roadmap.
   - Run it behind exactly one proxy, with its port bound to loopback: it trusts one `X-Forwarded-For` hop.
@@ -132,8 +135,9 @@ Each invariant below names where it is enforced and which tests exercise it:
   - Each side can cancel the other's scheduled changes and a recovery. The guardian can veto a thief's changes, and a freeze wipes them.
   - A thief cannot lift the caps or unfreeze while the owner or the guardian keeps cancelling within the change delay.
 - **Fees while frozen.**
-  - A thief who can make the passkey sign can still spend the account's funds on fees: up to `maxFee` per approval, within the daily cap, paid only to the relayer.
+  - A thief who can make the passkey sign can still spend the account's funds on fees: up to `maxFee` per approval, paid only to the relayer, and never past the day's cap, beyond which these fees are waived.
   - That is griefing, not theft.
+  - The relayer sends at most 10 such fee-free actions per account and UTC day; anyone can submit more themselves.
 - **After a recovery the owner cannot rebuild the old guardian card.**
   - The guardian salt comes from the old passkey's PRF.
   - The guardian must keep its card, and the owner should name a guardian again after recovering.
@@ -144,7 +148,7 @@ Each invariant below names where it is enforced and which tests exercise it:
   - VeraKey's code uses no `Uint` shifts and no `U256` division; the shifts it does use are on `u8` and `u32`.
   - Fix: migrate to stylus-sdk 0.10 (roadmap).
   - `cargo audit` also lists four unmaintained proc-macro crates, used at build time only.
-- **npm:** `pnpm audit --prod` reports no known vulnerabilities (2026-09-24).
+- **npm:** `pnpm audit --prod` reports no known vulnerabilities (2026-09-29).
 - **Secure Payment Confirmation:**
   - Chromium only (macOS, Windows, Android).
   - The enrollment belongs to one browser profile, so requiring the sheet limits payments to the browsers where the passkey is enrolled for it.
@@ -184,6 +188,17 @@ A second internal audit the same day ran Nemesis (alternating Feynman and state-
 | Low | A freeze scheduled through the timelock did not cancel the scheduled changes | A freeze cannot be scheduled; it is always instant (invariant 5) |
 | Low | Owner changes that could never apply kept one of the eight pending slots | They are refused when they are scheduled (invariant 6) |
 | Low | The factory accepted a configuration every account then rejected | The factory and the accounts check the same bounds (`verakey_core::config`) |
+
+A third internal review on 2026-09-29 ran Nemesis over the whole system: the contracts and circuits again, and for the first time the relayer, the SDK's sign-in and payment checks, the integration kit, the popup and the app. It also regenerated both verifiers from the circuits (byte-identical) and compared the deployed code with the audited build. The first three findings were reproduced, on a local Nitro devnode with real proofs or against the relayer, and every fix has a regression test (`packages/sdk/test/e2e/audit.e2e.test.ts`, `packages/sdk/test/e2e/relayer.e2e.test.ts`, `server/rate-limit.test.ts`, `packages/sdk/test/server.test.ts`, `packages/sdk/test/signin.test.ts`). The contract fixes shipped in a new Arbitrum Sepolia deployment on 2026-09-29.
+
+| Severity | Finding | Fix |
+|---|---|---|
+| Medium | Freezing, restricting and cancelling are never refused because of the caps, and each paid up to `maxFee`, so a stolen passkey could burn the whole balance on fees | Past the day's cap their fee is waived: a day never spends more than its cap (invariant 2) |
+| Medium | The relayer counted visitors by their full address, so rotating IPv6 addresses gave unlimited new accounts, faucet grants and RPC calls | Visitors are counted by /64, new accounts and faucet grants have a daily budget for everyone, and the RPC proxy refuses large batches and unbounded log queries |
+| Low | Concurrent faucet requests for one account were each paid | The faucet reserves the account before it sends |
+| Low | A kit session could not be revoked: signing out only cleared the cookie in that browser, and a passkey a recovery removed stayed signed in for up to seven days | Signing out ends every copy of the session, and a session checks every 10 minutes that its passkey still owns the account |
+| Low | A crafted sign-in made the site's server run the on-chain proof check, and one player could pile up slow payment checks | `verifySignIn` stops before any RPC call once a local check fails; one payment check runs at a time per player |
+| Low | The same owner change twice, or removals that together would leave no owner, could be scheduled; the extra one could never apply and kept a pending slot | They are refused when they are scheduled (invariant 6) |
 
 ## Reporting
 

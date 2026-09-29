@@ -35,7 +35,7 @@ import { ARBITRUM_SEPOLIA } from "@verakey/sdk/deployments";
 
 export const verakey = createVeraKeyServer({
   origin: "https://your.game",   // your site's exact origin
-  deployment: ARBITRUM_SEPOLIA,  // pinned in the SDK version you install (0.2.1 or later)
+  deployment: ARBITRUM_SEPOLIA,  // pinned in the SDK version you install (0.2.3 or later)
   secret: VERAKEY_SECRET,        // at least 32 random bytes, known only to your server
   merchant: SHOP_ADDRESS,        // where payments go
   onPayment: ({ player, amount, hash }) => {
@@ -88,14 +88,21 @@ function Shop() {
           <code>onPayment</code> receives a payment already verified on-chain, from the signed-in player's account to your
           merchant: check that the amount pays for what you sell. If it throws, the player sees its message, and{" "}
           <code>pay()</code> rejects with <code>error.payment</code>: once your site is back,{" "}
-          <code>confirmPayment(error.payment)</code> asks it again without a second payment.
+          <code>confirmPayment(error.payment)</code> asks it again without a second payment. The kit checks one payment
+          per player at a time (another answers 429); key what you grant by <code>hash</code>, as above, so that a retry
+          of your own never grants twice.
         </li>
         <li>
           The kit accepts each payment once, in memory by default. In production, or with more than one server process,
           pass a <code>store</code> backed by your database, such as Redis <code>SET NX</code> or a unique key in SQL,
-          so a restart never accepts a payment twice.
+          so a restart never accepts a payment twice. Give it a <code>has()</code> too, so that signing out ends every
+          copy of the session cookie, on every process.
         </li>
-        <li>Sessions are cookies signed with <code>secret</code>: changing it signs every player out.</li>
+        <li>
+          Sessions are cookies signed with <code>secret</code>: changing it signs every player out. Every 10 minutes (
+          <code>ownerCheckSeconds</code>), a session checks on-chain that its passkey still owns the account, so a
+          passkey that a recovery or an owner change removed stops being signed in.
+        </li>
       </ul>
 
       <H2>Add the button</H2>
@@ -325,8 +332,12 @@ test("a player signs in with a new VeraKey passkey", async ({ page }) => {
           from game.example to www.game.example, starts every player over with a new ID and an empty account.
         </li>
         <li>
-          With the kit, <code>createVeraKeyServer</code> covers the first three items; the https origin, the headers
-          and your choice of origin stay yours.
+          Limit how often one visitor may call your sign-in and payment routes, as you would a login form: each check
+          reads the chain.
+        </li>
+        <li>
+          With the kit, <code>createVeraKeyServer</code> covers the first three items; the https origin, the headers,
+          your choice of origin and the rate limits stay yours.
         </li>
       </ul>
 

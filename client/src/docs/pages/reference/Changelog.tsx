@@ -9,6 +9,31 @@ export default function ChangelogPage() {
       <H2>2026-09-29</H2>
       <ul>
         <li>
+          <strong>A third internal review, and a new deployment:</strong> the review found six issues, all fixed the same
+          day (see <A href="/docs/security/review">Review and accepted risks</A>). An account no longer lets the fees of
+          freezing and cancelling push a day past its daily cap: past the cap, their fee is waived. And it refuses a change
+          identical to one already waiting (<code>ChangeAlreadyPending</code>), and a removal that, with the removals
+          already scheduled, would leave no owner (<code>LastOwner</code>). These are contract changes, so Arbitrum
+          Sepolia has a new factory and account implementation (see <A href="/docs/reference/deployments">Deployments</A>),
+          and <code>ARBITRUM_SEPOLIA</code> in SDK 0.2.3 points to them; 0.2.1 and 0.2.2 are deprecated. Accounts made
+          before 29 September stay on the previous deployment: the same passkey now opens a new, empty account, which
+          the demo faucet funds again.
+        </li>
+        <li>
+          <strong>The relayer spends less on attackers:</strong> a visitor on IPv6 is counted by its /64, which one
+          machine usually holds whole; new accounts and faucet grants have daily budgets for everyone; the RPC proxy
+          takes batches of at most 10 calls and only bounded log queries; each account has one transaction in flight at a
+          time; and safety actions whose fee the account waives are relayed at most 10 times a day per account. See{" "}
+          <A href="/docs/build/relayer-api#rate-limits">Relayer API</A>.
+        </li>
+        <li>
+          <strong>SDK 0.2.3, sessions the kit can end:</strong> signing out ends every copy of the session cookie, a
+          session checks every 10 minutes that its passkey still owns the account (<code>ownerCheckSeconds</code>), the
+          payment route checks one payment per player at a time, <code>verifySignIn</code> no longer reads the chain once
+          a check that needs no chain has failed, and <code>ChangeAlreadyPending</code> is a <code>policy</code> error.
+          See <A href="/docs/build/sign-in#use-the-kit">Use the kit</A>.
+        </li>
+        <li>
           <strong>Translated pages keep working:</strong> with Chrome's page translation on, the app stopped on an error
           screen as soon as a button showed its spinner, and the landing page did within seconds, as its payment preview
           plays by itself. Button labels now sit apart from their spinners, the preview is left untranslated, and a page

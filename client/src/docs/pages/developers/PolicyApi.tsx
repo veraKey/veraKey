@@ -43,9 +43,10 @@ interface TrackedChange { account: Address; changeId: Hex; kind: ChangeKind; pay
       <p>
         A scheduled change waits out the account's change delay (<code>eta</code> is in Unix seconds). A change to the
         guardian waits the change delay plus the recovery delay, and cancels a recovery the previous guardian started. A
-        freeze cannot be scheduled (use <code>restrict</code>), and an owner change that could never apply is refused at
-        once (<code>AlreadyOwner</code>, <code>NotOwner</code>, <code>LastOwner</code>). At most 8 changes wait at once; a
-        ninth is refused with <code>TooManyPendingChanges</code>.
+        freeze cannot be scheduled (use <code>restrict</code>), a change identical to one already waiting is refused
+        (<code>ChangeAlreadyPending</code>), and an owner change that could never apply is refused at once
+        (<code>AlreadyOwner</code>, <code>NotOwner</code>, and <code>LastOwner</code>, which counts the removals already
+        scheduled). At most 8 changes wait at once; a ninth is refused with <code>TooManyPendingChanges</code>.
       </p>
 
       <H2>Applying and cancelling</H2>
@@ -75,7 +76,7 @@ isPending(account: Address, changeId: Hex): Promise<boolean>
         head={["Helper", "Kind", "Instant with restrict?"]}
         rows={[
           [<code key="1">addOwner(nullifier)</code>, "1", "Never"],
-          [<code key="2">removeOwner(nullifier)</code>, "2", "Never. The last owner cannot be removed (LastOwner)."],
+          [<code key="2">removeOwner(nullifier)</code>, "2", "Never. The last owner cannot be removed (LastOwner), even by removals scheduled together."],
           [<code key="3">setLimits(perTxCap, dailyCap)</code>, "3", "When both are at most the current caps (perTxCap never below maxFee)"],
           [<code key="4">setRecipient(recipient, allowed)</code>, "4", "When allowed is false (removing a recipient)"],
           [<code key="5">setAllowlist(enabled)</code>, "5", "When enabled is true"],

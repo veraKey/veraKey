@@ -87,8 +87,10 @@ export default function DeploymentsPage() {
         In code, <code>ARBITRUM_SEPOLIA</code> from <A href={SDK_NPM_URL}><code>@verakey/sdk/deployments</code></A>{" "}
         holds the values a site's server verifies against: the chain, the factory, the verifier, the rpIdHash and
         VeraKey's origin. They are pinned in the SDK version you install, and a redeploy comes with a new version: SDK
-        0.2.1 and later pin this deployment, while 0.2.0 pinned the previous one, for verakey.mdloglabs.org, and is
-        deprecated.
+        0.2.3 and later pin this deployment. 0.2.1 and 0.2.2 pinned the previous one, whose accounts miss the fixes of
+        the <A href="/docs/security/review">29 September review</A>, and 0.2.0 the one before it, for
+        verakey.mdloglabs.org; all three are deprecated. The verifiers and the validator module are unchanged since the
+        previous deployment.
       </p>
 
       <H2>Policy for new accounts</H2>

@@ -6,13 +6,14 @@ export default function FundGuide() {
       <H2>Demo USDG</H2>
       <p>
         On the Accounts page, select <strong>Demo USDG</strong> on an account card. The demo faucet sends 5 USDG to that
-        account, once per account, for up to 3 accounts per visitor per day. If the account is not deployed yet, it is
-        deployed first.
+        account, once per account, for up to 3 accounts per visitor per day and 20 accounts a day in all. If the account
+        is not deployed yet, it is deployed first.
       </p>
       <p>
         The faucet pays from the relayer's treasury of Paxos USDG test tokens on Arbitrum Sepolia (
         <Address value="0xFFC95faa3d63Cde504a05B567C600B78C0b41892" />). When the treasury runs out, the app says "The
-        demo faucet is out of USDG. Try again later."
+        demo faucet is out of USDG. Try again later." When the day's 20 grants are given out, it says "The demo faucet
+        has given out today's USDG. Try again tomorrow."
       </p>
       <Callout kind="tip" title="Faucet empty?">
         Claim test USDG at <A href="https://faucet.paxos.com">faucet.paxos.com</A> for Arbitrum Sepolia and send it to

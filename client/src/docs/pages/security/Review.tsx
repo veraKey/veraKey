@@ -8,19 +8,21 @@ export default function ReviewPage() {
         <li>VeraKey is a testnet preview on Arbitrum Sepolia.</li>
         <li>The circuits and contracts have <strong>not had an independent audit</strong>, and UltraHonk itself has not been independently audited.</li>
         <li>
-          Two internal reviews were done on 2026-09-24, the second a Nemesis audit of the contracts and circuits, and their
-          findings are fixed. They do not replace an audit.
+          Three internal reviews were done: two on 2026-09-24, the second a Nemesis audit of the contracts and circuits, and
+          a Nemesis audit of the whole system on 2026-09-29. Their findings are fixed. They do not replace an audit.
         </li>
       </ul>
       <Callout kind="warning">Do not use VeraKey with real funds until it has been audited.</Callout>
       <p>What is tested instead:</p>
       <ul>
         <li>18 circuit tests: 11 for the authorization circuit, 7 for the link circuit;</li>
-        <li>44 unit tests and 9 property tests of 2,000 cases each for the account's logic;</li>
+        <li>47 unit tests and 10 property tests of 2,000 cases each for the account's logic;</li>
         <li>36 tests for the ERC-7579 validator, with real proofs;</li>
+        <li>130 unit tests for the SDK, the integration kit among them;</li>
         <li>
-          75 end-to-end tests that deploy the real contracts to a local Arbitrum Nitro node and use real proofs: 44 for the account, 7
-          that replay the audit's attacks, 10 for disclosures, 5 for Sign in with VeraKey and 9 that drive the relayer over HTTP;
+          85 end-to-end tests that deploy the real contracts to a local Arbitrum Nitro node and use real proofs: 44 for the
+          account, 11 that replay the audits' attacks, 10 for disclosures, 5 for Sign in with VeraKey and 15 that drive the
+          relayer over HTTP;
         </li>
         <li>
           an automated browser workflow that drives the app in headless Chrome with a virtual
@@ -115,6 +117,48 @@ export default function ReviewPage() {
           ],
         ]}
       />
+      <p>
+        A third internal review on 2026-09-29 ran Nemesis over the whole system: the contracts and circuits again, and for
+        the first time the relayer, the SDK's sign-in and payment checks, the integration kit, the popup and the app. It
+        also regenerated both verifiers from the circuits (byte-identical) and compared the deployed code with the audited
+        build. The first three findings were reproduced, on a local Arbitrum Nitro node with real proofs or against the
+        relayer, and every fix has a regression test. The contract fixes shipped in a new deployment on 2026-09-29.
+      </p>
+      <Table
+        head={["Severity", "Finding", "Fix"]}
+        rows={[
+          [
+            <Badge key="s" tone="orange">Medium</Badge>,
+            "Freezing, restricting and cancelling are never refused because of the caps, and each paid up to maxFee, so a stolen passkey could burn the whole balance on fees.",
+            "Past the day's cap their fee is waived: a day never spends more than its cap (2).",
+          ],
+          [
+            <Badge key="s" tone="orange">Medium</Badge>,
+            "The relayer counted visitors by their full address, so rotating IPv6 addresses gave unlimited new accounts, faucet grants and RPC calls.",
+            "Visitors are counted by /64, new accounts and faucet grants have a daily budget for everyone, and the RPC proxy refuses large batches and unbounded log queries.",
+          ],
+          [
+            <Badge key="s">Low</Badge>,
+            "Concurrent faucet requests for one account were each paid.",
+            "The faucet reserves the account before it sends.",
+          ],
+          [
+            <Badge key="s">Low</Badge>,
+            "A kit session could not be revoked: signing out only cleared the cookie in that browser, and a passkey a recovery removed stayed signed in for up to seven days.",
+            "Signing out ends every copy of the session, and a session checks every 10 minutes that its passkey still owns the account.",
+          ],
+          [
+            <Badge key="s">Low</Badge>,
+            "A crafted sign-in made the site's server run the on-chain proof check, and one player could pile up slow payment checks.",
+            "verifySignIn stops before any RPC call once a local check fails; one payment check runs at a time per player.",
+          ],
+          [
+            <Badge key="s">Low</Badge>,
+            "The same owner change twice, or removals that together would leave no owner, could be scheduled; the extra one could never apply and kept a pending slot.",
+            "They are refused when they are scheduled (6).",
+          ],
+        ]}
+      />
 
       <H2>Accepted risks</H2>
       <ul>
@@ -131,8 +175,9 @@ export default function ReviewPage() {
         </li>
         <li>
           <strong>Fees while frozen.</strong> A thief who can make the passkey sign can still spend the account's funds on
-          fees: up to <code>maxFee</code> per approval, within the daily cap, paid only to the relayer. That is griefing, not
-          theft.
+          fees: up to <code>maxFee</code> per approval, paid only to the relayer, and never past the day's cap, beyond which
+          these fees are waived. That is griefing, not theft. The relayer sends a few such fee-free actions per account and
+          day; anyone can submit more themselves.
         </li>
         <li>
           <strong>After a recovery the owner cannot rebuild the old guardian card.</strong> The guardian salt comes from the
@@ -188,7 +233,7 @@ export default function ReviewPage() {
       </p>
       <p>
         A dependency audit also lists four unmaintained Rust macro crates, used only when building. The JavaScript
-        dependencies had no known vulnerabilities on 2026-09-24.
+        dependencies had no known vulnerabilities on 2026-09-29.
       </p>
 
       <H2>Report a vulnerability</H2>
