@@ -71,17 +71,16 @@ Docs: **https://verakey.xyz/docs** (users, developers and reviewers).
   Accounts made before then stay on the previous factory
   ([`0xbaac250f…e55c`](https://sepolia.arbiscan.io/address/0xbaac250f9f1b07651c121e314bccc6fa4c64e55c)).
 - On 27 September 2026 VeraKey moved from verakey.mdloglabs.org to verakey.xyz. Accounts are bound to their domain
-  for good, so the contracts above are a new deployment for verakey.xyz; the previous one, for verakey.mdloglabs.org,
-  stays on-chain with its accounts.
+  for good, so verakey.xyz got a new deployment; the one for verakey.mdloglabs.org stays on-chain with its accounts.
 - A ZeroDev Kernel v3.3 account owned by a VeraKey passkey: `VeraKeyValidator` is its root validator, and its first
   user operation, bundled by VeraKey's relayer, deployed it and paid 1 USDG
   ([`0x0f617b9b…2fc3`](https://sepolia.arbiscan.io/tx/0x0f617b9b889c61f9322206631cdab1c5d207fc1a95b1f97a0bfc54c8ddf92fc3), 1,218,222 gas). Reproduce it with
   `node --env-file=.env --import tsx packages/sdk/scripts/kernel-sepolia.mts` (add `--dry-run` to only simulate).
-- Sign in with VeraKey and a payment on this deployment: the integration kit's end-to-end test (the React quickstart
-  in headless Chrome, a virtual passkey with PRF) signed a player in through the live popup, then paid 1 USDG and the
-  0.02 USDG fee
-  ([`0xea54a309…a855`](https://sepolia.arbiscan.io/tx/0xea54a309445e3c58d38463555080e40cd8ada19099a0520cd73d411d3b18a855), 1,187,516 gas).
-- First USDG payment on Arbitrum Sepolia, on 27 September 2026, on the previous deployment: a passkey on an iPhone
+- Sign in with VeraKey and a payment on this deployment, on 29 September 2026: the integration kit's end-to-end test
+  (the React quickstart in headless Chrome, a virtual passkey with PRF) signed a player in through the live popup, then
+  paid 1 USDG and the 0.02 USDG fee
+  ([`0xa7e1abea…25c5`](https://sepolia.arbiscan.io/tx/0xa7e1abea32a1b3d14a92223ee438b19865bde3ddea96cbc2cb5725c22d1f25c5), 1,232,098 gas).
+- First USDG payment on Arbitrum Sepolia, on 27 September 2026, on an earlier deployment: a passkey on an iPhone
   approved 2 USDG, the phone's browser made the proof, and the account verified it and paid, gasless:
   [`0x81c5d7e4…f797`](https://sepolia.arbiscan.io/tx/0x81c5d7e446873a656deefe7910dd65719a5c3dac4cc2c95719d9f8173c5ff797)
   (1,225,020 gas, 0.02 USDG fee). Before it, the same account froze

@@ -17,7 +17,9 @@ export default function ChangelogPage() {
           Sepolia has a new factory and account implementation (see <A href="/docs/reference/deployments">Deployments</A>),
           and <code>ARBITRUM_SEPOLIA</code> in SDK 0.2.3 points to them; 0.2.1 and 0.2.2 are deprecated. Accounts made
           before 29 September stay on the previous deployment: the same passkey now opens a new, empty account, which
-          the demo faucet funds again.
+          the demo faucet funds again. On the new factory, the integration kit's end-to-end test paid 1 USDG through the
+          live popup (
+          <A href="https://arbitrum-sepolia.blockscout.com/tx/0xa7e1abea32a1b3d14a92223ee438b19865bde3ddea96cbc2cb5725c22d1f25c5">transaction</A>).
         </li>
         <li>
           <strong>The relayer spends less on attackers:</strong> a visitor on IPv6 is counted by its /64, which one
