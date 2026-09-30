@@ -162,10 +162,13 @@ describe("what the docs tell people", () => {
     expect(quickstart).toMatch(/Aztec's CDN/);
     expect(displayed(await render("/docs/build/sign-in"))).toContain("npm install @verakey/sdk");
     for (const page of PAGES) expect(plain(await render(page.path)), page.path).not.toMatch(/SDK becomes available|SDK and developer access open/);
-    const notice = plain(renderToStaticMarkup(<PreviewNotice />));
+    const notice = plain(renderToStaticMarkup(<Router ssrPath="/docs/build/quickstart"><PreviewNotice /></Router>));
     expect(notice).toContain("npm install @verakey/sdk");
     expect(notice).toMatch(/Sign in with VeraKey works/);
     expect(notice).toMatch(/deployment for your domain/);
+    // A verifier pins the deployment's values; reading them from VeraKey's server would let it choose the verifier.
+    expect(notice).toMatch(/Deployments page in your own configuration/);
+    expect(notice).not.toContain("/api/config");
     const modules = plain(await render("/docs/build/sdk"));
     for (const module of ["@verakey/sdk/connect", "@verakey/sdk/signin"]) expect(modules).toContain(module);
   });
@@ -173,7 +176,7 @@ describe("what the docs tell people", () => {
   it("links the SDK's public npm page wherever the docs name the package", async () => {
     const link = `href="${SDK_NPM_URL}"`;
     // Developer pages show the preview notice, so it carries the link for them; other pages link it themselves.
-    expect(renderToStaticMarkup(<PreviewNotice />)).toContain(link);
+    expect(renderToStaticMarkup(<Router ssrPath="/docs/build/quickstart"><PreviewNotice /></Router>)).toContain(link);
     for (const page of PAGES) {
       const html = await render(page.path);
       if (html.includes("@verakey/sdk") && !page.preview) expect(html, page.path).toContain(link);
@@ -190,15 +193,55 @@ describe("what the docs tell people", () => {
       /cloudflared|tunnel/i, /self-host/i, /\.env\b/, /environment variable/i, /\bREADME\b/, /\bCI\b/,
       /\b(nargo|cargo|forge)\b/, /\b(packages|scripts|server|circuits|deployments)\//, /contracts\/(stylus|evm)/,
       /devnode/i, /public issue/i,
+      // Paraphrases the docs once used for the same things: the local test node, the build tools, the relayer's settings.
+      /\blocal (arbitrum |nitro |test |dev )*(node|chain|devnet)\b/i, /\btest chain\b/i, /nitro[- ]?node/i, /\bfoundry\b/i,
+      /\bforge\b/i, /\b(anvil|hardhat)\b/i, /process\.env|RELAY_JITTER|_PER_(DAY|MINUTE|IP)\b/,
+      // Nor how it was built.
+      /\b(claude|chatgpt|copilot)\b|built (it )?with (the help of )?(an )?AI\b|\bAI[- ](assisted|generated|written)\b/i,
     ];
     const found: string[] = [];
-    for (const page of PAGES) {
-      const text = displayed(await render(page.path));
+    const check = (where: string, text: string) => {
       for (const pattern of SELF_HOSTED) {
         const match = text.match(pattern);
-        if (match) found.push(`${page.path}: "${text.slice(Math.max(0, (match.index ?? 0) - 30), (match.index ?? 0) + 40)}"`);
+        if (match) found.push(`${where}: "${text.slice(Math.max(0, (match.index ?? 0) - 30), (match.index ?? 0) + 40)}"`);
       }
-    }
+    };
+    // Developer pages show the preview notice; the title and the lead come from the registry.
+    check("preview notice", displayed(renderToStaticMarkup(<Router ssrPath="/docs/build/quickstart"><PreviewNotice /></Router>)));
+    for (const page of PAGES) check(page.path, `${page.title}\n${page.description}\n${displayed(await render(page.path))}`);
+    expect(found).toEqual([]);
+  });
+
+  it("says each recurring claim the same way everywhere, in American spelling", async () => {
+    const REPLACED = [
+      // Unlinkability: nothing VeraKey puts on-chain links your accounts; money you move can.
+      /(?<!VeraKey puts )nothing on-chain (that )?(links|connects|ties)|\bshares? nothing on-chain|nobody can link/i,
+      // The PRF secret: VeraKey keeps only a one-way check of it.
+      /remembers the secret/i,
+      // A disclosure's link is permanent for anyone who holds the file.
+      /only to them|only for a while/i,
+      // Payments are public: VeraKey is unlinkable, not anonymous.
+      /\bprivate,? (gasless )?(USDG )?payments?\b|\bpayments? (are|stay) private/i,
+      // pendingChanges comes earliest eta first.
+      /oldest first/i,
+      // The relayer's budgets spare only a freeze that defends the account, and its per-minute limits count every request.
+      /every freeze|a freeze or a cancel|nothing counts before it simulates/i,
+      // The live account implementation's size, and P256VERIFY's price since ArbOS 50.
+      /46\.3 KB/, /P256VERIFY[^.]{0,80}3,450/,
+      // A random delay before submission exists, but it is off.
+      /can add a random delay/i,
+      /\b(recognis|organis|authoris|initialis|serialis|normalis|minimis|maximis|prioritis|optimis|customis|finalis|summaris|visualis|utilis|standardis|realis)(e|ed|es|ing|ation|ations)\b/i,
+      /\b(behaviour|colour|flavour|favour|honour)s?\b/i,
+    ];
+    const found: string[] = [];
+    const check = (where: string, text: string) => {
+      for (const pattern of REPLACED) {
+        const match = text.match(pattern);
+        if (match) found.push(`${where}: "${text.slice(Math.max(0, (match.index ?? 0) - 30), (match.index ?? 0) + 40)}"`);
+      }
+    };
+    check("preview notice", plain(renderToStaticMarkup(<Router ssrPath="/docs/build/quickstart"><PreviewNotice /></Router>)));
+    for (const page of PAGES) check(page.path, `${page.title}\n${page.description}\n${plain(await render(page.path))}`);
     expect(found).toEqual([]);
   });
 

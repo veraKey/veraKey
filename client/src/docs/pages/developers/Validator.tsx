@@ -14,7 +14,7 @@ export default function ValidatorPage() {
         Each account that installs it stores its own <code>appId</code> and <code>nullifier</code>.
       </p>
       <Callout kind="note" title="What is tested">
-        The module is tested with real proofs (36 Foundry tests), and it runs in a ZeroDev Kernel v3.3 account on
+        The module is tested with real proofs (36 tests), and it runs in a ZeroDev Kernel v3.3 account on
         Arbitrum Sepolia: that account was created with <code>VeraKeyValidator</code> as its root validator, and its first
         user operation, a 1 USDG payment, was authorized by a proof (<A href="https://arbitrum-sepolia.blockscout.com/tx/0x0f617b9b889c61f9322206631cdab1c5d207fc1a95b1f97a0bfc54c8ddf92fc3">transaction</A>). It has not
         been tried in a Nexus account yet.
@@ -28,8 +28,8 @@ const initData = validatorInstallData(appIdHex, nullifierHex); // abi.encode(byt
 // then, from the account: installModule(1, validatorAddress, initData)
 `}</Code>
       <p>
-        <code>onInstall</code> refuses a second install, and values that are not BN254 field elements or a zero nullifier.
-        <code> onUninstall</code> never reverts, so the module can never block its own removal.
+        <code>onInstall</code> refuses a second install, and values that are not BN254 field elements or a zero nullifier.{" "}
+        <code>onUninstall</code> never reverts, so the module can never block its own removal.
       </p>
 
       <H2>Sign a user operation</H2>
@@ -40,13 +40,13 @@ import { credentialIdBytes } from "@verakey/sdk/store";
 import { validatorSignature, VALIDATOR_VERIFICATION_GAS } from "@verakey/sdk/validator";
 import { getAssertion } from "@verakey/sdk/webauthn";
 
+userOp.verificationGasLimit = VALIDATOR_VERIFICATION_GAS + accountOverhead; // set the gas limits first: they are part of the userOpHash
 const assertion = await getAssertion({ rpId, challenge: hexToBytes(userOpHash), credentialIds: [credentialIdBytes(passkey)] });
 const { proof } = await prover.prove({
   publicKey, prfSecret, appId, nullifier, rpIdHash: hexToBytes(rpIdHash),
   signature: assertion.signature, authenticatorData: assertion.authenticatorData, clientDataJSON: assertion.clientDataJSON,
 });
 userOp.signature = validatorSignature(proof, bytesToHex(assertion.clientDataJSON)); // abi.encode(bytes proof, bytes clientDataJSON)
-userOp.verificationGasLimit = VALIDATOR_VERIFICATION_GAS + accountOverhead;
 `}</Code>
       <p>
         <code>validateUserOp</code> returns 0 when the proof authorizes the userOpHash for the calling account, and 1
@@ -57,8 +57,9 @@ userOp.verificationGasLimit = VALIDATOR_VERIFICATION_GAS + accountOverhead;
       <H2>ZeroDev Kernel</H2>
       <p>
         With ZeroDev's SDK, VeraKey's plugin becomes a Kernel account's sudo validator: <code>createKernelAccount</code>{" "}
-        installs <code>VeraKeyValidator</code> with the owner's nullifier, and every user operation the account signs asks
-        the passkey to sign its userOpHash and the browser to prove it.
+        sets up the account so that its first user operation deploys it with <code>VeraKeyValidator</code> installed for
+        the owner's nullifier, and every user operation the account signs asks the passkey to sign its userOpHash and the
+        browser to prove it.
       </p>
       <Code lang="ts">{`
 import { createKernelAccount } from "@zerodev/sdk";
@@ -72,7 +73,7 @@ const sudo = toVeraKeyKernelValidator({
   nullifier,
   prove: async (userOpHash) => {
     const assertion = await getAssertion({ rpId, challenge: hexToBytes(userOpHash), credentialIds: [credentialIdBytes(passkey)] });
-    const { proof } = await prover.prove({ /* as above */ });
+    const { proof } = await prover.prove({ /* as above, with appId: BigInt(appId), nullifier: BigInt(nullifier) */ });
     return { proof, clientDataJSON: bytesToHex(assertion.clientDataJSON) };
   },
 });

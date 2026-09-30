@@ -19,9 +19,9 @@ export default function ProtectGuide() {
         ]}
       />
       <p>
-        The rule behind every setting: changes that tighten the policy apply at once, and changes that loosen it are
-        scheduled and wait out the change delay. A stolen, unlocked phone can make your account safer instantly, but it
-        cannot quietly make it riskier.
+        The two delays are fixed when the account is created. For every other setting, changes that tighten the policy
+        apply at once, and changes that loosen it are scheduled and wait out the change delay. A stolen, unlocked phone
+        can make your account safer instantly, but it cannot quietly make it riskier.
       </p>
 
       <H2>Caps</H2>
@@ -29,8 +29,10 @@ export default function ProtectGuide() {
         Enter a new per-payment and daily cap under <strong>Change the policy</strong>. If both are lower than or equal
         to the current caps, the button says <strong>Lower now</strong> and they apply immediately. Otherwise it says{" "}
         <strong>Set caps</strong>, and the change is scheduled. The per-payment cap cannot go below the largest fee (0.25
-        USDG on Arbitrum Sepolia). And a spent cap never stops you: freezing and cancelling work even when today's cap is
-        used up, and they never spend past it, because the part of their fee beyond the cap is waived.
+        USDG on Arbitrum Sepolia). And a spent cap never stops you from defending the account: freezing, lowering the
+        caps and cancelling work even when today's cap is used up, and they never spend past it, because the part of
+        their fee beyond the cap is waived. With the cap used up, scheduling a change, such as an unfreeze, has to wait
+        for the next UTC day.
       </p>
 
       <H2>The new-recipient cap</H2>
@@ -75,7 +77,10 @@ export default function ProtectGuide() {
       <ul>
         <li>
           <strong>Apply</strong> appears when the countdown ends. A scheduled change does nothing until someone applies it,
-          so select <strong>Apply</strong>. Applying needs no passkey approval, and anyone may do it.
+          so select <strong>Apply</strong>. Applying needs no passkey approval, and anyone may do it. In a browser other
+          than the one that scheduled the change, <strong>Apply</strong> appears only while the app can still find the
+          change's details on-chain (about the last 7 hours). After that the change shows "(details not found)" with only
+          the <strong>×</strong> button, so apply it from the browser that scheduled it.
         </li>
         <li>
           The <strong>×</strong> button cancels a change with a passkey approval.
@@ -89,10 +94,11 @@ export default function ProtectGuide() {
         confirmed in the sheet, so a tampered page cannot pay without the browser showing you the payee and the total.
       </p>
       <p>
-        Requiring it applies at once; <strong>Stop requiring it</strong> is scheduled. In browsers that cannot show the
-        sheet, the option says <strong>Not available in this browser</strong>. Only turn it on if you pay from a browser
-        where your passkey is enrolled for the sheet. See <A href="/docs/guides/pay#confirm-in-the-payment-sheet">Confirm
-        in the payment sheet</A>.
+        Requiring it applies at once; <strong>Stop requiring it</strong> is scheduled. The option works only in the
+        browser where you created your passkey, in Chrome on macOS or Android, because that is where the app enrolls it
+        for the sheet. Elsewhere it says <strong>Not available in this browser</strong>. Once it is on, payments from
+        other browsers and devices are refused, so only turn it on if you always pay from this browser. See{" "}
+        <A href="/docs/guides/pay#confirm-in-the-payment-sheet">Confirm in the payment sheet</A>.
       </p>
     </>
   );

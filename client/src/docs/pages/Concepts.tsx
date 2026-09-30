@@ -11,9 +11,15 @@ export default function Concepts() {
       </p>
       <p>
         The PRF extension lets a passkey also return a 32-byte secret, derived from the credential and a fixed input.
-        The same passkey always returns the same secret, on every device where it syncs. VeraKey uses it to derive your
-        nullifiers, and refuses to create accounts with a passkey that does not support PRF.{" "}
-        <A href="/docs/guides/create-account#what-you-need">Supported providers</A> lists which ones do.
+        VeraKey uses it to derive your nullifiers, and refuses to create accounts with a passkey that does not support
+        PRF. <A href="/docs/guides/create-account#what-you-need">Supported providers</A> lists which ones do.
+      </p>
+      <p>
+        A passkey normally returns the same secret on every device where it syncs, but some password managers return a
+        different one through another route, such as a phone's QR code, and a different secret opens different
+        accounts. VeraKey keeps only a one-way check of the secret each passkey returned in a browser, never the secret
+        itself, and refuses an unlock that returns a different one. See{" "}
+        <A href="/docs/guides/faq#my-passkey-opens-a-different-wallet">My passkey opens a different wallet</A>.
       </p>
 
       <H2>Nullifiers</H2>
@@ -25,9 +31,9 @@ export default function Concepts() {
 nullifier = Poseidon2("VERAKEY_NULLIFIER_V1", publicKey.x, publicKey.y, prfSecret, appId)
 `}</Code>
       <p>
-        The same passkey gets the same nullifier in the same app on every device, and unrelated nullifiers in different
-        apps. Without the PRF secret, nobody can compute your nullifiers, even with your public key. A nullifier is an
-        owner id, not a proof that you are a unique person.
+        The same passkey gets the same nullifier in the same app on every device, as long as it returns the same PRF
+        secret, and unrelated nullifiers in different apps. Without the PRF secret, nobody can compute your nullifiers,
+        even with your public key. A nullifier is an owner id, not a proof that you are a unique person.
       </p>
 
       <H2>Per-app accounts</H2>
@@ -51,9 +57,10 @@ account = CREATE2(factory, salt = keccak256(appId, nullifier, configHash), EIP-1
       <H2>Zero-knowledge proofs</H2>
       <p>
         Instead of sending your signature to the chain, your browser proves that it knows a valid passkey signature
-        over the action, under a key that hashes to your nullifier. The proof also checks the relying party (VeraKey's
-        rpId) and that your device verified you. The proof system is UltraHonk; the circuit is written in Noir and
-        proven by bb.js in your browser in about 2 seconds.
+        over the action, under a key that, with your PRF secret and the app's id, hashes to your nullifier. The proof
+        also checks the relying party (VeraKey's rpId) and that your device verified you. The proof system is
+        UltraHonk; the circuit is written in Noir and proven by bb.js in your browser, in about 2 seconds in desktop
+        Chrome with 8 threads; browsers that prove on one thread take a few seconds longer.
       </p>
       <p>
         On-chain, a Solidity verifier generated from the same circuit checks the proof in 712,554 gas. See{" "}
@@ -69,6 +76,11 @@ account = CREATE2(factory, salt = keccak256(appId, nullifier, configHash), EIP-1
         Each account refuses fees above its maximum (0.25 USDG on Arbitrum Sepolia) and pays fees only to the relayer
         address fixed when the account was created. Anyone else may submit your approved action; they just do not get
         the fee. The <A href="/docs/build/relayer-api">Relayer API</A> documents every endpoint.
+      </p>
+      <p>
+        VeraKey's relayer sees your IP address and when you act, and, through its RPC proxy, which accounts your browser
+        reads. It also serves the app, whose page code handles your key and PRF secret: see the{" "}
+        <A href="/docs/security#trust-assumptions">security model</A>.
       </p>
 
       <H2>Policy and timelocks</H2>
@@ -89,8 +101,8 @@ account = CREATE2(factory, salt = keccak256(appId, nullifier, configHash), EIP-1
       <H2>Guardians and recovery</H2>
       <p>
         You can add a backup passkey as a second owner, and name a guardian: a friend's wallet, a multisig or another
-        account. The account stores only a salted hash of the guardian's address, so the guardian stays private until
-        it acts.
+        wallet of yours, but not a VeraKey account. The account stores only a salted hash of the guardian's address, so
+        the guardian stays private until it acts.
       </p>
       <p>
         A guardian can freeze the account, veto scheduled changes and start a recovery, which replaces every owner after
@@ -101,10 +113,12 @@ account = CREATE2(factory, salt = keccak256(appId, nullifier, configHash), EIP-1
 
       <H2>Disclosures</H2>
       <p>
-        Nothing on-chain links your accounts in different apps, but sometimes you want to prove that two accounts are
-        yours, to an auditor or an exchange. A disclosure does that: your passkey approves a statement naming both
-        accounts, the audience and an expiry, and a second circuit proves that one passkey owns both, without revealing
-        it. See <A href="/docs/guides/disclosures">Prove two accounts are yours</A>.
+        VeraKey puts nothing on-chain that links your accounts in different apps: no shared address, key or owner.
+        Money you move between them, or into them from one wallet, can still connect them, and so can a guardian you
+        share between them once it acts for more than one. But sometimes you want to prove that two accounts are yours,
+        to an auditor or an exchange. A disclosure does that: your passkey approves a statement naming both accounts,
+        the audience and an expiry, and a second circuit proves that one passkey owns both, without revealing it. See{" "}
+        <A href="/docs/guides/disclosures">Prove two accounts are yours</A>.
       </p>
     </>
   );

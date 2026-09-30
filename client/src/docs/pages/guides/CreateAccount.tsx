@@ -24,7 +24,9 @@ export default function CreateAccountGuide() {
         <li><strong>PRF extension:</strong> supported, or checked on first use.</li>
         <li><strong>Secure context:</strong> passkeys only work over HTTPS or on localhost.</li>
         <li><strong>Origin:</strong> your accounts are bound on-chain to this exact site.</li>
-        <li><strong>Multi-threaded proving:</strong> cross-origin isolation lets the prover use every CPU core.</li>
+        <li>
+          <strong>Multi-threaded proving:</strong> cross-origin isolation lets the prover use several CPU cores (up to 8).
+        </li>
       </ul>
 
       <H2>Create your passkey</H2>
@@ -37,8 +39,9 @@ export default function CreateAccountGuide() {
         </Step>
         <Step title="Create passkey">
           <p>
-            Select <strong>Create passkey</strong>. Your device asks twice: once to create the passkey, and once to
-            unlock it. The second prompt returns the PRF secret that keeps your accounts unlinkable.
+            Select <strong>Create passkey</strong> and confirm on your device. If your passkey provider does not return
+            the PRF secret while it creates the passkey, your device asks once more, to unlock it. The PRF secret keeps
+            your accounts unlinkable.
           </p>
         </Step>
         <Step title="See your accounts">
@@ -52,8 +55,16 @@ export default function CreateAccountGuide() {
       <H2>Unlock on another device</H2>
       <p>
         Your passkey provider syncs the passkey to your other devices. On a new device, open the app and select{" "}
-        <strong>I already have a VeraKey passkey on another device</strong>, or <strong>Unlock with passkey</strong>. Your
-        accounts are derived again on that device: they are the same accounts, with the same addresses.
+        <strong>I already have a VeraKey passkey on another device</strong>. A browser that has used your passkey before
+        shows <strong>Unlock with passkey</strong> instead. Your accounts are derived again on that device: they are the
+        same accounts, with the same addresses. Do not select <strong>Create passkey</strong> on the new device: a new
+        passkey opens new, empty accounts.
+      </p>
+      <p>
+        A passkey normally returns the same secret on every device where it syncs, but some password managers return a
+        different one through another route, such as a phone's QR code, and a different secret opens different
+        accounts. See{" "}
+        <A href="/docs/guides/faq#my-passkey-opens-a-different-wallet">My passkey opens a different wallet</A>.
       </p>
       <p>
         Unlocking asks your passkey for its PRF secret once per session. The secret stays in the browser's memory and is
@@ -64,7 +75,7 @@ export default function CreateAccountGuide() {
       <p>
         Each app gets its own account, owned by its own nullifier. The demo's main app is <strong>Pay</strong>. The
         Accounts page also shows the account the same passkey gets in a second app, <strong>Shop</strong>: a different
-        address and a different nullifier, with nothing on-chain that connects them.
+        address and a different nullifier, and nothing VeraKey puts on-chain links them.
       </p>
       <p>
         An account's address is known before the account exists, because the factory derives it from the app id, your

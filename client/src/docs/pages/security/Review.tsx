@@ -20,19 +20,14 @@ export default function ReviewPage() {
         <li>36 tests for the ERC-7579 validator, with real proofs;</li>
         <li>138 unit tests for the SDK, the integration kit among them;</li>
         <li>
-          87 end-to-end tests that deploy the real contracts to a local Arbitrum Nitro node and use real proofs: 44 for the
-          account, 11 that replay the audits' attacks, 10 for disclosures, 5 for Sign in with VeraKey and 17 that drive the
-          relayer over HTTP;
+          87 end-to-end tests that deploy the real contracts and use real proofs: 44 for the account, 11 that replay the
+          audits' attacks, 10 for disclosures, 5 for Sign in with VeraKey and 17 that drive the relayer over HTTP;
         </li>
         <li>
-          an automated browser workflow that drives the app in headless Chrome with a virtual
-          passkey, on desktop, on mobile and through the payment sheet.
+          automated browser tests that drive the app in headless Chrome with a virtual passkey, on desktop, on mobile and
+          through the payment sheet.
         </li>
       </ul>
-      <p>
-        Every change rebuilds the circuits, the verifiers and the contracts, and runs all of these tests except the browser
-        workflow.
-      </p>
 
       <H2>Internal review</H2>
       <p>
@@ -78,7 +73,7 @@ export default function ReviewPage() {
       <p>
         A second internal audit the same day ran Nemesis over the Stylus contracts, the ERC-7579 validator and both circuits:
         alternating passes that question every line and map every piece of state that must change together, until nothing
-        new surfaces. Every finding but the last was reproduced on a local Arbitrum Nitro node with real proofs, and its
+        new surfaces. Every finding but the last was reproduced against the real contracts with real proofs, and its
         fix has a regression test that replays the attack. The last one, the factory's bounds, was confirmed by reading
         the code, and its fix has unit tests.
       </p>
@@ -121,7 +116,7 @@ export default function ReviewPage() {
         A third internal review on 2026-09-29 ran Nemesis over the whole system: the contracts and circuits again, and for
         the first time the relayer, the SDK's sign-in and payment checks, the integration kit, the popup and the app. It
         also regenerated both verifiers from the circuits (byte-identical) and compared the deployed code with the audited
-        build. The first three findings were reproduced, on a local Arbitrum Nitro node with real proofs or against the
+        build. The first three findings were reproduced, with the real contracts and real proofs or against the
         relayer, and every fix has a regression test. The contract fixes shipped in a new deployment on 2026-09-29.
       </p>
       <Table
@@ -163,8 +158,11 @@ export default function ReviewPage() {
         Before release, a separate review of these fixes found three more gaps, fixed the same day: requests with a bad
         proof could use up the relayer's allowance for an account's fee-free restricts, and so block the owner's freeze;
         payments paid for in demo USDG could still empty the relayer's ETH; and a slow chain could hold a kit session's
-        owner check for up to 40 seconds. Now nothing counts before it simulates, a freeze or a cancel is never refused
-        for a budget, the relayer has a daily gas budget, and an owner check takes two seconds at most.
+        owner check for up to 40 seconds. Now the relayer has a daily gas budget, which, like its daily limits on new
+        accounts and fee-free restricts, counts only calls that simulate; cancelling a change or a recovery, and a freeze
+        that stops payments or cancels waiting changes, are never refused for a budget; and an owner check takes two
+        seconds at most. The per-account limit of 12 requests a minute still counts every request, so a flood of requests
+        naming an account can delay its relayed actions, a freeze included, while the flood lasts.
       </p>
 
       <H2>Accepted risks</H2>
@@ -172,8 +170,9 @@ export default function ReviewPage() {
         <li>
           <strong>A stolen, unlocked passkey can fight the owner.</strong> Whoever holds it can approve anything the owner
           can, within the caps, the new-recipient cap and the timelocks. Each side can cancel the other's scheduled changes
-          and a recovery. The guardian can veto a thief's changes, and a freeze wipes them. A thief cannot lift the caps or
-          unfreeze while the owner or the guardian keeps cancelling within the change delay.
+          and a recovery. The guardian can veto a thief's changes except a change to the guardian, which only an owner can
+          cancel. An owner's freeze wipes them all; a guardian's freeze keeps changes to the guardian. A thief cannot
+          lift the caps or unfreeze while the owner or the guardian keeps cancelling within the change delay.
         </li>
         <li>
           <strong>A guardian can take over.</strong> A recovery that no owner cancels within the recovery delay makes the
@@ -183,8 +182,9 @@ export default function ReviewPage() {
         <li>
           <strong>Fees while frozen.</strong> A thief who can make the passkey sign can still spend the account's funds on
           fees: up to <code>maxFee</code> per approval, paid only to the relayer, and never past the day's cap, beyond which
-          these fees are waived. That is griefing, not theft. The relayer never refuses a freeze or a cancel for its
-          budgets, and sends at most 10 other fee-free restricts per account and day.
+          these fees are waived. That is griefing, not theft. The relayer never refuses, for its budgets, cancelling a
+          change or a recovery, or a freeze that stops payments or cancels waiting changes, and sends at most 10 other
+          fee-free restricts per account and day.
         </li>
         <li>
           <strong>After a recovery the owner cannot rebuild the old guardian card.</strong> The guardian salt comes from the
@@ -198,15 +198,20 @@ export default function ReviewPage() {
           <A href="/docs/guides/recovery">Recovery and guardians</A>.
         </li>
         <li>
-          <strong>A passkey can return a different PRF secret through another route.</strong> Some password managers
-          answer the same passkey with another secret through a phone's QR code than on the device itself, and another
-          secret opens other accounts. The app remembers the secret each passkey returned in a browser and refuses a
-          different one there, but a browser that has never seen the passkey cannot tell. Use the same route every time.
+          <strong>A passkey can return a different PRF secret through another route.</strong> A passkey normally returns
+          the same secret on every device where it syncs, but some password managers return a different one through
+          another route, such as a phone's QR code, and a different secret opens different accounts. VeraKey keeps only a
+          one-way check of the secret each passkey returned in a browser, never the secret itself, and refuses an unlock
+          that returns a different one, but a browser that has never seen the passkey cannot tell. Use the same route
+          every time: see <A href="/docs/guides/faq#my-passkey-opens-a-different-wallet">My passkey opens a different
+          wallet</A>.
         </li>
         <li>
-          <strong>Secure Payment Confirmation</strong> works only in Chromium (macOS, Windows, Android), and its enrollment
-          belongs to one browser profile. Requiring the sheet therefore limits payments to the browsers where the passkey is
-          enrolled for it. Elsewhere the app uses the ordinary passkey prompt.
+          <strong>Secure Payment Confirmation</strong> works only in Chromium (macOS, Windows, Android), the app enrolls
+          passkeys for it only in Chrome on macOS and Android, and an enrollment belongs to one browser profile.
+          Requiring the sheet therefore limits payments to the browsers where the passkey is enrolled for it: elsewhere
+          the app refuses to pay. An account that does not require the sheet uses the ordinary passkey prompt where the
+          sheet is not available.
         </li>
         <li>
           <strong>The ERC-7579 validator enforces no spending policy.</strong> Pair it with a policy or hook module.
@@ -216,7 +221,8 @@ export default function ReviewPage() {
           low, so set <code>verificationGasLimit</code> yourself; the SDK exports <code>VALIDATOR_VERIFICATION_GAS</code>.
         </li>
         <li>
-          <strong>Proving on iPhone has not been measured yet.</strong> Desktop Chrome takes 1.85 s.
+          <strong>Proving on iPhone has not been measured yet.</strong> It takes about 2 seconds in desktop Chrome with 8
+          threads; browsers that prove on one thread take a few seconds longer.
         </li>
       </ul>
 
@@ -240,12 +246,13 @@ export default function ReviewPage() {
       </p>
       <p>
         A dependency audit also lists four unmaintained Rust macro crates, used only when building. The JavaScript
-        dependencies had no known vulnerabilities on 2026-09-29.
+        packages that the app, the relayer and the SDK ship had no known vulnerabilities on 2026-09-29.
       </p>
 
       <H2>Report a vulnerability</H2>
       <p>
-        Please report vulnerabilities privately to <Contact />, and do not disclose them publicly before they are fixed.
+        Please report vulnerabilities privately to <Contact />, by direct message to @veraKey_ on X, and do not disclose
+        them publicly before they are fixed.
       </p>
       <p>A useful report includes:</p>
       <ul>

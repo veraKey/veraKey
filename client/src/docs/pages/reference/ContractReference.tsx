@@ -22,7 +22,7 @@ export default function ContractReferencePage() {
         stack
         head={["Function", "Caller", "What it does"]}
         rows={[
-          [c("pay(address to, uint256 amount, …proof)"), "Owner's proof", "Pays amount USDG to to, and the fee to the fee recipient."],
+          [c("pay(address to, uint256 amount, …proof)"), "Owner's proof", <>Pays <code>amount</code> USDG to <code>to</code>, and the fee to the fee recipient.</>],
           [c("scheduleChange(uint8 change_kind, bytes payload, …proof) → bytes32"), "Owner's proof", "Schedules a change; returns its id. It applies after the change delay; a change to the guardian waits the recovery delay too. A freeze, an owner change that could never apply, or a change identical to one already waiting, is refused."],
           [c("restrict(uint8 change_kind, bytes payload, …proof) → bytes32"), "Owner's proof", "Applies a tightening change at once; a freeze also cancels the scheduled changes. Never refused because of the caps: past the day's cap its fee is waived."],
           [c("applyChange(bytes32 change_id, uint8 change_kind, bytes payload)"), "Anyone", "Applies a scheduled change whose delay has passed, with the exact kind and payload scheduled."],
@@ -52,7 +52,7 @@ export default function ContractReferencePage() {
           [c("protections() → (uint256, bool, bytes32, bool)"), "newPayeeCap, frozen, guardianCommitment (zero when no guardian), paymentSheetRequired."],
           [c("fees() → (address, uint256)"), "feeRecipient, maxFee."],
           [c("pendingChangeIds() → bytes32[]"), "The ids of the scheduled changes still waiting (at most 8)."],
-          [c("pendingChange(bytes32 change_id) → (uint8, bytes32, uint64, uint256)"), "changeKind, payloadHash, eta, ownerEpoch; eta is zero for an unknown id."],
+          [c("pendingChange(bytes32 change_id) → (uint8, bytes32, uint64, uint256)"), <>changeKind, payloadHash (<code>keccak256(changeKind ‖ payload)</code>), eta, ownerEpoch; eta is zero for an unknown id.</>],
           [c("recovery() → (bytes32, uint64)"), "The pending recovery's nullifier and eta; eta is zero when none is pending."],
           [c("isOwner(bytes32 nullifier) → bool"), "Whether the nullifier owns the account in the current owner epoch."],
           [c("ownerCount() → uint256"), "How many owners the account has."],
@@ -73,7 +73,7 @@ export default function ContractReferencePage() {
         rows={[
           [c("Initialized(bytes32 indexed appId, bytes32 indexed ownerNullifier, address factory)"), "The factory sets up the account."],
           [c("Paid(uint256 indexed nonce, address indexed to, uint256 amount, uint256 fee, address indexed submitter)"), "A payment succeeds."],
-          [c("ChangeScheduled(bytes32 indexed changeId, uint8 changeKind, bytes payload, uint64 eta)"), "A change is scheduled. The payload is only here; the account stores its hash."],
+          [c("ChangeScheduled(bytes32 indexed changeId, uint8 changeKind, bytes payload, uint64 eta)"), <>A change is scheduled. The payload is only here; the account stores <code>keccak256(changeKind ‖ payload)</code>, the SDK's <code>changeDataHash</code>.</>],
           [c("ChangeApplied(bytes32 indexed changeId, uint8 changeKind)"), "A scheduled change is applied."],
           [c("ChangeCancelled(bytes32 indexed changeId)"), "A scheduled change is cancelled by an owner, the guardian, a freeze or a recovery."],
           [c("Restricted(bytes32 indexed restrictionId, uint8 changeKind, bytes payload)"), "A tightening change applies at once."],
@@ -104,8 +104,9 @@ export default function ContractReferencePage() {
 
       <H2>Change kinds</H2>
       <p>
-        A change is a kind and an ABI-encoded payload; the SDK builds both with <code>changePayload</code>. Every change can be
-        scheduled; the ones marked instant can also go through <code>restrict</code>.
+        A change is a kind and an ABI-encoded payload; the SDK builds both with <code>changePayload</code>. Every change except
+        Freeze can be scheduled. The ones marked instant can also go through <code>restrict</code>, and Freeze goes only
+        through <code>restrict</code>.
       </p>
       <Table
         stack

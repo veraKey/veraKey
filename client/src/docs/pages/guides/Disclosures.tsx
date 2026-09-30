@@ -5,10 +5,10 @@ export default function DisclosuresGuide() {
     <>
       <H2>When to use a disclosure</H2>
       <p>
-        Your accounts in different apps share nothing on-chain. Sometimes you need someone to know that two of them are
-        yours: an auditor checking your records, an exchange confirming where funds came from, or a lender. A disclosure
-        proves it to them without revealing your passkey and without putting anything on-chain. Whoever holds the file
-        can show it to anyone, for good, so share one only with someone you trust with that fact.
+        Nothing VeraKey puts on-chain links your accounts in different apps. Sometimes you need someone to know that two
+        of them are yours: an auditor checking your records, an exchange confirming where funds came from, or a lender.
+        A disclosure proves it to them without revealing your passkey and without putting anything on-chain. Whoever
+        holds the file can show it to anyone, for good, so share one only with someone you trust with that fact.
       </p>
 
       <H2>Make a disclosure</H2>
@@ -65,10 +65,18 @@ export default function DisclosuresGuide() {
           ["Passkey signed this statement", "The signed client data is a passkey assertion over this statement."],
           ["Signed on the VeraKey origin", "The assertion was made on the VeraKey site."],
           ["Proof commits to this statement", "The proof's public inputs are this statement's."],
-          ["Proof verifies on-chain and locally", "The link verifier on Arbitrum (by eth_call) and bb.js in the browser both accept the proof."],
+          [
+            "Proof verifies on-chain and locally",
+            "The link verifier on Arbitrum (by eth_call) and bb.js in the browser both accept the proof. If the in-browser prover does not load, the page checks the proof on-chain only, through VeraKey's RPC proxy, and says so.",
+          ],
           ["Accounts still owned by these nullifiers", "Each account derives from the factory, and a deployed account is still owned by its nullifier."],
         ]}
       />
+      <p>
+        The verify page checks the proof and both accounts through VeraKey's RPC proxy, so VeraKey's server sees which
+        two accounts are linked. To keep that private, verify with the SDK's <code>verifyDisclosure</code> and your own
+        RPC endpoint: see <A href="/docs/build/disclosures">Disclosures</A>.
+      </p>
 
       <H2>What a disclosure reveals</H2>
       <ul>

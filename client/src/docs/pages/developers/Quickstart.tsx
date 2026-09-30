@@ -19,7 +19,8 @@ export default function QuickstartPage() {
           domain has its own deployment and relayer.
         </li>
         <li>
-          For fast proving, serve your pages with cross-origin isolation, so the prover can use every CPU core:
+          For fast proving, serve your pages with cross-origin isolation, so the prover can use several CPU cores (up to
+          8 threads in the example below):{" "}
           <code>Cross-Origin-Opener-Policy: same-origin</code> and <code>Cross-Origin-Embedder-Policy: require-corp</code>.
           This is for apps that prove in their own pages, as this Quickstart does. A page that opens the Sign in with
           VeraKey popup must not send <code>Cross-Origin-Opener-Policy: same-origin</code>: it cuts the popup off from
@@ -30,14 +31,17 @@ export default function QuickstartPage() {
       <H2>1. Get the SDK</H2>
       <p>
         The SDK is the <A href={SDK_NPM_URL}><code>@verakey/sdk</code></A> package for the browser, with TypeScript
-        types. Its modules load separately, so an app downloads the prover only when it proves.
+        types. Its modules load separately, so an app downloads the prover only when it first needs it: the first time it
+        reads or deploys an account, proves, or unlocks a passkey this browser has not seen. The prover is not
+        downloaded when the page loads.
       </p>
       <Code lang="bash">{`
 npm install @verakey/sdk
 `}</Code>
       <p>
-        The prover needs a common reference string (CRS). The first proof in a browser downloads it from Aztec's CDN, a
-        few megabytes, and the browser keeps it for later proofs.
+        The prover needs a common reference string (CRS). When the prover first loads in a browser (here, at the first{" "}
+        <code>vera.account()</code>, or earlier when <code>vera.unlock()</code> runs on a new device), it downloads the
+        CRS from Aztec's CDN, about 8 MB, and the browser keeps it for later visits.
       </p>
 
       <H2>2. Configure the client</H2>
@@ -82,8 +86,8 @@ const { session } = await vera.register("Alice"); // creates a passkey with PRF
 if (!session) await vera.unlock();                // some providers return PRF only on the next assertion
 `}</Code>
       <p>
-        Returning users call <code>vera.unlock()</code>: one passkey prompt that returns the PRF secret for the session. Then
-        read the account for your app:
+        Returning users call <code>vera.unlock()</code>: one passkey prompt that returns the PRF secret for the session
+        (two on a new device when the account is not deployed yet). Then read the account for your app:
       </p>
       <Code lang="ts">{`
 const account = await vera.account(APP_ID);
@@ -111,7 +115,8 @@ const receipt = await vera.pay(APP_ID, merchant, 2_000_000n, state => {
       <p>
         Amounts are USDG base units (6 decimals): <code>2_000_000n</code> is 2 USDG. <code>pay</code> deploys the account
         first if needed. Without enough USDG, it rejects: with the <code>funds</code> stage before the passkey prompt when
-        the fee alone is not covered, or later with <code>TokenTransferFailed</code> when the amount is not.
+        the fee alone is not covered, or later with the <code>relay</code> stage and <code>error.revert</code> set to{" "}
+        <code>TokenTransferFailed</code> when the balance is below the amount plus the fee.
       </p>
 
       <H2>6. Handle the result</H2>
@@ -133,7 +138,8 @@ try {
     case "authentication": // the user cancelled or the prompt timed out
     case "device":         // the passkey lacks PRF, or the authenticator returned unexpected data
     case "proof":          // proving failed in the browser
-    case "relay":          // the relayer or the network failed
+    case "relay":          // the relayer refused or failed, or the call reverted: error.revert may name the
+                           // error, e.g. "TokenTransferFailed" when the balance is below the amount plus the fee
       showError(error.message);
   }
 }

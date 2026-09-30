@@ -6,7 +6,7 @@ export default function ContractsPage() {
       <H2>The account</H2>
       <p>
         <code>VeraKeyAccount</code> is a Rust program on Arbitrum Stylus. It is
-        deployed once as an implementation (46.3 KB, as a multi-fragment Stylus program, which Arbitrum supports since
+        deployed once as an implementation (46.5 KB, as a multi-fragment Stylus program, which Arbitrum supports since
         ArbOS 60), and every user account is an EIP-1167 clone that delegates to it. The implementation locks itself in
         its constructor, so it cannot be initialized as an account.
       </p>
@@ -27,7 +27,10 @@ export default function ContractsPage() {
           origin and not cross-origin. For <code>pay</code> only, a <code>payment.get</code> assertion from the payment sheet
           is accepted when its payee, total and rpId match;
         </li>
-        <li><code>HonkVerifier.verify</code> accepts the proof with the six public inputs the account computes;</li>
+        <li>
+          <code>HonkVerifier.verify</code> accepts the proof with the six public inputs the account builds itself, taking
+          only the nullifier from the call, once step 3 has found it to be an owner;
+        </li>
         <li>the nonce is consumed, before any token moves.</li>
       </ol>
 
@@ -56,7 +59,7 @@ not frozen → amount > 0 → a valid recipient (not zero, not the account) → 
           ["2", "usdg, ownerCount (u64)"],
           ["3", "perTxCap (u128), dailyCap (u128)"],
           ["4", "newPayeeCap (u128), recoveryEta (u64), maxFee (u64)"],
-          ["5", "nonce (u64), spendDay (u64), spentToday (u128): everything a payment writes"],
+          ["5", "nonce (u64), spendDay (u64), spentToday (u128): everything a payment to a known recipient writes (a first payment also marks the recipient known)"],
           ["6", "feeRecipient"],
           ["then", "appId, rpIdHash, origin, ownerEpoch, guardianCommitment, recoveryNullifier, the 8 pending change ids, and the maps of owners, allowed recipients, known recipients and pending changes"],
         ]}

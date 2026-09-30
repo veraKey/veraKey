@@ -33,7 +33,7 @@ export default function SdkGuidePage() {
           [<code key="11">@verakey/sdk/store</code>, "LocalPasskeyStore, MemoryPasskeyStore"],
           [<code key="12">@verakey/sdk/abi</code>, "veraKeyAccountAbi, veraKeyFactoryAbi, honkVerifierAbi, erc20Abi"],
           [<code key="13">@verakey/sdk/privacy</code>, "countPublicKeyOccurrences: check calldata for a public key"],
-          [<code key="21">@verakey/sdk/bytes</code>, "concatBytes, toFieldHex, limbs, sha256, base64url and other byte helpers"],
+          [<code key="21">@verakey/sdk/bytes</code>, "concatBytes, toFieldHex, limbs, sha256, base64UrlEncode, base64UrlDecode and other byte helpers"],
           [<code key="22">@verakey/sdk/errors</code>, "ProofGenerationError"],
         ]}
       />
@@ -44,7 +44,7 @@ export default function SdkGuidePage() {
         stack
         head={["Field", "Type", "Meaning"]}
         rows={[
-          [<code key="1">rpId</code>, "string", "The WebAuthn relying party id, e.g. the app's domain. From /api/config."],
+          [<code key="1">rpId</code>, "string", "The WebAuthn relying party id, the same for every app (verakey.xyz on Arbitrum Sepolia). From /api/config."],
           [<code key="2">rpName</code>, "string?", "Shown when a passkey is created. Default \"VeraKey\"."],
           [<code key="3">chainId</code>, "number", "The chain id."],
           [<code key="4">rpcUrl</code>, "string", "A JSON-RPC URL for reads, usually the relayer's /api/rpc."],
@@ -81,8 +81,9 @@ export default function SdkGuidePage() {
         <li><code>lock()</code> forgets the session and its PRF secret. <code>session</code> returns the current one, or <code>null</code>.</li>
       </ul>
       <p>
-        The passkey store keeps only the credential id, the public key and a label (in <code>localStorage</code> under{" "}
-        <code>verakey.passkeys.v1</code>); never a secret.
+        The passkey store keeps the credential id, the public key, a label, when it was added, whether it is enrolled for
+        the payment sheet, and a one-way check of its PRF secret (in <code>localStorage</code> under{" "}
+        <code>verakey.passkeys.v1</code>); never the secret itself.
       </p>
 
       <H2>Accounts</H2>
@@ -108,12 +109,20 @@ export default function SdkGuidePage() {
         <code>requestDemoFunds(address)</code> (testnets).
       </p>
       <Callout kind="warning" title="Accounts follow the unlocked passkey">
-        Every method derives the account address from the session's nullifier. A backup owner, or the new owner after a
-        recovery, derives a different address, so the SDK cannot yet act on an account it did not derive.
+        Every method that takes an app id, such as <code>pay</code> or <code>account</code>, derives the account address
+        from the session's nullifier, except <code>predictAddress</code>, which derives it from the nullifier you pass.
+        A backup owner, or the new owner after a recovery, derives a different address, so the SDK cannot yet approve
+        actions on an account it did not derive. Only the methods that need no passkey, such as{" "}
+        <code>executeRecovery</code>, take an account address.
       </Callout>
 
       <H2>The proof state machine</H2>
-      <p>Every action method except <code>applyChange</code> and <code>executeRecovery</code> takes a listener that receives these states, in order:</p>
+      <p>
+        Every action method except <code>applyChange</code> and <code>executeRecovery</code> takes a listener. Actions that
+        send a transaction report authenticating, proving, relaying, confirming and verified, in that order.{" "}
+        <code>createDisclosure</code> and <code>proveSignIn</code> report authenticating, proving and then idle once the
+        proof is ready. Any of them reports rejected when it fails.
+      </p>
       <Code lang="ts" title="ProofState">{`
 type ProofState =
   | { status: "idle" }
@@ -130,16 +139,22 @@ type ProofState =
       </p>
 
       <H2>Errors</H2>
-      <p>Failures reject with a <code>VeraKeyError</code>:</p>
+      <p>
+        Action failures reject with a <code>VeraKeyError</code>. <code>executeRecovery</code>, <code>ensureAccount</code>{" "}
+        and <code>requestDemoFunds</code> call the relayer directly and reject with its <code>RelayerError</code>.{" "}
+        <code>unlock</code> and <code>authenticate</code> reject with a <code>VeraKeyError</code> at the{" "}
+        <code>authentication</code> or <code>device</code> stage, except on a new device: there, a cancelled second prompt
+        rejects with the browser's <code>DOMException</code>, and a failed prover load or chain read with its own error.
+      </p>
       <Table
         head={["stage", "Meaning"]}
         rows={[
-          [<code key="1">policy</code>, "Valid proof, but the account refused. revert holds the contract error, e.g. NewPayeeCapExceeded."],
-          [<code key="2">funds</code>, "The account cannot cover the relayer fee. Checked before the passkey prompt; a payment above the balance fails later with the revert TokenTransferFailed."],
+          [<code key="1">policy</code>, "The account's policy refused the action; revert holds the contract error, e.g. NewPayeeCapExceeded. The SDK also refuses early, before the passkey prompt, with FeeTooHigh or PaymentSheetRequired when it can tell in advance. createDisclosure also refuses the same app id twice at this stage, with no revert."],
+          [<code key="2">funds</code>, "The account cannot cover the relayer fee. Checked before the passkey prompt."],
           [<code key="3">authentication</code>, "The user cancelled, the prompt timed out, or the payment sheet was closed."],
           [<code key="4">device</code>, "The passkey has no PRF, or the authenticator returned unexpected data."],
           [<code key="5">proof</code>, "Proving failed."],
-          [<code key="6">relay</code>, "The relayer refused or failed, or the transaction reverted."],
+          [<code key="6">relay</code>, "The relayer refused or failed, or the transaction reverted. A payment whose amount plus fee is more than the balance lands here, with the revert TokenTransferFailed."],
         ]}
       />
       <p>
@@ -149,11 +164,15 @@ type ProofState =
 
       <H2>Proving performance</H2>
       <ul>
-        <li>Proving takes 1.85 s (median) in desktop Chrome with 8 threads. Proving on iPhone has not been measured yet.</li>
+        <li>
+          Proving takes about 2 seconds (1.85 s median) in desktop Chrome with 8 threads; browsers that prove on one
+          thread take a few seconds longer. Proving on iPhone has not been measured yet.
+        </li>
         <li>Threads need cross-origin isolation (COOP and COEP headers); without it, bb.js proves on one thread.</li>
         <li>
-          <code>srsSize: 2 ** 17</code> is required: the circuit needs 2^16 points, but bb.js 5.2.0 reads the CRS in 4 MiB
-          chunks. The two CRS files are 4 MiB each.
+          Pass <code>srsSize: 2 ** 17</code>: the circuit needs 2^16 points, but bb.js 5.2.0 reads the CRS in 4 MiB chunks,
+          so 2^17 is the smallest size that works. The two CRS files are then 4 MiB each. Without it, bb.js loads 2^19
+          points (2^18 on iOS), a larger download.
         </li>
         <li>Call <code>vera.prover()</code> early, for example after unlocking, so the first approval does not wait for the download.</li>
       </ul>

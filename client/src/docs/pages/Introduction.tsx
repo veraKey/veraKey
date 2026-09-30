@@ -13,9 +13,10 @@ export default function Introduction() {
         action, but it never receives your passkey's public key or signature.
       </p>
       <p>
-        So nothing on-chain ties your identities in different apps together, unless you choose to prove the link to
-        someone. VeraKey is to wallets what Hide My Email is to email addresses. It is unlinkable, not anonymous: each
-        account's own history stays public.
+        So nothing VeraKey puts on-chain ties your identities in different apps together, unless you choose to prove the
+        link to someone. VeraKey is to wallets what Hide My Email is to email addresses. It is unlinkable, not anonymous:
+        each account's own history stays public, and money you move between your accounts, or into them from one wallet,
+        can connect them.
       </p>
       <H2>Who it is for</H2>
       <ul>
@@ -26,9 +27,9 @@ export default function Introduction() {
       <H2>What you can do</H2>
       <ul>
         <li>Create a passkey and get one account per app, derived before it is ever deployed.</li>
-        <li>Sign in to a site through VeraKey: each site gets its own ID for you, and nothing links it to the IDs other sites get.</li>
+        <li>Sign in to a site through VeraKey: each site gets its own ID for you, and nothing VeraKey puts on-chain links it to the IDs other sites get.</li>
         <li>Pay in USDG with one passkey approval; a relayer pays the gas and takes a small USDG fee you approved.</li>
-        <li>Protect the account: caps, a smaller cap on first payments to new recipients, an instant freeze, a private guardian and, in Chrome, the browser's own payment sheet.</li>
+        <li>Protect the account: caps, a smaller cap on first payments to new recipients, an instant freeze, a private guardian and, in Chrome on macOS and Android, the browser's own payment sheet.</li>
         <li>Prove to an auditor that two of your accounts share a passkey, without revealing the key.</li>
       </ul>
       <H2>Project status</H2>

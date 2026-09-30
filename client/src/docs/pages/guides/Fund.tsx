@@ -6,11 +6,12 @@ export default function FundGuide() {
       <H2>Demo USDG</H2>
       <p>
         On the Accounts page, select <strong>Demo USDG</strong> on an account card. The demo faucet sends 5 USDG to that
-        account, once per account, for up to 3 accounts per visitor per day and 20 accounts a day in all. If the account
-        is not deployed yet, it is deployed first.
+        account, once per account, for up to 3 accounts per visitor per day and 20 accounts a day in all. The
+        per-visitor limit counts faucet requests, not grants: each request uses one of the visitor's 3 a day, even when
+        it is refused. If the account is not deployed yet, it is deployed first.
       </p>
       <p>
-        The faucet pays from the relayer's treasury of Paxos USDG test tokens on Arbitrum Sepolia (
+        The faucet pays from the relayer's treasury of Paxos USDG test tokens on Arbitrum Sepolia (USDG token{" "}
         <Address value="0xFFC95faa3d63Cde504a05B567C600B78C0b41892" />). When the treasury runs out, the app says "The
         demo faucet is out of USDG. Try again later." When the day's 20 grants are given out, it says "The demo faucet
         has given out today's USDG. Try again tomorrow."
@@ -36,8 +37,8 @@ ethereum:<USDG token>@<chain id>/transfer?address=<your account>
 
       <H2>Fund without linking your accounts</H2>
       <p>
-        Your accounts share nothing on-chain, but money can still connect them. If you top up your Pay account and your
-        Shop account from the same wallet, anyone can see that one wallet funded both.
+        VeraKey puts nothing on-chain that links your accounts, but money can still connect them. If you top up your Pay
+        account and your Shop account from the same wallet, anyone can see that one wallet funded both.
       </p>
       <ul>
         <li>Receive income directly into the account that will spend it: ask the payer to send to that account.</li>

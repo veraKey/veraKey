@@ -23,9 +23,10 @@ export default function FaqGuide() {
       <p>
         Your accounts are derived from your passkey and a secret it returns for VeraKey (PRF). Some password managers
         return a different secret for the same passkey through another route, for example through a phone's QR code
-        instead of the password manager on this device, and a different secret opens different accounts. VeraKey
-        remembers the secret each passkey returned in this browser and refuses an unlock that returns another one, so
-        unlock the way you did before. In a browser that has never seen the passkey, use the route you used first.
+        instead of the password manager on this device, and a different secret opens different accounts. VeraKey keeps
+        only a one-way check of the secret each passkey returned in this browser, never the secret itself, and refuses
+        an unlock that returns a different one, so unlock the way you did before. In a browser that has never seen the
+        passkey, use the route you used first.
       </p>
 
       <H2>The faucet is out of USDG</H2>
@@ -37,8 +38,10 @@ export default function FaqGuide() {
 
       <H2>Authenticated, not authorized</H2>
       <p>
-        Your passkey approved, but the account's policy refused: the amount is above a cap, the recipient is new or not
-        allowlisted, or the account is frozen. The message names the reason. See{" "}
+        Your passkey approved, but the account's policy refused: the amount plus the relayer fee is above the
+        per-payment cap or would take today's spending past the daily cap, the amount of a first payment to a new
+        recipient is above the new-recipient cap, the allowlist is on and the recipient is not on it, the account only
+        pays through the payment sheet, or the account is frozen. The message names the reason. See{" "}
         <A href="/docs/guides/pay#when-a-payment-is-refused">When a payment is refused</A>.
       </p>
 
@@ -46,8 +49,8 @@ export default function FaqGuide() {
       <p>
         The payment sheet (Secure Payment Confirmation) appears only in Chrome on macOS and Android, with a passkey
         enrolled for it in that browser profile: the app enrolls passkeys for it only there, where the platform's passkeys
-        support PRF. Elsewhere the app uses the ordinary passkey prompt. If your
-        account requires the sheet, pay from a browser that can show it, or schedule{" "}
+        support PRF. Elsewhere the app uses the ordinary passkey prompt. If your account requires the sheet, pay from a
+        browser that can show it, or schedule{" "}
         <A href="/docs/guides/protect#require-the-payment-sheet">Stop requiring it</A>.
       </p>
 

@@ -28,7 +28,10 @@ function LiveNetwork() {
         The live configuration could not be loaded; the addresses above are the canonical Arbitrum Sepolia deployment.
       </Callout>
     ) : (
-      <p>Loading the live configuration from <A href="/api/config">/api/config</A>…</p>
+      <p>
+        This app's relayer reports its network, origin and rpId, factory, relayer address, the fee signed into every
+        action and the demo faucet amount at <A href="/api/config">/api/config</A>.
+      </p>
     );
   }
   const canonical = config.contracts.factory.toLowerCase() === sepolia.contracts.factory.toLowerCase();
@@ -94,7 +97,11 @@ export default function DeploymentsPage() {
       </p>
 
       <H2>Policy for new accounts</H2>
-      <p>Every account the factory creates starts with this policy. The owner can tighten it at once, or loosen it after the change delay.</p>
+      <p>
+        Every account the factory creates starts with this policy. The owner can tighten the three caps at once, or
+        loosen them after the change delay. The delays, <code>maxFee</code> and the fee recipient are fixed when the
+        account is created.
+      </p>
       <Table
         head={["Setting", "Value"]}
         rows={[
@@ -128,7 +135,7 @@ export default function DeploymentsPage() {
       </ul>
       <p>
         Sourcify does not verify Stylus programs. To check what an address runs, read it from the chain, for example with
-        Foundry's <code>cast</code>:
+        the <code>cast</code> command-line tool:
       </p>
       <Code lang="bash" title="Read-only checks">{`
 RPC=${RPC}

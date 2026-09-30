@@ -16,9 +16,9 @@ export default function ChangelogPage() {
           already scheduled, would leave no owner (<code>LastOwner</code>). These are contract changes, so Arbitrum
           Sepolia has a new factory and account implementation (see <A href="/docs/reference/deployments">Deployments</A>),
           and <code>ARBITRUM_SEPOLIA</code> in SDK 0.2.3 points to them; 0.2.1 and 0.2.2 are deprecated. Accounts made
-          before 29 September stay on the previous deployment: the same passkey now opens a new, empty account, which
-          the demo faucet funds again. On the new factory, the integration kit's end-to-end test paid 1 USDG through the
-          live popup (
+          on verakey.xyz before 29 September stay on the previous deployment: the same passkey now opens a new, empty
+          account, which the demo faucet funds again. On the new factory, the integration kit's end-to-end test paid 1
+          USDG through the live popup (
           <A href="https://arbitrum-sepolia.blockscout.com/tx/0xa7e1abea32a1b3d14a92223ee438b19865bde3ddea96cbc2cb5725c22d1f25c5">transaction</A>).
         </li>
         <li>
@@ -26,8 +26,10 @@ export default function ChangelogPage() {
           machine usually holds whole; the gas the relayer spends, new accounts, faucet grants and RPC calls have budgets
           for everyone; the RPC proxy takes batches of at most 10 calls and only bounded log queries; each account has one
           transaction in flight at a time; and a restrict whose fee the account waives is relayed at most 10 times a day
-          per account. Nothing counts against a limit before it simulates, and a freeze or a cancel is never refused for
-          a budget. See <A href="/docs/build/relayer-api#rate-limits">Relayer API</A>.
+          per account. The daily budgets count a call only once it simulates, and the relayer never refuses, for any
+          budget, cancelling a change or a recovery, or a freeze that stops payments or cancels waiting changes. The
+          per-minute limits, the RPC budget among them, and the faucet's per-visitor limit count every request. See{" "}
+          <A href="/docs/build/relayer-api#rate-limits">Relayer API</A>.
         </li>
         <li>
           <strong>SDK 0.2.3, sessions the kit can end:</strong> signing out ends every copy of the session cookie, a
@@ -51,8 +53,8 @@ export default function ChangelogPage() {
         <li>
           <strong>SDK 0.2.2, one passkey keeps one identity:</strong> some password managers return a different PRF secret
           for the same passkey through another route, such as a phone's QR code instead of the manager on the device, and a
-          different secret opens different accounts. VeraKey now remembers a one-way check of the secret each passkey
-          returned in a browser, and refuses an unlock that returns another one. See{" "}
+          different secret opens different accounts. VeraKey now keeps a one-way check of the secret each passkey returned
+          in a browser, never the secret itself, and refuses an unlock that returns a different one. See{" "}
           <A href="/docs/guides/faq#my-passkey-opens-a-different-wallet">My passkey opens a different wallet</A>.
         </li>
         <li>
@@ -85,7 +87,8 @@ export default function ChangelogPage() {
         <li>
           <strong>SDK 0.1.2, VeraKey passkeys own ZeroDev Kernel accounts:</strong>{" "}
           <code>toVeraKeyKernelValidator</code> from <code>@verakey/sdk/kernel</code> makes the ERC-7579 validator a
-          Kernel plugin. On Arbitrum Sepolia, on the previous deployment, a Kernel v3.3 account deployed and paid 1 USDG with a passkey proof (
+          Kernel plugin. On Arbitrum Sepolia, on the previous deployment, a Kernel v3.3 account deployed and paid 1 USDG
+          with a proof from a software passkey, a P-256 key that stands in for a device passkey (
           <A href="https://arbitrum-sepolia.blockscout.com/tx/0x66dbf2ed7552d9e0d563bdf9a8aee30656d1e99cfab4c9e8bade961c0d0cfc2f">transaction</A>). See <A href="/docs/build/erc-7579">ERC-7579 validator</A>.
         </li>
         <li>

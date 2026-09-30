@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { PreviewNotice } from "./components";
 import { DOCS_UPDATED, neighbors, pagesByGroup, type DocPage } from "./registry";
 import { DocsSearch } from "./Search";
+import { SITE_DESCRIPTION, SITE_TITLE } from "./site";
 import { fragmentId } from "./slug";
 
 interface TocItem {
@@ -130,10 +131,22 @@ export function DocsLayout({ page, children }: { page?: DocPage; children: React
   useScrollOnNavigate(article, location);
   const { prev, next } = page ? neighbors(page.path) : {};
 
+  // On the way out, put back the site's own title and description, so Home and the app do not keep a docs title.
+  // Not the values found on the way in: a prerendered docs page already starts with its docs title.
   useEffect(() => {
     document.title = page ? `${page.title} · VeraKey Docs` : "Page not found · VeraKey Docs";
     setMetaDescription(page?.description ?? "VeraKey documentation.");
+    return () => {
+      document.title = SITE_TITLE;
+      setMetaDescription(SITE_DESCRIPTION);
+    };
   }, [page]);
+
+  // Prerendered markup says "Ctrl K"; Apple devices switch to ⌘K after hydration.
+  const [searchKey, setSearchKey] = useState("Ctrl K");
+  useEffect(() => {
+    if (/Mac|iPhone|iPad/.test(navigator.platform)) setSearchKey("⌘K");
+  }, []);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -164,7 +177,7 @@ export function DocsLayout({ page, children }: { page?: DocPage; children: React
           <button className="dx-search-button" onClick={() => setSearchOpen(true)} aria-label="Search the docs">
             <SearchIcon size={14} />
             <span>Search docs…</span>
-            <kbd>⌘K</kbd>
+            <kbd>{searchKey}</kbd>
           </button>
           <nav className="dx-top-links" aria-label="Site">
             <Link href="/">Home</Link>

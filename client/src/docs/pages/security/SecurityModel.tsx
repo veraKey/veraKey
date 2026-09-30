@@ -17,8 +17,9 @@ const INVARIANTS: [string, ReactNode, ReactNode][] = [
       A payment plus its fee, and the fee of a scheduled change, count against the per-payment and daily caps. Freezing,
       restricting and cancelling a change or a recovery are never refused because of the caps, so a thief who spends the
       day's cap cannot stop the owners. Their fee, at most <code>maxFee</code>, counts toward the day's spending, and the
-      part past the day's cap is waived: a day never spends more than its cap, so a stolen passkey cannot burn the
-      balance on fees. The per-payment cap never drops below <code>maxFee</code>.
+      part past the day's cap is waived: a day never spends more than its cap, so a stolen passkey can burn at most the
+      day's cap on fees each day, never the whole balance at once. The per-payment cap never drops below{" "}
+      <code>maxFee</code>.
     </>,
     <>
       e2e: policy; audit: <code>with the day's cap spent, the owner still vetoes a waiting change and freezes</code>,{" "}
@@ -31,7 +32,7 @@ const INVARIANTS: [string, ReactNode, ReactNode][] = [
     "Fees cannot be redirected.",
     <>
       Every fee goes to the factory's <code>feeRecipient</code> (the relayer) and is at most <code>maxFee</code> (0.25 USDG
-      on Sepolia); both are bound into the account address. Whoever submits a transaction, or tricks a user into
+      on Arbitrum Sepolia); both are bound into the account address. Whoever submits a transaction, or tricks a user into
       approving one, cannot turn the signed fee into a payment to themselves, even from a frozen account.
     </>,
     <>
@@ -90,13 +91,13 @@ const INVARIANTS: [string, ReactNode, ReactNode][] = [
     "The key never reaches the chain.",
     <>
       Owners are nullifiers, <code>Poseidon2(domain, pk, prf, appId)</code>. The public key, the signature and the PRF
-      secret are never in calldata, storage or events, and the app checks every transaction it sends for the public key
-      (<code>publicKeyOccurrences</code>).
+      secret are never in calldata, storage or events, and the app checks every transaction it sends with a proof for the
+      public key (<code>publicKeyOccurrences</code>).
     </>,
     <>e2e: <code>pubkey_absent_from_calldata</code>; circuit tests</>,
   ],
   [
-    "Accounts in different apps share nothing on-chain, unless their owner discloses the link.",
+    "Nothing VeraKey puts on-chain links accounts in different apps, unless their owner discloses the link.",
     <>
       The account address is CREATE2 over <code>(appId, nullifier, configHash)</code>. The guardian is stored as{" "}
       <code>keccak256(abi.encode(typehash, account, guardian, salt))</code>.
@@ -175,8 +176,8 @@ export default function SecurityModelPage() {
       <H2>What VeraKey protects</H2>
       <ul>
         <li><strong>Your money.</strong> Only a fresh approval with your passkey moves USDG, and only for the exact action you approved. The one exception is a guardian recovery that no owner cancels in time: it hands the account to the guardian's chosen passkey.</li>
-        <li><strong>Your passkey.</strong> Its public key, its signatures and its PRF secret never reach the chain, the relayer or other apps.</li>
-        <li><strong>Your separate identities.</strong> Your accounts in different apps cannot be linked on-chain, unless you prove the link yourself.</li>
+        <li><strong>Your passkey.</strong> Its public key, its signatures and its PRF secret never reach the chain, the relayer or other apps. Only the VeraKey page code in your browser handles them: see <A href="#trust-assumptions">Trust assumptions</A>.</li>
+        <li><strong>Your separate identities.</strong> Nothing VeraKey puts on-chain links your accounts in different apps, unless you prove the link yourself. How you fund them, or a guardian they share, still can: see <A href="#what-still-leaks">What still leaks</A>.</li>
         <li><strong>You, from a bad approval.</strong> Even an approved action stays within the caps, the new-recipient cap, the fee limit and the timelocks.</li>
       </ul>
       <p>
@@ -187,9 +188,8 @@ export default function SecurityModelPage() {
       <H2>Invariants</H2>
       <p>
         These must always hold. Each names how it is enforced and the tests that exercise it: <code>e2e</code> tests deploy
-        the real contracts to a local Arbitrum Nitro node and use real proofs, <code>prop</code> tests check the account's
-        logic on 2,000 random cases each, the circuit tests check the circuits' constraints, and the validator tests use
-        real proofs.
+        the real contracts and use real proofs, <code>prop</code> tests check the account's logic on 2,000 random cases
+        each, the circuit tests check the circuits' constraints, and the validator tests use real proofs.
       </p>
       <Table
         stack
@@ -214,27 +214,32 @@ export default function SecurityModelPage() {
       <H3>The VeraKey page code</H3>
       <p>
         Every app uses VeraKey's rpId, so the page served from the VeraKey origin sees the key, the PRF secret and the
-        signature in your browser. It proves only in the browser, runs under a strict CSP with no third-party scripts, loads
-        its proving files from VeraKey's own origin. A malicious page would still need a fresh passkey approval for every action,
+        signature in your browser. It proves only in the browser, runs under a strict CSP with no third-party scripts, and
+        loads its proving files from VeraKey's own origin. A malicious page would still need a fresh passkey approval for every action,
         could not exceed the caps, the new-recipient cap, the fee limit or the timelocks, and, with the payment sheet
         required, could not pay without the browser itself showing the payee and the total.
       </p>
       <H3>The relayer</H3>
       <p>
-        It cannot move funds or change what was signed. It could refuse to relay, but anyone can submit the same calldata
-        instead (a third party is not paid the fee). It relays only for accounts whose code is the EIP-1167 clone of this
-        deployment's implementation, caps each transaction at 2.5M gas, sends one transaction per account at a time,
-        limits new accounts and faucet grants per visitor and per day for everyone, and spends at most a daily gas budget,
-        so look-alike contracts, rotating addresses and fees paid in test USDG cannot drain its gas. It never refuses a
-        freeze or a cancel for a budget. It counts an IPv6 visitor by its /64. It sees request metadata (IP, timing): its
-        rate-limit keys are a daily-rotated HMAC of the address kept in memory, and it can add a random delay before
-        broadcasting.
+        When it relays, it cannot move funds or change what was signed. It also serves the VeraKey page code, so trusting
+        that page (above) means trusting whoever runs the relayer. It could refuse to relay, but anyone can submit the same
+        calldata instead (a third party is not paid the fee). It relays only for accounts whose code is the EIP-1167 clone
+        of this deployment's implementation, caps each transaction at 2.5M gas, sends one transaction per account at a
+        time, limits, per day, new accounts and faucet requests for each visitor and new accounts and faucet grants for
+        everyone, and spends at most a daily gas budget on everything except actions that defend an account, so
+        look-alike contracts and rotating addresses cannot drain its gas. It never refuses, for any budget, an action that
+        defends an account: cancelling a change or a recovery, and a freeze that stops payments or cancels waiting
+        changes. Only the per-minute request limits, per visitor and per account, bound those. A freeze of an account
+        that is already frozen and has nothing waiting counts like any other restrict. It counts visitors by a
+        daily-rotated HMAC of their IP address (an IPv6 one by its /64), kept in memory; per-account limits use the
+        account address or the nullifier. It sees your IP address and when you act, and, through its RPC proxy, which
+        accounts your browser reads. It broadcasts a call as soon as it passes its checks.
       </p>
       <H3>The USDG issuer</H3>
       <p>Paxos can freeze any single account. This is by design: VeraKey is unlinkable, not anonymous.</p>
       <H3>The proof system</H3>
       <p>
-        Noir 1.0.0-beta.25 and Barretenberg 5.2.0 (UltraHonk, ZK flavour, optimized Solidity verifier). The verifiers are
+        Noir 1.0.0-beta.25 and Barretenberg 5.2.0 (UltraHonk, ZK flavor, optimized Solidity verifier). The verifiers are
         generated, not hand-written. UltraHonk has not been independently audited.
       </p>
       <H3>Browsers</H3>
@@ -248,14 +253,20 @@ export default function SecurityModelPage() {
       <ul>
         <li><strong>Amounts, recipients and timing</strong> are public for each account.</li>
         <li>
-          <strong>Where funds come from.</strong> Funding several app accounts from one wallet links them on-chain. Receive
-          income directly into each account (see <A href="/docs/guides/fund">Fund and receive</A>); on mainnet, top up through
-          an ASP-screened pool such as 0xbow Privacy Pools or Railgun on Arbitrum One. No such pool runs on Arbitrum Sepolia.
+          <strong>Where funds come from.</strong> Funding several app accounts from one wallet, or moving money between
+          them, links them on-chain. Receive income directly into each account (see{" "}
+          <A href="/docs/guides/fund">Fund and receive</A>); on mainnet, top up through an ASP-screened pool such as 0xbow
+          Privacy Pools or Railgun on Arbitrum One. No such pool runs on Arbitrum Sepolia.
         </li>
-        <li><strong>A guardian reveals itself</strong> for one account when it acts.</li>
+        <li>
+          <strong>A guardian reveals itself</strong> for one account when it acts, so one guardian that acts for accounts
+          in several apps links them.
+        </li>
         <li>
           <strong>A disclosure is permanent.</strong> Whoever holds the file learns that the two accounts share an owner
-          and can check the proof. Only an honest verifier checking under its own name sees a forwarded one fail.
+          and can check the proof. Only an honest verifier checking under its own name sees a forwarded one fail. The
+          verify page at /app/verify reads both accounts through VeraKey's RPC proxy, so VeraKey's server sees the pair
+          too.
         </li>
       </ul>
 
@@ -267,7 +278,7 @@ export default function SecurityModelPage() {
         rows={[
           ["Passkey public key, signature, authenticator data", "hidden", "hidden", "seen, in the browser only"],
           ["PRF secret", "hidden", "hidden", "seen, in the browser only"],
-          ["Which accounts belong to one person", "hidden, unless the owner discloses it", "visible if one relayer serves them all (IP, timing)", "visible"],
+          ["Which accounts belong to one person", "hidden, unless the owner discloses it, money moves between them or into them from one wallet, or a guardian they share acts for more than one", "visible if one relayer serves them all (IP, timing, the accounts a browser reads)", "visible"],
           ["Guardian address", "hidden until it acts", "hidden until it acts", "seen when set"],
           ["Account address, amounts, recipients, timing", "public", "public", "public"],
         ]}
@@ -283,8 +294,8 @@ export default function SecurityModelPage() {
           ["A tampered page on the VeraKey origin", "Ask you to approve something else", "A fresh approval per action (1), the caps (2, 4), and the payment sheet when required (11)"],
           ["An address-poisoning attacker", "Get you to pay a look-alike address", "The first payment to a new recipient is capped (4)"],
           ["A malicious guardian", "Freeze, veto changes, start a recovery, and take the account over if nobody cancels it in time", "Owners see and cancel the recovery during the recovery delay; it cannot veto changes to the guardian (10)"],
-          ["The relayer", "Refuse to relay, see IP and timing", "Anyone can submit the calldata instead; it never sees the key"],
-          ["An on-chain observer", "See each account's activity", "Accounts in different apps share nothing on-chain (8, 9)"],
+          ["The relayer", "Refuse to relay; see IP, timing and which accounts a browser looks up, and so link them", "Anyone can submit the calldata instead. The key and the PRF secret never reach it, unless the page code it serves is tampered with (above)"],
+          ["An on-chain observer", "See each account's activity", "Nothing VeraKey puts on-chain links accounts in different apps (8, 9); money moved between them, or into them from one wallet, still can, and so can a guardian they share once it acts for more than one"],
           ["Anyone a disclosure is forwarded to", "Learn that the two accounts share an owner, and check the proof", "Nothing: the link is permanent. An honest verifier refuses a disclosure made for someone else (13)"],
         ]}
       />

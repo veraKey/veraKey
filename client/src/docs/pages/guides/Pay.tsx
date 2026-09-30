@@ -31,7 +31,7 @@ export default function PayGuide() {
         head={["On a wide screen", "On a phone", "What happens"]}
         rows={[
           ["Passkey", "Approve with your passkey", "Your passkey signs the exact payment."],
-          ["Zero-knowledge proof", "Proving on this device", "Your browser proves the signature in zero knowledge, in about 2 seconds on a desktop."],
+          ["Zero-knowledge proof", "Proving on this device", "Your browser proves the signature in zero knowledge: about 2 seconds in desktop Chrome with 8 threads; browsers that prove on one thread take a few seconds longer."],
           ["Gasless relay", "Sending the proof", "The relayer simulates the payment, then submits it."],
           ["Arbitrum", "Confirming on Arbitrum", "Arbitrum includes the transaction: the account checks the proof and the policy, and pays."],
         ]}
@@ -45,7 +45,8 @@ export default function PayGuide() {
       <H2>Fees</H2>
       <p>
         You never need ETH. The relayer pays the gas, and your account pays it a fee of 0.02 USDG. The fee is part of
-        what your passkey approves, so it cannot be changed afterwards. It counts against your caps like any payment.
+        what your passkey approves, so it cannot be changed afterwards. The amount plus the relayer fee must fit the
+        per-payment and daily caps; the new-recipient cap looks at the amount alone.
       </p>
       <p>
         Accounts refuse any fee above 0.25 USDG and pay fees only to the relayer address fixed when the account was
@@ -65,7 +66,7 @@ export default function PayGuide() {
       </p>
 
       <H2>Your receipt</H2>
-      <p>A verified payment shows a receipt with:</p>
+      <p>On a wide screen, a verified payment shows a receipt with:</p>
       <ul>
         <li>the amount, the account it came from, the recipient and the relayer fee;</li>
         <li>the transaction, linked to Arbiscan;</li>
@@ -73,6 +74,10 @@ export default function PayGuide() {
         <li>the size of the proof (8,768 bytes);</li>
         <li>how many times your passkey's public key appears in the transaction: 0.</li>
       </ul>
+      <p>
+        On a phone, the <strong>Paid</strong> screen shows the amount, the recipient, the time the proof took, the
+        relayer fee, how many times your passkey's public key appears in the transaction (0) and a link to Arbiscan.
+      </p>
 
       <H2>When a payment is refused</H2>
       <p>
@@ -83,9 +88,9 @@ export default function PayGuide() {
       <Table
         head={["Reason", "What it means", "What to do"]}
         rows={[
-          [<code key="a">PerTxCapExceeded</code>, "The amount is above the per-payment cap.", "Pay less, or raise the cap (timelocked)."],
+          [<code key="a">PerTxCapExceeded</code>, "The amount plus the fee is above the per-payment cap.", "Pay less, or raise the cap (timelocked)."],
           [<code key="b">DailyCapExceeded</code>, "The payment would pass today's cap.", "Wait until the next UTC day, or raise the cap (timelocked)."],
-          [<code key="c">NewPayeeCapExceeded</code>, "It is the first payment to this address, and it is above the new-recipient cap.", "Pay a smaller amount first, or allowlist the recipient."],
+          [<code key="c">NewPayeeCapExceeded</code>, "It is the first payment to this address, and it is above the new-recipient cap.", "Pay a smaller amount first, or allowlist the recipient (timelocked)."],
           [<code key="d">RecipientNotAllowed</code>, "The allowlist is on and the recipient is not on it.", "Add the recipient (timelocked)."],
           [<code key="e">AccountFrozen</code>, "The account is frozen.", "Schedule an unfreeze on the Policy page."],
           [<code key="f">PaymentSheetRequired</code>, "The account only pays through the payment sheet.", "Pay from a browser that can show it, or stop requiring it (timelocked)."],

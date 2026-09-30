@@ -7,13 +7,13 @@ export default function SignInPage() {
       <H2>How sign-in works</H2>
       <p>
         Sign in with VeraKey lets a game or an app on its own domain sign players in with their VeraKey passkey, and take
-        USDG payments from them. Your page opens VeraKey's popup, the player approves with Face ID or Touch ID, and your
-        page gets back a result that your server verifies itself.
+        USDG payments from them. Your page opens VeraKey's popup, the player approves with their passkey (Face ID, Touch
+        ID or a PIN), and your page gets back a result that your server verifies itself.
       </p>
       <ul>
-        <li><strong>A player ID for your site alone.</strong> Your app id is derived from your origin, so the popup only ever gives you the player's ID for your site. Other sites get different IDs, and nobody can link them.</li>
+        <li><strong>A player ID for your site alone.</strong> Your app id is derived from your origin, so the popup only ever gives you the player's ID for your site. Other sites get different IDs, and nothing VeraKey puts on-chain links them.</li>
         <li><strong>A proof, not a promise.</strong> The result carries a zero-knowledge proof that the player's passkey approved this sign-in, for your origin and your nonce. Your server checks it on-chain with a free call, or locally.</li>
-        <li><strong>Private by default.</strong> The proof is made in the player's browser. During a sign-in, no request to VeraKey carries the player ID, your app id or your nonce.</li>
+        <li><strong>Private.</strong> The proof is made in the player's browser. During a sign-in, no request to VeraKey carries the player ID, your app id or your nonce. Send <code>Referrer-Policy: no-referrer</code>, so VeraKey's server does not learn your domain either.</li>
         <li><strong>Payments from an account for your site.</strong> The popup shows your real domain, the recipient and the amount, and pays from the account VeraKey keeps for the player on your site, within its caps.</li>
       </ul>
       <Code lang="text" title="One sign-in">{`
@@ -39,7 +39,7 @@ export const verakey = createVeraKeyServer({
   secret: VERAKEY_SECRET,        // at least 32 random bytes, known only to your server
   merchant: SHOP_ADDRESS,        // where payments go
   onPayment: ({ player, amount, hash }) => {
-    if (amount !== 1_000_000n) throw new Error("A sword costs 1 USDG."); // the player sees this message
+    if (amount !== 1_000_000n) throw new Error("A sword costs 1 USDG."); // pay() rejects with this message
     return grantSword(player.id, hash);
   },
 });
@@ -86,8 +86,8 @@ function Shop() {
         <li>In your own routes, <code>await verakey.getPlayer(request)</code> is the signed-in player, or null.</li>
         <li>
           <code>onPayment</code> receives a payment already verified on-chain, from the signed-in player's account to your
-          merchant: check that the amount pays for what you sell. If it throws, the player sees its message, and{" "}
-          <code>pay()</code> rejects with <code>error.payment</code>: once your site is back,{" "}
+          merchant: check that the amount pays for what you sell. If it throws, <code>pay()</code> rejects with its
+          message, for your page to show the player, and with <code>error.payment</code>: once your site is back,{" "}
           <code>confirmPayment(error.payment)</code> asks it again without a second payment. The kit checks one payment
           per player at a time (another answers 429); key what you grant by <code>hash</code>, as above, so that a retry
           of your own never grants twice.
@@ -168,8 +168,9 @@ if (verdict.valid) startSession(verdict.playerId, verdict.account);
 `}</Code>
       <p>
         Take the deployment's values from <A href="/docs/reference/deployments">Deployments</A> and keep them in your
-        server's configuration; never read them from a result. <code>verifySignIn</code> returns every check, and the{" "}
-        <code>detail</code> of a failed one says why. A malformed result is a refusal, never an exception:
+        server's configuration; never read them from a result. <code>verifySignIn</code> returns the checks it ran, and
+        the <code>detail</code> of a failed one says why. Once a check that needs no chain fails, it stops before reading
+        the chain, so Proof verifies and the account checks are left out. A malformed result is a refusal, never an exception:
       </p>
       <Table
         stack
@@ -225,7 +226,10 @@ const paid = verdict?.valid === true; // grant the item once per payment
           sent: find it with <code>findPayment</code>, which waits for it, then verify it.
         </li>
         <li><code>verifyPayment</code> waits for a payment that is sent but not yet in a block.</li>
-        <li>VeraKey's relayer submits the payment, so it sees the transaction, which is public on-chain anyway.</li>
+        <li>
+          VeraKey's relayer submits the payment, so it sees the transaction, which is public on-chain anyway, and the
+          player's IP address, which is not. The <A href="/docs/security">security model</A> lists what VeraKey sees.
+        </li>
         <li>Accept each transaction hash once, so one payment never buys twice.</li>
       </ul>
 
@@ -275,6 +279,7 @@ async function addPasskeyAuthenticator(popup: Page) {
 }
 
 test("a player signs in with a new VeraKey passkey", async ({ page }) => {
+  test.setTimeout(120_000); // a first run loads the prover
   await page.goto("http://localhost:5173/");
   const popupOpens = page.waitForEvent("popup");
   await page.getByRole("button", { name: "Sign in with VeraKey" }).click(); // your page's button
@@ -324,7 +329,7 @@ test("a player signs in with a new VeraKey passkey", async ({ page }) => {
           cookie), accept it once, and let it expire. Otherwise an attacker could sign someone else's browser in as
           themselves.
         </li>
-        <li>Pin the deployment (chain, factory, verifier and VeraKey's origin) in your server's configuration.</li>
+        <li>Pin the deployment (chain, factory, verifier, rpIdHash and VeraKey's origin) in your server's configuration.</li>
         <li>Serve your site over https. The popup answers only https sites, and localhost or 127.0.0.1 while you develop.</li>
         <li>Send <code>Referrer-Policy: no-referrer</code>, so VeraKey's server does not learn your domain when the popup loads.</li>
         <li>
@@ -356,7 +361,7 @@ test("a player signs in with a new VeraKey passkey", async ({ page }) => {
           [<code key="3">closed</code>, "The player closed the popup. With error.hash, the payment was sent: verify it. With error.pending, it may have been sent: find it with findPayment first."],
           [<code key="4">busy</code>, "Another request from this page is still open."],
           [<code key="5">origin</code>, "The page is not on https, localhost or 127.0.0.1."],
-          [<code key="6">request</code>, "A malformed request, such as a nonce that is not 32 bytes, or your own nonce callback threw. The popup then closes at once, and error.cause says why: what your callback threw, so your page can show your server's message."],
+          [<code key="6">request</code>, "A malformed request, or your own nonce callback threw. When your nonce callback throws, or the nonce is not 32 bytes, the popup closes at once, and error.cause says why: what your callback threw, so your page can show your server's message, or the SDK's error naming the malformed nonce. When the popup itself refuses a request, such as a payment of 0, it stays open on its refusal screen until the player closes it, and error.cause is not set."],
           [<code key="7">cancelled</code>, "The player cancelled before approving."],
           [<code key="8">funds, policy, device, proof, relay</code>, <>The same stages as the SDK: see <A href="/docs/reference/errors">Errors</A>. A relay error can carry error.pending too.</>],
         ]}

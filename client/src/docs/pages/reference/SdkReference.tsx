@@ -40,10 +40,10 @@ const vera = new VeraKeyClient(config); // config: VeraKeyConfig
           [n("rpIdHash"), c("Hex"), "sha256 of the rpId, as the accounts store it."],
           [n("relayerUrl"), c("string"), 'Base URL of the relayer API, e.g. "/api".'],
           [n("relayerFee"), c("bigint"), "The relayer fee in USDG base units; it is signed into every action."],
-          [n("appIds"), c("bigint[]"), "The app ids this client manages; used to recognise a passkey on a new device."],
+          [n("appIds"), c("bigint[]"), "The app ids this client manages; used to recognize a passkey on a new device."],
           [n("loadProver"), c("() => Promise<VeraKeyProver>"), "Loads the prover lazily: bb.js and the CRS are several megabytes."],
           [n("store"), c("PasskeyStore?"), "Where passkey ids, public keys and PRF checks are kept (default LocalPasskeyStore)."],
-          [n("paymentInstrument"), c("{ displayName: string; icon: string }?"), "Shown in the browser's payment sheet."],
+          [n("paymentInstrument"), c("{ displayName: string; icon: string }?"), "Shown in the browser's payment sheet; the sheet needs it."],
         ]}
       />
       <H3>Passkeys and sessions</H3>
@@ -71,7 +71,7 @@ const vera = new VeraKeyClient(config); // config: VeraKeyConfig
           ["account", "(appId: bigint): Promise<AccountState>", "Reads the account's balance, policy, protections, scheduled changes and recovery."],
           ["ensureAccount", "(appId: bigint): Promise<Address>", "Deploys the account through the relayer; does nothing if it exists."],
           ["requestDemoFunds", "(account: Address): Promise<void>", "Asks the relayer's faucet for demo USDG (testnets)."],
-          ["pendingChanges", "(account: Address): Promise<PendingChangeInfo[]>", "The scheduled changes still waiting, oldest first."],
+          ["pendingChanges", "(account: Address): Promise<PendingChangeInfo[]>", "The scheduled changes still waiting, earliest eta first."],
           ["scheduledPayload", "(account: Address, changeId: Hex, lookbackBlocks = 100_000n): Promise<Hex | null>", "Best effort: a change's payload from its ChangeScheduled event; null when not found."],
           ["isPending", "(account: Address, changeId: Hex): Promise<boolean>", "True while the change is scheduled and not applied or cancelled."],
         ])}
@@ -79,9 +79,11 @@ const vera = new VeraKeyClient(config); // config: VeraKeyConfig
       <H3>Actions</H3>
       <p>
         Each action proves on this device and submits through the relayer. <code>emit</code> is optional and receives every{" "}
-        <A href="#types">ProofState</A>; a failure rejects with a <code>VeraKeyError</code>. <code>applyChange</code> and{" "}
-        <code>executeRecovery</code> need no passkey and take no listener, and <code>executeRecovery</code> rejects with the
-        relayer's <code>RelayerError</code>.
+        <A href="#types">ProofState</A>; a failure rejects with a <code>VeraKeyError</code>. <code>authorize</code>, the
+        lower-level call, emits no <code>rejected</code> state and can reject with the RPC's own error.{" "}
+        <code>applyChange</code> and <code>executeRecovery</code> need no passkey and take no listener;{" "}
+        <code>executeRecovery</code> rejects with the relayer's <code>RelayerError</code>, and a network failure in either
+        rejects with the underlying error.
       </p>
       <Table
         stack
@@ -103,7 +105,7 @@ const vera = new VeraKeyClient(config); // config: VeraKeyConfig
         stack
         head={["Method", "Signature", "What it does"]}
         rows={methods([
-          ["canConfirmPayments", "(session?: Session | null): Promise<boolean>", "Whether this passkey is enrolled for the payment sheet in this browser, and the browser can show it."],
+          ["canConfirmPayments", "(session?: Session | null): Promise<boolean>", "Whether this passkey is enrolled for the payment sheet in this browser, the client has a paymentInstrument, and the browser can show the sheet."],
           ["guardianSalt", "(appId: bigint, guardian: Address, session?: Session): Promise<Hex>", "The salt that hides the guardian in this app's account, derived from the PRF secret."],
           ["guardianCard", "(appId: bigint, guardian: Address): Promise<GuardianCard>", "The card to give the guardian, with the commitment to schedule."],
           ["createDisclosure", "(request: { appIdA: bigint; appIdB: bigint; audience: string; nonce?: Hex; ttlSeconds?: number; labels?: { appA?: string; appB?: string } }, emit?): Promise<DisclosurePackage>", "Proves to audience that this passkey owns both apps' accounts. Valid for ttlSeconds (default one day). Nothing is sent anywhere."],
@@ -189,7 +191,10 @@ interface StoredPasskey {
       <p>
         <code>publicKeyOccurrences</code> in the verified state counts how often the passkey's public key appears in the
         transaction's calldata. VeraKey's transactions never contain it, so it is 0. The rejection stages are explained in{" "}
-        <A href="/docs/reference/errors#sdk-rejection-stages">SDK rejection stages</A>.
+        <A href="/docs/reference/errors#sdk-rejection-stages">SDK rejection stages</A>. <code>POLICY_REVERTS</code>, a{" "}
+        <code>Set</code> of contract error names, lists the reverts the client reports at the <code>policy</code> stage.
+        The prover throws <code>ProofGenerationError</code> (also from <code>@verakey/sdk/errors</code>) when an
+        assertion does not satisfy the circuit; the client reports it at the <code>proof</code> stage.
       </p>
 
       <H2>Action helpers</H2>
@@ -227,7 +232,10 @@ interface Action {
         <code>GUARDIAN_TYPEHASH</code>, <code>NULLIFIER_DOMAIN</code>, <code>PRF_SALT_LABEL</code>,{" "}
         <code>MAX_DEADLINE_WINDOW</code> (600), <code>USDG_DECIMALS</code> (6), <code>BN254_R</code>, <code>P256_N</code> and{" "}
         <code>ZERO_HASH</code>. The ABIs are <code>veraKeyAccountAbi</code>, <code>veraKeyFactoryAbi</code>,{" "}
-        <code>honkVerifierAbi</code> and <code>erc20Abi</code>.
+        <code>honkVerifierAbi</code> and <code>erc20Abi</code>. The byte helpers of <code>@verakey/sdk/bytes</code> are{" "}
+        <code>bytesToHex</code>, <code>hexToBytes</code>, <code>concatBytes</code>, <code>toFieldHex</code> (a field
+        element as 32-byte hex), <code>limbs</code>, <code>bigintToBytes32</code>, <code>bytesToBigint</code>,{" "}
+        <code>base64UrlEncode</code>, <code>base64UrlDecode</code>, <code>asBytes</code> and <code>sha256</code>.
       </p>
 
       <H2>WebAuthn helpers</H2>
@@ -238,7 +246,7 @@ interface Action {
         rows={methods([
           ["createPasskey", "(options: CreatePasskeyOptions): Promise<RegisteredPasskey>", "Creates a discoverable ES256 passkey with PRF enabled; payment: true also enrolls it for the payment sheet."],
           ["getAssertion", "(options: GetAssertionOptions): Promise<PasskeyAssertion>", "A user-verified assertion. withPrf evaluates PRF (unlock only: signing assertions must keep 37 bytes of authenticator data)."],
-          ["getSpcAssertion", "(options: SpcAssertionOptions): Promise<PasskeyAssertion>", "Asks the browser's payment sheet to show payee and total and sign them."],
+          ["getSpcAssertion", "(options: SpcAssertionOptions): Promise<PasskeyAssertion>", "Asks the browser's payment sheet to show payee and total; the passkey signs them."],
           ["spcAvailability", "(): Promise<string>", '"available" when the browser can show the payment sheet (Chromium on macOS, Windows, Android).'],
           ["formatSpcTotal", "(units: bigint): string", "The payment sheet total for USDG base units, byte for byte what the account expects."],
           ["webauthnDigest", "(authenticatorData: Uint8Array, clientDataJSON: Uint8Array): Promise<Uint8Array>", "sha256(authenticatorData ‖ sha256(clientDataJSON)), the digest a passkey signs."],
@@ -253,7 +261,9 @@ interface Action {
         <code>AUTHENTICATOR_DATA_LENGTH</code> is 37. The errors <code>PrfUnsupportedError</code> and{" "}
         <code>UnsupportedAuthenticatorError</code> become the <code>device</code> stage in the client. Passkey ids and public
         keys are kept by a <code>PasskeyStore</code> (<code>list</code>, <code>get</code>, <code>save</code>,{" "}
-        <code>remove</code>): <code>LocalPasskeyStore</code> in a browser, <code>MemoryPasskeyStore</code> in tests and Node.
+        <code>remove</code>): <code>LocalPasskeyStore</code> in a browser, <code>MemoryPasskeyStore</code> in tests and Node.{" "}
+        <code>credentialIdBytes(passkey)</code> and <code>publicKeyOf(passkey)</code>, from <code>@verakey/sdk/store</code>,
+        turn a <code>StoredPasskey</code>'s id and public key back into bytes, for example for <code>getAssertion</code>.
       </p>
 
       <H2>Disclosure helpers</H2>
@@ -380,14 +390,14 @@ interface DisclosedAccount {
         head={["Export", "Signature", "What it does"]}
         rows={methods([
           ["VeraKeyConnect", "new VeraKeyConnect({ url })", "Opens VeraKey's popup for one request at a time."],
-          ["signIn", "({ nonce: Hex | () => Promise<Hex> }): Promise<SignInResult>", "Signs the player in; call it from a click."],
-          ["pay", "({ to: Address; amount: bigint; account?: Address }): Promise<PaymentResult>", "Asks the player to pay; call it from a click. With account, the popup refuses to pay from any other account."],
+          ["VeraKeyConnect.signIn", "({ nonce: Hex | (() => Promise<Hex>) }): Promise<SignInResult>", "Signs the player in; call it from a click."],
+          ["VeraKeyConnect.pay", "({ to: Address; amount: bigint; account?: Address }): Promise<PaymentResult>", "Asks the player to pay; call it from a click. With account, the popup refuses to pay from any other account."],
           ["VeraKeyConnectError", "{ code, message, revert?, hash?, pending?, cause? }", "Why a request failed. hash: the payment was sent. pending: it may have been sent; find it with findPayment. cause: what the site's own nonce callback threw (code request)."],
-          ["verifySignIn", "(result, { origin, nonce, publicClient, deployment, prover?, skipOnChainProof?, now?, maxTtlSeconds?, clockSkewSeconds? }): Promise<{ valid, checks, playerId, account }>", "Checks a sign-in on the site's server and returns every check. prover also verifies the proof locally with bb.js; skipOnChainProof, with a prover, skips the on-chain check. now (seconds) replaces the clock; maxTtlSeconds (default 300) and clockSkewSeconds (default 60) bound the expiry."],
+          ["verifySignIn", "(result, { origin, nonce, publicClient, deployment, prover?, skipOnChainProof?, now?, maxTtlSeconds?, clockSkewSeconds? }): Promise<{ valid, checks, playerId, account }>", "Checks a sign-in on the site's server and returns the checks it ran: a malformed result stops at Format or Well-formed fields, and once a check that needs no chain fails, it stops before reading the chain. prover also verifies the proof locally with bb.js; skipOnChainProof, with a prover, skips the on-chain check. now (seconds) replaces the clock; maxTtlSeconds (default 300) and clockSkewSeconds (default 60) bound the expiry."],
           ["verifyPayment", "(hash, { publicClient, account, to, amount, timeoutMs? }): Promise<{ valid, checks, fee }>", "Checks that a transaction paid this amount from this account to this recipient; waits for one that is sent but not yet in a block. Accept the payment only when valid is true."],
           ["findPayment", "({ publicClient, account, nonce, fromBlock?, timeoutMs? }): Promise<Hex | null>", "Finds a payment by the paying account and its action nonce, from VeraKeyConnectError.pending."],
           ["appIdFromOrigin", "(origin: string): bigint", "The app id a site gets, derived from its origin."],
-          ["accountAddressOf", "(deployment, appId, nullifier): Address", "An account's address, computed offline."],
+          ["accountAddressOf", "({ factory, accountImplementation, configHash }, appId: bigint, nullifier: bigint): Address", "An account's address, computed offline. accountImplementation and configHash come from /api/config; ARBITRUM_SEPOLIA does not carry them."],
           ["signInChallenge", "(statement): Hex", "What the passkey signs for a sign-in."],
           ["VeraKeyClient.proveSignIn", "(appId, { nonce, origin, now? }, emit?): Promise<SignInResult>", "The popup's side: signs and proves a sign-in. Needs accountImplementation and configHash in the client's config."],
         ])}

@@ -5,15 +5,16 @@ export default function OverviewPage() {
     <>
       <H2>Components</H2>
       <p>
-        VeraKey has three places where code runs: your device, a relayer, and Arbitrum. Secrets stay on the device;
-        the relayer only moves proofs; Arbitrum decides.
+        VeraKey has three places where code runs: your device, a relayer, and Arbitrum. Secrets stay on the device.
+        The relayer serves the app, reads the chain for it and submits its transactions, but it cannot approve anything
+        for you. Arbitrum decides.
       </p>
       <Lanes
         lanes={[
           {
             title: "Your device",
             items: [
-              { name: "Passkey provider", detail: "iCloud Keychain or Google Password Manager: holds the P-256 key, checks Face ID or Touch ID, returns the PRF secret." },
+              { name: "Passkey provider", detail: "iCloud Keychain or Google Password Manager: holds the P-256 key, checks Face ID, Touch ID or your PIN, returns the PRF secret." },
               { name: "VeraKey app and SDK", detail: "Builds action hashes, asks the passkey to sign, keeps the session." },
               { name: "Provers (bb.js)", detail: "Prove the authorization and link circuits with UltraHonk, in the browser." },
             ],
@@ -21,7 +22,12 @@ export default function OverviewPage() {
           {
             title: "VeraKey relayer",
             items: [
-              { name: "Relay API", detail: "Creates accounts; checks, simulates and submits proof-authorized calls; pays the gas." },
+              { name: "Web app", detail: "Serves the VeraKey app, the sign-in popup and the proving files." },
+              {
+                name: "Relay API",
+                detail:
+                  "Creates accounts; checks, simulates and submits account calls (proof-authorized actions, plus applyChange and executeRecovery, which anyone may call); pays the gas.",
+              },
               { name: "RPC proxy", detail: "Read-only JSON-RPC for the browser; keeps provider keys server-side." },
               { name: "Demo faucet", detail: "Sends test USDG to new accounts." },
             ],
@@ -43,10 +49,10 @@ export default function OverviewPage() {
       <Flow
         steps={[
           { title: "Hash", detail: "The SDK computes the action hash from the chain, account, nonce, payment, fee and deadline." },
-          { title: "Sign", detail: "The passkey signs it after user verification: a 37-byte authenticator data and a P-256 signature." },
-          { title: "Prove", detail: "bb.js proves the signature, the flags, the rpId and the nullifier in about 2 s." },
+          { title: "Sign", detail: "The passkey signs it after user verification, returning 37 bytes of authenticator data and a P-256 signature." },
+          { title: "Prove", detail: "bb.js proves the signature, the flags, the rpId and the nullifier in about 2 seconds in desktop Chrome with 8 threads; browsers that prove on one thread take a few seconds longer." },
           { title: "Relay", detail: "The relayer checks the account, simulates the call and submits it." },
-          { title: "Settle", detail: "The account verifies, applies its policy, consumes the nonce and transfers USDG." },
+          { title: "Settle", detail: "The account checks its policy, verifies the client data and the proof, consumes the nonce and transfers USDG." },
         ]}
       />
       <p>What crosses each boundary:</p>
@@ -54,9 +60,9 @@ export default function OverviewPage() {
         head={["From → to", "What is sent"]}
         rows={[
           ["Passkey → browser", "The assertion (signature, authenticator data, client data) and, when unlocking, the PRF secret."],
-          ["Browser → relayer", "The account, the function and its arguments: amount, recipient, fee, deadline, nullifier, client data and the proof."],
+          ["Browser → relayer", "For a relayed call, the account, the function and its arguments: amount, recipient, fee, deadline, nullifier, client data and the proof. To deploy an account, its app id and nullifier. Through the RPC proxy, the chain reads, which name the accounts the browser looks at."],
           ["Relayer → Arbitrum", "The same call, as a transaction the relayer signs and pays for."],
-          ["Account → verifier", "The proof and six public inputs: the client data hash, the rpId hash, the app id and the nullifier."],
+          ["Account → verifier", "The proof and six public inputs: the client data hash and the rpId hash (two 128-bit limbs each), the app id and the nullifier."],
         ]}
       />
 
@@ -65,7 +71,7 @@ export default function OverviewPage() {
         head={["Component", "Trusted for", "What limits it"]}
         rows={[
           ["The VeraKey page code", "Handling the passkey, the PRF secret and the signature in your browser", "Proving only in the browser, a strict CSP with no third-party scripts, and proving files served from VeraKey's own origin. Every action still needs a fresh passkey approval, and the caps, the new-recipient cap, the fee limit, the timelocks and, optionally, the payment sheet bound what an approved action can do."],
-          ["The relayer", "Liveness, and it sees request metadata (IP, timing)", "It cannot move funds or change what was signed. Anyone can submit the same calldata; fees go only to the fixed fee recipient. Rate-limit keys are a daily-rotated HMAC of the IP, kept in memory."],
+          ["The relayer", "Liveness, and serving the VeraKey page code in the row above, so trusting that page means trusting whoever runs the relayer. It sees your IP address and when you act, and, through its RPC proxy, which accounts your browser reads, and the nullifiers it looks them up by", "When it relays, it cannot move funds or change what was signed. Anyone can submit the same calldata; fees go only to the fixed fee recipient. Visitors are counted by a daily-rotated HMAC of their IP address (an IPv6 one by its /64), kept in memory; per-account limits use the account address or the nullifier."],
           ["The circuits and verifiers", "Soundness of the proofs", "Generated by Barretenberg 5.2.0 from Noir sources; not independently audited."],
           ["The USDG issuer", "The token itself", "Paxos can freeze any single account: VeraKey is unlinkable, not anonymous."],
           ["Browsers", "Serializing clientDataJSON as WebAuthn Level 3 specifies", "The account rejects client data whose first keys are not type, challenge and origin."],

@@ -32,8 +32,9 @@ export default function CircuitsPage() {
         ]}
       />
       <p>
-        The account computes every public input itself, so a proof only verifies for this client data (which contains
-        the action hash as its challenge), this relying party, this app and an owner.
+        The account builds every public input itself: it hashes the client data it checked, uses its stored rpId hash
+        and app id, and takes the nullifier from the call only if it is one of its owners. So a proof only verifies for
+        this client data (which contains the action hash as its challenge), this relying party, this app and an owner.
       </p>
 
       <H2>The nullifier</H2>
@@ -71,7 +72,9 @@ NULLIFIER_DOMAIN = "VERAKEY_NULLIFIER_V1" (as a field element)
       <p>
         The circuits are written in Noir 1.0.0-beta.25. Barretenberg 5.2.0 generates their verification keys and their
         Solidity verifiers with its optimized generator, which batches field inversions and brings on-chain verification
-        to 712,554 gas. Every build regenerates the verifiers from the circuits and fails if they differ.
+        to 712,554 gas. The deployed <code>HonkVerifier</code> and <code>LinkHonkVerifier</code> are these generated
+        contracts. The <A href="/docs/security/review">review on 2026-09-29</A> regenerated both from the circuits,
+        found them byte-identical, and compared the deployed code with the audited build.
       </p>
       <Callout kind="warning">
         The circuits have not had an independent audit, and UltraHonk itself has not been independently audited.

@@ -5,9 +5,15 @@ export default function RelayerApiPage() {
     <>
       <H2>Overview</H2>
       <p>
-        The VeraKey relayer serves the app and a JSON API under <code>/api</code>. It never sees a passkey, a
-        signature or a PRF secret: it receives finished proofs and public call data, simulates them, and submits only what
-        would succeed. It pays the gas; accounts pay it back in USDG.
+        The VeraKey server serves the app and answers a JSON API under <code>/api</code>. The relayer behind that API
+        never sees a passkey, a signature or a PRF secret: it receives finished proofs and public call data, simulates
+        them, and submits only what would succeed. It pays the gas. Each proof-authorized action pays it back with a USDG
+        fee, which the account waives in part or in full for a restrict or a cancel past its daily cap;{" "}
+        <code>applyChange</code> and <code>executeRecovery</code> carry no fee, and deploying an account or sending it
+        demo USDG costs the account nothing. It sees your IP address and when you act, and, through its RPC proxy, which
+        accounts your browser reads. The app's page code, which the same server serves, handles your key and PRF secret,
+        so trusting that page means trusting whoever runs the relayer: see the{" "}
+        <A href="/docs/security#trust-assumptions">Security model</A>.
       </p>
       <Table
         head={["Endpoint", "Purpose"]}
@@ -15,7 +21,12 @@ export default function RelayerApiPage() {
           [<code key="1">GET /api/config</code>, "The deployment and relayer settings the SDK needs"],
           [<code key="2">GET /api/health</code>, "The relayer's address and balances"],
           [<code key="3">POST /api/accounts</code>, "Deploy an account (idempotent)"],
-          [<code key="4">POST /api/relay</code>, "Submit a proof-authorized account call"],
+          [<code key="4">POST /api/relay</code>, (
+            <span key="4p">
+              Submit an account call: a proof-authorized action, or <code>applyChange</code> or{" "}
+              <code>executeRecovery</code>, which anyone may call
+            </span>
+          )],
           [<code key="5">POST /api/faucet</code>, "Demo USDG for a new account (testnets)"],
           [<code key="6">POST /api/rpc</code>, "A read-only JSON-RPC proxy"],
         ]}
@@ -62,7 +73,10 @@ export default function RelayerApiPage() {
       <Code lang="json">{`
 { "relayer": "0x6D377a3927df664FDA9946Aa0E6fb8F707844fA8", "eth": "12000000000000000", "usdg": "0", "block": "312092461" }
 `}</Code>
-      <p><code>eth</code> is in wei and <code>usdg</code> in base units: the relayer's gas budget and the faucet's treasury.</p>
+      <p>
+        <code>eth</code> is in wei and <code>usdg</code> in base units: the ETH the relayer pays gas with, and the faucet's
+        treasury.
+      </p>
 
       <H2>POST /api/accounts</H2>
       <Code lang="json" title="Request">{`
@@ -93,8 +107,17 @@ export default function RelayerApiPage() {
         relayer checks, in order, that:
       </p>
       <ol>
-        <li>the arguments match the function's ABI, and each <code>bytes</code> argument is at most 16 KiB;</li>
-        <li>the signed fee is at least the relayer's fee (else 402);</li>
+        <li>
+          the visitor and the account are within their <A href="#rate-limits">per-minute request limits</A> (else 429),
+          which count each request before the checks below;
+        </li>
+        <li>
+          the arguments have the function's number of arguments and JSON types (integers as decimal strings or numbers,
+          everything else as hex strings), and each <code>bytes</code> argument is at most 16 KiB. A value the function's
+          types cannot take, such as a short address or a negative amount, passes this check and fails in simulation
+          (502);
+        </li>
+        <li>for a call that carries a fee, the signed fee is at least the relayer's fee (else 402);</li>
         <li>the account's code is the EIP-1167 clone of this deployment's implementation, and the account belongs to this factory;</li>
         <li>no other transaction for the account is still on its way (else 409): one at a time, until it is in a block;</li>
         <li>the call succeeds in simulation, and again when its gas is estimated (else 422 with the contract error's name);</li>
@@ -106,8 +129,8 @@ export default function RelayerApiPage() {
         </li>
       </ol>
       <p>
-        Nothing that fails a check is ever broadcast. An optional random delay can separate arrival and
-        submission times.
+        Nothing that fails a check is ever broadcast. The relayer submits as soon as the checks pass: a random delay
+        between arrival and submission is supported, but it is off today.
       </p>
 
       <H2>POST /api/faucet</H2>
@@ -117,7 +140,9 @@ export default function RelayerApiPage() {
       <p>
         Sends the demo amount (5 USDG) to a deployed VeraKey account of this deployment, once per account, even to
         concurrent requests. Responds <code>{"{ \"hash\": \"0x…\" }"}</code>, 409 if the account was already funded, 429
-        when the visitor or the faucet has reached today's limit, or 503 when the treasury is empty.
+        when the visitor or the faucet has reached today's limit or the relayer has spent today's gas, or 503 when the
+        treasury holds less than the demo amount. The per-visitor limit counts faucet requests, not grants: each request
+        uses one of the visitor's 3 a day, even when it is refused.
       </p>
 
       <H2>POST /api/rpc</H2>
@@ -138,11 +163,17 @@ eth_feeHistory eth_getLogs net_version
       </p>
 
       <H2>Errors</H2>
-      <p>Errors are <code>{"{ \"error\": string, \"revert\"?: string }"}</code>:</p>
+      <p>
+        Errors are <code>{"{ \"error\": string, \"revert\"?: string }"}</code>, except that <code>/api/rpc</code> answers
+        a refused call (400) or an unreachable node (502) with a JSON-RPC error object:
+      </p>
       <Table
         head={["Status", "When"]}
         rows={[
-          ["400", "A malformed request; arguments that do not match the ABI; not a VeraKey account; an account of another deployment"],
+          [
+            "400",
+            "A request with missing or wrong fields; the wrong number of arguments or a value of the wrong JSON type; not a VeraKey account; an account of another deployment (a JSON body that does not parse or is over 64 KB, or a value that is not a whole number for an integer argument, currently gets 500)",
+          ],
           ["402", "The signed relayer fee is too low"],
           ["404", "The account is not deployed"],
           ["409", "The faucet already funded this account; another transaction for this account is still on its way"],
@@ -150,7 +181,7 @@ eth_feeHistory eth_getLogs net_version
           ["422", "The call reverts in simulation or gas estimation (revert holds the contract error, e.g. PerTxCapExceeded), or needs too much gas"],
           ["429", "A rate limit or a daily budget was reached"],
           ["500", "An unexpected relayer error"],
-          ["502", "The RPC endpoint could not simulate or estimate the call, or is unavailable"],
+          ["502", "The RPC endpoint could not simulate or estimate the call, or is unavailable; also, for now, an argument the function's types cannot take"],
           ["503", "The demo faucet is out of USDG"],
         ]}
       />
@@ -168,16 +199,18 @@ eth_feeHistory eth_getLogs net_version
           ["New accounts for everyone", "100 per day"],
           ["Faucet requests per visitor", "3 per day"],
           ["Faucet grants for everyone", "20 per day"],
-          ["Restricts per account whose fee the account waives, other than a freeze", "10 per day"],
+          ["Restricts per account whose fee the account waives, other than a freeze that stops payments or cancels waiting changes", "10 per day"],
           ["Gas the relayer spends, for everyone", "100 million per day"],
         ]}
       />
       <p>
         A visitor is one IPv4 address, or one IPv6 /64: a machine usually holds a whole /64, so rotating addresses inside
-        it does not reset its limits. The budgets for everyone bound what any number of visitors can make the relayer
-        spend in a day, since fees paid in test USDG do not pay for its ETH. Cancelling a change or a recovery, and a
-        freeze that stops payments or cancels waiting changes, are never refused for a budget: each undoes something
-        that cost whoever made it, and whoever stole a passkey must not be able to use up what the owner needs.
+        it does not reset its limits. The budgets for everyone bound what visitors can make the relayer spend in a day
+        on everything except the actions below, since fees paid in test USDG do not pay for its ETH. The relayer never
+        refuses, for any budget, an action that defends an account: cancelling a change or a recovery, and a freeze that
+        stops payments or cancels waiting changes. That way whoever stole a passkey cannot use up what the owner needs to
+        stop them; only the per-minute request limits, per visitor and per account, bound these actions. A freeze of an
+        account that is already frozen and has nothing waiting counts like any other restrict.
       </p>
       <Callout kind="security" title="No raw IP addresses">
         A visitor is an HMAC-SHA256 of its address under a random secret that rotates every UTC day, kept in memory only.

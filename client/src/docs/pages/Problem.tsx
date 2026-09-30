@@ -29,8 +29,8 @@ export default function Problem() {
       <H2>Why one passkey per app is not enough</H2>
       <p>
         You could create a separate passkey for every app. That avoids the shared key, but it costs an enrollment in
-        every app, a credential picker every time you sign, and a separate recovery setup per account. It also moves
-        the burden back to the user, which is what passkeys were meant to remove.
+        every app and a credential picker every time you sign. It also moves the burden back to the user, which is
+        what passkeys were meant to remove.
       </p>
 
       <H2>What VeraKey changes</H2>
@@ -65,7 +65,7 @@ export default function Problem() {
         head={["Stays public", "Why"]}
         rows={[
           ["Each account's address, amounts, recipients and timing", "Payments are ordinary USDG transfers on Arbitrum."],
-          ["Links created by funding", "Topping up several accounts from one wallet connects them on-chain. Fund each account separately."],
+          ["Links created by funding", "Topping up several accounts from one wallet, or moving money between them, connects them on-chain. Fund each account separately."],
           ["The issuer's control", "Paxos, USDG's issuer, can freeze any single account, as with any regulated stablecoin."],
         ]}
       />

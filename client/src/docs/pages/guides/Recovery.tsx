@@ -13,7 +13,8 @@ export default function RecoveryGuide() {
         On the Recovery page, select <strong>Create a backup passkey and add it</strong>, or add a passkey you already
         created in this browser. The backup becomes a second owner of the account. It has its own nullifier, so the chain
         cannot tell that both passkeys belong to the same person. Adding an owner is a loosening change, so it waits out
-        the change delay.
+        the change delay. When the countdown ends, select <strong>Apply</strong> under <strong>Scheduled changes</strong>{" "}
+        on the Policy page. Until the change is applied, the backup is not an owner.
       </p>
       <Callout kind="warning" title="Current limitation">
         The app and the SDK open the account derived from the passkey you unlock with. A backup passkey, or the new
@@ -24,16 +25,18 @@ export default function RecoveryGuide() {
       <H2>Name a guardian</H2>
       <p>
         A guardian is someone you trust to act if you lose your passkey: a friend's wallet, a multisig or another
-        account. Choose someone you would trust with the account itself: a guardian can take it over through a recovery
-        that nobody cancels (see below). Enter the guardian's address and select <strong>Set</strong>. The account never
-        stores the address; it stores a salted hash of it:
+        wallet of yours, any address that can send transactions. A VeraKey account cannot be a guardian: it can only pay
+        USDG, so it can never call another account's guardian functions. Choose someone you would trust with the account
+        itself: a guardian can take it over through a recovery that nobody cancels (see below). Enter the guardian's
+        address and select <strong>Set</strong>. The account never stores the address; it stores a salted hash of it:
       </p>
       <Code lang="solidity" title="Guardian commitment">{`
 keccak256(abi.encode(GUARDIAN_TYPEHASH, account, guardian, salt))
 `}</Code>
       <p>
         The salt is derived from your passkey's PRF secret, separately for each app. So nobody can tell who your guardian
-        is until it acts, and one guardian used by several of your apps leaves nothing on-chain that links them.
+        is until it acts, and one guardian used by several of your apps does not link them on-chain until it acts in
+        more than one of them: each action is sent from the guardian's own address.
       </p>
       <Callout kind="warning" title="Set only schedules the guardian">
         Naming a guardian is a loosening change, so it waits the change delay plus the recovery delay (7 minutes on Arbitrum
@@ -50,6 +53,7 @@ keccak256(abi.encode(GUARDIAN_TYPEHASH, account, guardian, salt))
       <ul>
         <li><code>chainId</code>, <code>account</code> and <code>guardian</code>;</li>
         <li><code>salt</code> and <code>commitment</code>;</li>
+        <li><code>app</code>: the app's name;</li>
         <li><code>howToAct</code>: the functions the guardian can call, from its own address.</li>
       </ul>
       <p>
@@ -67,12 +71,16 @@ keccak256(abi.encode(GUARDIAN_TYPEHASH, account, guardian, salt))
         </li>
         <li>The guardian calls <code>initiateRecovery(newNullifier, salt)</code> on your account.</li>
         <li>
-          The recovery waits out the recovery delay. The Recovery page shows <strong>Recovery in progress</strong> to any
-          owner, with <strong>Cancel with my passkey</strong>, in case it was not you.
+          The recovery waits out the recovery delay. The Recovery page shows <strong>Recovery in progress</strong> to the
+          passkey that created the account, with <strong>Cancel with my passkey</strong>, in case it was not you. A backup
+          passkey does not see it in the app yet (see the limitation above).
         </li>
         <li>
-          After the delay, anyone may complete it (<strong>Complete recovery</strong>). The new passkey becomes the only
-          owner. The old owners, and every change they scheduled, stop counting.
+          After the delay, anyone may complete it by calling <code>executeRecovery()</code> on your account: for example
+          the guardian, from its own address, or a developer with <code>vera.executeRecovery(account)</code>, which needs
+          no passkey. The app's <strong>Complete recovery</strong> button appears only to a passkey that still opens the
+          account, so once yours is lost, ask the guardian to call <code>executeRecovery()</code>. The new passkey becomes
+          the only owner. The old owners, and every change they scheduled, stop counting.
         </li>
       </ol>
       <Callout kind="warning" title="What the app cannot do yet">
@@ -93,8 +101,9 @@ keccak256(abi.encode(GUARDIAN_TYPEHASH, account, guardian, salt))
       <p>
         So a guardian can delay you, and it can take the account over only through a recovery that nobody cancels within
         the recovery delay: 5 minutes on Arbitrum Sepolia, a demo value. Nothing notifies you; the Recovery page shows{" "}
-        <strong>Recovery in progress</strong>. After a recovery, name your guardian again: the old card cannot be rebuilt,
-        because its salt came from the lost passkey. See{" "}
+        <strong>Recovery in progress</strong>. After a recovery your guardian stays in place, but you cannot rebuild its
+        card: the salt came from the lost passkey, so the guardian must keep its copy. Naming a new guardian waits until
+        the app can operate a recovered account. See{" "}
         <A href="/docs/security#invariants">the invariants</A> for the exact rules.
       </p>
     </>

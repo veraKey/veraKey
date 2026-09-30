@@ -11,7 +11,7 @@ export default function HowItWorks() {
       <Flow
         steps={[
           { title: "Action hash", detail: "The app hashes exactly what you approve." },
-          { title: "Passkey", detail: "Face ID or Touch ID signs that hash." },
+          { title: "Passkey", detail: "Your passkey signs that hash, after Face ID, Touch ID or your PIN." },
           { title: "Proof", detail: "Your browser proves the signature in zero knowledge." },
           { title: "Relayer", detail: "A relayer submits the proof and pays the gas." },
           { title: "Account", detail: "Your account checks everything, then pays." },
@@ -28,15 +28,16 @@ export default function HowItWorks() {
 keccak256(abi.encode(typehash, chainId, account, nonce, kind, target, amount, dataHash, fee, deadline))
 `}</Code>
       <p>
-        Because the nonce and the chain are inside, a signature for one payment cannot be replayed, used on another
-        chain or used for another account.
+        Because the chain, your account and its nonce are inside, a signature for one payment cannot be replayed, used
+        on another chain or used for another account.
       </p>
 
       <H3>2. Your passkey signs it</H3>
       <p>
         The browser asks your passkey for a WebAuthn assertion over that challenge. Your device checks Face ID, Touch ID
         or your PIN first (user verification). VeraKey asks for no extensions when signing, so the authenticator data
-        is always 37 bytes. In Chrome on macOS and Android, the browser's own{" "}
+        is 37 bytes, the length the circuit expects; the app refuses an authenticator that returns anything else. In
+        Chrome on macOS and Android, the browser's own{" "}
         <A href="/docs/guides/pay#confirm-in-the-payment-sheet">payment sheet</A> can ask instead, showing the payee and
         the total.
       </p>
@@ -45,7 +46,8 @@ keccak256(abi.encode(typehash, chainId, account, nonce, kind, target, amount, da
       <p>
         A Noir circuit, proven with UltraHonk by bb.js, checks the P-256 signature over the WebAuthn message, the flags
         and the relying party, and derives your nullifier. The public key, the signature and the PRF secret are private
-        inputs: they stay in the browser. Proving takes about 2 seconds in desktop Chrome with 8 threads.
+        inputs: they stay in the browser. Proving takes about 2 seconds in desktop Chrome with 8 threads; browsers that
+        prove on one thread take a few seconds longer.
       </p>
       <p>
         The proof has six public inputs: the hash of the browser's client data (two limbs), the rpId hash (two limbs),
@@ -57,7 +59,8 @@ keccak256(abi.encode(typehash, chainId, account, nonce, kind, target, amount, da
         The app sends the proof and the call to a relayer, which checks that the account is a genuine VeraKey account,
         simulates the call, and only then submits it and pays the gas. In return the account pays a small USDG fee that
         was part of what you approved, capped by the account (0.25 USDG on Arbitrum Sepolia). The relayer cannot change
-        what you signed, and anyone else may submit the same calldata instead.
+        what you signed, and anyone else may submit the same calldata instead. The relayer sees your IP address and when
+        you act, and, through its RPC proxy, which accounts your browser reads.
       </p>
 
       <H3>5. The account checks and pays</H3>
@@ -98,15 +101,18 @@ keccak256(abi.encode(typehash, chainId, account, nonce, kind, target, amount, da
           encrypted across your devices.
         </li>
         <li>
-          <strong>The PRF secret</strong> is held in the browser's memory for the session only. It is never stored,
-          never sent to the relayer and never put on-chain.
+          <strong>The PRF secret</strong> is held in the browser's memory for the session only. It is never sent to the
+          relayer or put on-chain. VeraKey keeps only a one-way check of the secret each passkey returned in a browser,
+          never the secret itself, and refuses an unlock that returns a different one.
         </li>
         <li>
-          <strong>The public key and the signature</strong> are used only by the prover in your browser.
+          <strong>The public key and the signature</strong> stay in your browser. The prover uses them, and the app
+          keeps the public key (never a secret) in this browser's storage to recognize your passkey.
         </li>
       </ul>
       <Callout kind="security" title="What you trust">
-        The VeraKey page code runs in your browser and can see these values while you use it. This is the main trust
+        VeraKey's relayer also serves the app, whose page code runs in your browser and can see the public key, the
+        signature and the PRF secret while you use it, but never the passkey's private key. This is the main trust
         assumption; the <A href="/docs/security#trust-assumptions">security model</A> explains how the account limits
         what a compromised page could do.
       </Callout>

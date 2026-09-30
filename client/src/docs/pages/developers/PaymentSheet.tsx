@@ -5,9 +5,9 @@ export default function PaymentSheetPage() {
     <>
       <H2>Browser support</H2>
       <p>
-        Secure Payment Confirmation (SPC) is a W3C standard: the browser, not your page, shows the payee and the total in
-        its own sheet, and the passkey signs them. Only Chromium ships it: Chrome on macOS, Windows and Android. On
-        Linux it needs a browser flag, and Safari and Firefox do not support it.
+        Secure Payment Confirmation (SPC) is a W3C specification (a Candidate Recommendation): the browser, not your
+        page, shows the payee and the total in its own sheet, and the passkey signs them. Only Chromium ships it: Chrome
+        on macOS, Windows and Android. On Linux it needs a browser flag, and Safari and Firefox do not support it.
       </p>
       <Code lang="ts">{`
 import { spcAvailability } from "@verakey/sdk/webauthn";

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { A, Callout, H2, H3, Table } from "../../components";
+import { A, Callout, Contact, H2, H3, Table } from "../../components";
 
 const c = (text: string) => <code className="dx-nowrap">{text}</code>;
 
@@ -15,9 +15,9 @@ const ACCOUNT_ERRORS: [string, ReactNode, ReactNode][] = [
   ["DeadlineTooFar()", "The deadline is more than 10 minutes away.", <>Use a deadline within <code>MAX_DEADLINE_WINDOW</code> (600 seconds).</>],
   ["FeeTooHigh(uint256 maxFee)", <>The signed fee is above the account's <code>maxFee</code>.</>, "Sign a lower fee. A relayer that asks more than maxFee cannot serve this account."],
   ["InvalidAmount()", "The amount is zero, or amount plus fee overflows.", "Pay a positive amount."],
-  ["InvalidChange()", "The change kind is unknown or its payload is malformed; a freeze was sent to scheduleChange (use restrict); a per-payment cap is below maxFee; or a recovery names a zero or out-of-field nullifier.", <>Build payloads with <code>changePayload</code>.</>],
+  ["InvalidChange()", "The change kind is unknown, or its payload is malformed or out of range (a per-payment cap of zero or above the daily cap, a cap above 2^128−1, an owner nullifier that is zero or outside the field, or the zero address as a recipient); a freeze was sent to scheduleChange (use restrict); a per-payment cap is below maxFee; or a recovery names a zero or out-of-field nullifier.", <>Build payloads with <code>changePayload</code>, using values the account accepts.</>],
   ["InvalidClientData(uint8 code)", "The signed client data does not authorize this action at this origin.", <>See <A href="#client-data-error-codes">the codes below</A>.</>],
-  ["InvalidConfig()", "initialize got an invalid configuration: an app id or owner nullifier outside the field, a zero address, an empty or over-long origin, a per-payment cap of zero or above the daily cap, a maximum fee above the per-payment cap, or a delay over 30 days.", "Deploy the factory with a valid configuration."],
+  ["InvalidConfig()", "initialize got an invalid configuration: an app id or owner nullifier outside the field, a zero owner nullifier, a zero address, an empty or over-long origin, a per-payment cap of zero or above the daily cap, a cap above 2^128−1, a maximum fee above the per-payment cap or above 2^64−1, or a delay over 30 days.", <>Create accounts through the factory (<code>createAccount</code>). It checks the same configuration when it is deployed, and the app id and nullifier in each <code>createAccount</code> call, so its accounts never hit this error.</>],
   ["InvalidProof()", "The verifier rejected the proof for the public inputs the account computed.", "Prove again. Check that the rpId, the app id and the nullifier match this account."],
   ["InvalidRecipient()", "The recipient is the zero address or the account itself.", "Pay another address."],
   ["LastOwner()", "A RemoveOwner change would remove the only owner, counting the removals already scheduled.", "Add another owner first, or cancel a scheduled removal."],
@@ -26,7 +26,7 @@ const ACCOUNT_ERRORS: [string, ReactNode, ReactNode][] = [
   ["NotGuardian()", "The caller and salt do not match the stored guardian commitment, or no guardian is set.", "Call from the guardian's address with the salt on its guardian card."],
   ["NotInitialized()", "The contract at this address was never initialized as an account.", <>Create accounts through the factory (<code>createAccount</code>).</>],
   ["NotOwner()", "The nullifier is not an owner in the current owner epoch (a removed passkey, an owner replaced by a recovery, or another app's passkey); or a RemoveOwner change names a non-owner.", "Unlock with a passkey that owns this account."],
-  ["NotRestrictive()", "restrict got a change that would loosen the account.", <>Use <code>scheduleChange</code>; only tightening changes skip the timelock.</>],
+  ["NotRestrictive()", "restrict got a change that is not a tightening one: it would loosen the account, change its owners or guardian, or has an unknown kind or a malformed payload.", <>Schedule a valid change with <code>scheduleChange</code>; only tightening changes skip the timelock.</>],
   ["PaymentSheetRequired()", "The account requires the payment sheet, and the client data is a plain passkey assertion.", "Pay from a browser where the passkey is enrolled for the payment sheet, or drop the requirement with a scheduled change."],
   ["PerTxCapExceeded()", "The amount plus fee is above the per-payment cap (payments and scheduled changes only).", "Pay less, or raise the cap with a scheduled change."],
   ["RecipientNotAllowed()", "The allowlist is on, and the recipient is not on it.", "Pay an allowed recipient, or allow this one with a scheduled change."],
@@ -37,7 +37,7 @@ const ACCOUNT_ERRORS: [string, ReactNode, ReactNode][] = [
 ];
 
 const FACTORY_ERRORS: [string, string][] = [
-  ["InvalidConfig()", "The factory was deployed with an invalid configuration."],
+  ["InvalidConfig()", "The factory's constructor got an invalid configuration, so the deployment reverted."],
   ["InvalidIdentifier()", "createAccount got an app id or nullifier that is not a BN254 field element, or a zero nullifier."],
   ["DeploymentFailed()", "The CREATE2 deployment of the clone failed."],
   ["InitializationFailed()", "The new account's initialize call reverted."],
@@ -87,7 +87,9 @@ export default function ErrorsPage() {
 
       <H2>Relayer errors</H2>
       <p>
-        The relayer answers <code>{'{ "error": "…", "revert"?: "…" }'}</code> with one of these statuses. See{" "}
+        The relayer answers <code>{'{ "error": "…", "revert"?: "…" }'}</code> with one of these statuses.{" "}
+        <code>/api/rpc</code> answers a refused call (400) or an unreachable node (502) with a JSON-RPC error instead:{" "}
+        <code>{'{ "jsonrpc": "2.0", "id": null, "error": { "code": …, "message": "…" } }'}</code>. See{" "}
         <A href="/docs/build/relayer-api">Relayer API</A>.
       </p>
       <Table
@@ -100,19 +102,19 @@ export default function ErrorsPage() {
           ["409", "The faucet already funded this account, or another transaction for this account is still on its way.", "Nothing to do. The SDK sends again by itself, for about ten seconds, while the account is busy."],
           ["413", "A bytes argument is larger than 16 KiB.", "Send a real proof and client data."],
           ["422", <>The call reverts in simulation or gas estimation (<code>revert</code> names the error), or it needs more than 2.5M gas.</>, <>See <A href="#account-errors">Account errors</A>.</>],
-          ["429", "A rate limit: requests per visitor per minute, requests per account, new accounts per visitor per day, or faucet grants per visitor per day. Or a daily budget: the relayer's gas, new accounts or faucet grants for everyone, or restricts whose fee the account waives (10 per account). Freezing and cancelling are never refused for a budget.", "Wait and try again."],
-          ["500", "An unexpected relayer error.", "Try again; check the relayer's logs."],
-          ["502", "The RPC endpoint could not simulate or estimate the call, or is unavailable.", "Try again later."],
+          ["429", "A rate limit: requests per visitor per minute, RPC calls per visitor or for everyone per minute, requests per account, new accounts per visitor per day, or faucet requests per visitor per day (a refused request counts too). Or a daily budget: the relayer's gas, new accounts or faucet grants for everyone, or restricts whose fee the account waives (10 per account). The relayer never refuses, for any budget, an action that defends an account: cancelling a change or a recovery, and a freeze that stops payments or cancels waiting changes. A freeze of an account that is already frozen and has nothing waiting counts like any other restrict.", "Wait and try again."],
+          ["500", "An unexpected relayer error.", <>Try again later. If it keeps failing, tell <Contact />.</>],
+          ["502", "The RPC endpoint could not simulate or estimate the call, or is unavailable. For now, an argument the function's types cannot take, such as a short address, lands here too.", "Check the arguments, then try again later."],
           ["503", "The demo faucet is out of USDG.", "Try again later."],
         ]}
       />
 
       <H2>SDK rejection stages</H2>
       <p>
-        A failed SDK action rejects with a <code>VeraKeyError</code> and emits <code>{'{ status: "rejected", stage, message, revert? }'}</code>{" "}
-        (<code>applyChange</code> and <code>executeRecovery</code> take no listener, and <code>executeRecovery</code> rejects with a{" "}
-        <code>RelayerError</code>).
-        The stage says where it failed:
+        A failed SDK action rejects with a <code>VeraKeyError</code> and emits <code>{'{ status: "rejected", stage, message, revert? }'}</code>.{" "}
+        <code>applyChange</code> and <code>executeRecovery</code> take no listener, and <code>executeRecovery</code>,{" "}
+        <code>ensureAccount</code> and <code>requestDemoFunds</code> call the relayer directly and reject with its{" "}
+        <code>RelayerError</code>. The stage says where it failed:
       </p>
       <Table
         stack
@@ -122,10 +124,18 @@ export default function ErrorsPage() {
           [c("authentication"), "The passkey prompt was cancelled or timed out, or the payment sheet was closed.", "Try again. Nothing was sent."],
           [c("device"), "The passkey provider does not support PRF, the passkey is not ES256, the authenticator returned authenticator data that is not 37 bytes, or a passkey this browser knows returned a different PRF secret than before.", "Use a passkey from iCloud Keychain or Google Password Manager. For a different secret, unlock the way you did before."],
           [c("proof"), "Proving failed, for example because the assertion does not satisfy the circuit.", "Try again; check that the prover and its CRS loaded."],
-          [c("policy"), <>The account refused a valid proof; <code>revert</code> names the error. The SDK also refuses early with <code>FeeTooHigh</code> or <code>PaymentSheetRequired</code> when it can tell in advance.</>, <>See <A href="#account-errors">Account errors</A>.</>],
+          [c("policy"), <>The account's policy refused the action; <code>revert</code> names the contract error, one of <code>POLICY_REVERTS</code>. The SDK also refuses early, before the passkey prompt, with <code>FeeTooHigh</code> or <code>PaymentSheetRequired</code> when it can tell in advance, and <code>createDisclosure</code> refuses the same app id twice.</>, <>See <A href="#account-errors">Account errors</A>.</>],
           [c("relay"), "The relayer refused or could not be reached, simulation reverted with an error outside POLICY_REVERTS (such as TokenTransferFailed), or the transaction reverted on-chain.", <>See <A href="#relayer-errors">Relayer errors</A>.</>],
         ]}
       />
+      <p>
+        Sign in with VeraKey's popup reports these stages as its error codes, with <code>cancelled</code> for{" "}
+        <code>authentication</code>, and has codes of its own (<code>blocked</code>, <code>unavailable</code>,{" "}
+        <code>closed</code>, <code>busy</code>, <code>origin</code>, <code>request</code>): see{" "}
+        <A href="/docs/build/sign-in#errors-and-limits">Errors and limits</A>. The
+        integration kit's <code>VeraKeySessionError</code> adds <code>server</code>, <code>network</code> and{" "}
+        <code>signed-out</code>: see the <A href="/docs/reference/sdk#integration-kit">Integration kit</A>.
+      </p>
       <Callout kind="tip">
         The <A href="/docs/guides/faq">FAQ</A> explains the messages people see most in the app.
       </Callout>

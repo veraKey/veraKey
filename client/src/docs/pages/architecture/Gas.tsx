@@ -5,10 +5,9 @@ export default function GasPage() {
     <>
       <H2>Measured costs</H2>
       <p>
-        Measured on 2026-09-24 on a local Arbitrum Nitro node (nitro-node v3.11.4, ArbOS 61), with both Stylus programs cached
-        and real proofs. The local node prices L1 data at zero, so these numbers are L2 execution only. On Arbitrum
-        Sepolia a transaction's gas used also counts its L1 data fee: a 1 USDG payment through the live popup used
-        1,187,516 gas, 1,062,352 of it on L2.
+        Measured in end-to-end tests on 2026-09-24 at ArbOS 61, with both Stylus programs cached, real proofs and L1 data
+        priced at zero, so these numbers are L2 execution only. On Arbitrum Sepolia a transaction's gas used also counts
+        its L1 data fee: a 1 USDG payment through the live popup used 1,187,516 gas, 1,062,352 of it on L2.
       </p>
       <Table
         head={["Operation", "Gas"]}
@@ -20,7 +19,7 @@ export default function GasPage() {
           [<code key="5">restrict</code>, "979,007 to lower the caps"],
           [<code key="6">restrict</code>, "1,021,974 for a freeze that cancels 8 scheduled changes"],
           [<code key="7">createAccount</code>, "383,296 (EIP-1167 clone and storage initialization)"],
-          ["P256VERIFY precompile, for comparison (no privacy)", "3,450"],
+          ["P256VERIFY precompile, for comparison (no privacy)", "6,900"],
         ]}
       />
       <p>
@@ -67,7 +66,10 @@ export default function GasPage() {
 
       <H2>Proving time</H2>
       <ul>
-        <li>1.85 s (median of 3) in headless desktop Chrome with 8 threads.</li>
+        <li>
+          About 2 seconds in desktop Chrome with 8 threads: 1.85 s (median of 3) in headless Chrome. Browsers that prove on
+          one thread take a few seconds longer.
+        </li>
         <li>Multithreading needs cross-origin isolation; the app serves the COOP and COEP headers.</li>
         <li>The first proof also downloads bb.js and two 4 MiB CRS files, which the app serves from its own origin.</li>
         <li>Proving on iPhone has not been measured yet.</li>

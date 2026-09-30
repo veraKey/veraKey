@@ -14,8 +14,8 @@ createDisclosure(
       <p>
         It needs an unlocked session. The passkey approves a statement naming both accounts, the audience, a nonce and an
         expiry (<code>ttlSeconds</code>, 1 day by default), and the browser proves it with the link circuit. The link prover
-        loads on first use and shares bb.js with the payment prover. Nothing is sent anywhere: you decide who gets the
-        package.
+        loads on first use and shares bb.js with the authorization prover (<code>VeraKeyProver</code>). Nothing is sent
+        anywhere: you decide who gets the package.
       </p>
       <Code lang="ts">{`
 const pkg = await vera.createDisclosure({
@@ -92,22 +92,30 @@ verdict.accounts; // { a, b }: address, deployed, ownedByNullifier
         <li><strong>Passkey signed this statement</strong>: the client data is a <code>webauthn.get</code> assertion over the statement's challenge.</li>
         <li><strong>Signed on the VeraKey origin</strong>, and not cross-origin.</li>
         <li><strong>Proof commits to this statement</strong>: the public inputs are recomputed from the client data, the rpId hash and the statement, never taken from the package.</li>
-        <li><strong>Proof verifies on-chain</strong> and/or <strong>locally</strong>.</li>
+        <li>
+          <strong>Proof verifies on-chain (LinkHonkVerifier, eth_call)</strong> and/or <strong>Proof verifies locally
+          (bb.js)</strong>. With neither <code>linkVerifier</code> nor <code>linkProver</code> set, a failing{" "}
+          <strong>Proof verified</strong> check instead.
+        </li>
         <li><strong>Accounts still owned by these nullifiers</strong>: both addresses come from the factory, and a deployed account still has its nullifier as an owner.</li>
       </ol>
 
       <H2>On-chain or local verification</H2>
       <p>
         On-chain verification calls <code>LinkHonkVerifier.verify(proof, publicInputs)</code> with <code>eth_call</code>:
-        free, and no transaction. It trusts the RPC endpoint you use. For audiences that do not want to trust an RPC,
-        verify locally with the link prover:
+        free, and no transaction. It trusts the RPC endpoint you use. To check the proof without trusting an RPC, verify it
+        locally with the link prover. The account addresses and their owners are still read through{" "}
+        <code>publicClient</code>, so use an RPC endpoint you trust for those:
       </p>
       <Code lang="ts">{`
 const linkProver = await vera.linkProver(); // or new LinkProver(prover.barretenberg)
 const verdict = await verifyDisclosure(pkg, { ...options, linkProver });
 `}</Code>
       <p>
-        The verify page at <A href="/app/verify">/app/verify</A> does both. The link circuit is described in{" "}
+        Whichever RPC endpoint <code>publicClient</code> uses also learns which two accounts you check. The verify page at{" "}
+        <A href="/app/verify">/app/verify</A> does both proof checks when its in-browser prover loads; if it does not, the
+        page checks on-chain only and says so. It reads through VeraKey's RPC proxy, so VeraKey's server sees the two
+        accounts; to keep them private, verify with your own endpoint. The link circuit is described in{" "}
         <A href="/docs/architecture/circuits#the-link-circuit">Circuits</A>.
       </p>
     </>

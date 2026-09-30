@@ -9,9 +9,10 @@ pay(appId: bigint, to: Address, amount: bigint, emit?: (state: ProofState) => vo
     options?: { secureConfirmation?: boolean }): Promise<TransactionReceipt>
 `}</Code>
       <p>
-        <code>amount</code> is in USDG base units. The client adds the relayer fee to what the passkey signs; both count
-        against the caps. The account refuses the payment if it breaks any rule: the caps, the new-recipient cap, the
-        allowlist, a freeze, or a required payment sheet. With <code>secureConfirmation</code>, see{" "}
+        <code>amount</code> is in USDG base units. The client adds the relayer fee to what the passkey signs. The amount
+        plus the relayer fee must fit the per-payment and daily caps; the new-recipient cap looks at the amount alone.
+        The account refuses the payment if it breaks any rule: the caps, the new-recipient cap, the allowlist, a freeze,
+        or a required payment sheet. With <code>secureConfirmation</code>, see{" "}
         <A href="/docs/build/payment-sheet">Payment sheet</A>.
       </p>
 
@@ -53,8 +54,9 @@ interface TrackedChange { account: Address; changeId: Hex; kind: ChangeKind; pay
       <Code lang="ts">{`
 applyChange(account: Address, change: TrackedChange): Promise<TransactionReceipt> // no passkey: anyone may apply
 cancelChange(appId: bigint, changeId: Hex, emit?): Promise<TransactionReceipt>    // needs an owner's approval
-pendingChanges(account: Address): Promise<PendingChangeInfo[]>                    // from the chain, oldest first
-scheduledPayload(account: Address, changeId: Hex): Promise<Hex | null>            // best effort, from recent logs
+pendingChanges(account: Address): Promise<PendingChangeInfo[]>                    // from the chain, earliest eta first
+scheduledPayload(account: Address, changeId: Hex, lookbackBlocks = 100_000n): Promise<Hex | null>
+  // best effort, from the ChangeScheduled logs of the last lookbackBlocks blocks
 isPending(account: Address, changeId: Hex): Promise<boolean>
 `}</Code>
       <p>
@@ -77,7 +79,7 @@ isPending(account: Address, changeId: Hex): Promise<boolean>
         rows={[
           [<code key="1">addOwner(nullifier)</code>, "1", "Never"],
           [<code key="2">removeOwner(nullifier)</code>, "2", "Never. The last owner cannot be removed (LastOwner), even by removals scheduled together."],
-          [<code key="3">setLimits(perTxCap, dailyCap)</code>, "3", "When both are at most the current caps (perTxCap never below maxFee)"],
+          [<code key="3">setLimits(perTxCap, dailyCap)</code>, "3", "When both are at most the current caps and maxFee ≤ perTxCap ≤ dailyCap"],
           [<code key="4">setRecipient(recipient, allowed)</code>, "4", "When allowed is false (removing a recipient)"],
           [<code key="5">setAllowlist(enabled)</code>, "5", "When enabled is true"],
           [<code key="6">setGuardian(commitment)</code>, "6", "Never. The zero hash removes the guardian."],
